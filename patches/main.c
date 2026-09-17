@@ -3,6 +3,22 @@
 int dummy = 1;
 int dummyBSS;
 
+/* A limb array is shared by every actor of the same type, so its address alone
+   gives two identical enemies the same matrix id and RT64 matches one to the
+   other. Count actors within a frame and mix that ordinal into the id.
+   Keyed on arg0 rather than the limb array: the limb array belongs to the
+   current animation, so keying on it renumbers an actor whenever a different
+   actor of the same type changes animation, which hands one actor the id its
+   neighbour used last frame. arg10 is the game's double-buffered matrix buffer,
+   so a change in it marks a frame boundary; the ordinal holds even though the
+   absolute matrix slot shifts when an actor ahead changes limb count. */
+#define MTX_TAG_SLOTS 16
+u32 gMtxTagFrameBuf = 0;
+u32 gMtxTagKey[MTX_TAG_SLOTS];
+u8 gMtxTagSeen[MTX_TAG_SLOTS];
+s32 gMtxTagUsed = 0;
+u32 gMtxTagInstance = 0;
+
 extern s32 osPfsReadWriteFile_recomp(OSPfs *, s32, u8, int, int, u8 *);
 extern s32 osPfsInitPak_recomp(OSMesgQueue *, OSPfs *, int);
 extern s32 osPfsFileState_recomp(OSPfs *, s32, OSPfsState *);
@@ -208,8 +224,9 @@ RECOMP_PATCH void func_8001DC78(MtxF* arg0, Vec3f arg1, s32 arg4, s32 arg5, s32 
     Gfx* temp_v0_4;
     s32* temp_a1;
     s32* temp_a2_2;
-    Vec3f spD0;
     s32 var_a2;
+    s32 tag_slot;
+    u32 mtx_id;
     s32 var_s1;
     s8 temp_s1;
     s32 temp_a2;
@@ -246,20 +263,51 @@ RECOMP_PATCH void func_8001DC78(MtxF* arg0, Vec3f arg1, s32 arg4, s32 arg5, s32 
     arg1.z *= sp7C.unk_20;
     if (temp_s2->unk_16 & 1) {
         func_80023E80(arg0, &spA0, &spA0);
-        func_8002371C(&D_8008C5E8, spD0.x, spD0.y, spD0.z, D_80086DC0.unk_0C, D_80086DC0.unk_10, D_80086DC0.unk_14);
+        func_8002371C(&D_8008C5E8, spA0.xw, spA0.yw, spA0.zw, D_80086DC0.unk_0C, D_80086DC0.unk_10, D_80086DC0.unk_14);
         func_80023DF4(&D_8008C5E8, arg1.x, arg1.y, arg1.z);
         guMtxF2L(&D_8008C5E8, arg10 + 3 + D_8007B2F8);
     } else {
         func_80023E80(arg0, &spA0, &spA0);
         guMtxF2L(&spA0, arg10 + 3 + D_8007B2F8);
     }
+    // RT64 discards every extended GBI command until the extension is enabled,
+    // and nothing else in this game ever enables it. Idempotent, so just enable
+    // it ahead of the group below.
+    gEXEnable(gMasterGfxPos++);
+    // At an actor's root limb, work out which instance of this actor group we are
+    // within the current frame. The whole subtree below reuses that ordinal.
+    if (temp_s2->unk_14 == 0) {
+        if ((u32)arg10 != gMtxTagFrameBuf) {
+            gMtxTagFrameBuf = (u32)arg10;
+            gMtxTagUsed = 0;
+        }
+        gMtxTagInstance = 0;
+        for (tag_slot = 0; tag_slot < gMtxTagUsed; tag_slot++) {
+            if (gMtxTagKey[tag_slot] == (u32)arg0) {
+                gMtxTagSeen[tag_slot]++;
+                gMtxTagInstance = gMtxTagSeen[tag_slot];
+                break;
+            }
+        }
+        if ((tag_slot == gMtxTagUsed) && (gMtxTagUsed < MTX_TAG_SLOTS)) {
+            gMtxTagKey[gMtxTagUsed] = (u32)arg0;
+            gMtxTagSeen[gMtxTagUsed] = 0;
+            gMtxTagUsed++;
+        }
+    }
+    // Tag each limb's matrix so RT64 interpolates the same limb across frames
+    // instead of guessing. temp_s2 is this limb's entry address; the instance
+    // ordinal separates actors that share it. The first instance XORs with zero,
+    // so a lone actor keeps the plain limb address as its id.
+    mtx_id = ((u32)temp_s2) ^ (gMtxTagInstance * 0x9E3779B9u);
+    gEXMatrixGroupDecomposedNormal(gMasterGfxPos++, mtx_id, G_EX_PUSH, G_MTX_MODELVIEW, G_EX_EDIT_ALLOW);
     gSPMatrix(gMasterGfxPos++, D_2000000 + 3 + D_8007B2F8, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     D_8007B2F8++;
     var_s0 = arg9;
     if (temp_s2->unk_16 & 2) {\
-        D_8008C5B0[D_8008C5E0].x = spD0.x;
-        D_8008C5B0[D_8008C5E0].y = spD0.y;
-        D_8008C5B0[D_8008C5E0].z = spD0.z;
+        D_8008C5B0[D_8008C5E0].x = spA0.xw;
+        D_8008C5B0[D_8008C5E0].y = spA0.yw;
+        D_8008C5B0[D_8008C5E0].z = spA0.zw;
         D_8008C5E0++;
     }
     temp_a2_2 = temp_s2->unk_18;
@@ -279,8 +327,11 @@ RECOMP_PATCH void func_8001DC78(MtxF* arg0, Vec3f arg1, s32 arg4, s32 arg5, s32 
         temp = arg5 + 1;
         if (temp == var_s0->unk_14) {
             func_8001DC78((MtxF* ) &spA0, arg1, arg4, i, arg6, arg7, arg8, arg9, arg10);
-        }        
+        }
     }
+    // Pop after the children so the group covers this limb's subtree and nothing
+    // drawn later in the frame (HUD, arena) inherits this limb's id.
+    gEXPopMatrixGroup(gMasterGfxPos++, G_MTX_MODELVIEW);
 }
 
 // RECOMP_PATCH s32 func_800319E0(s32 pfsIndex, s32 file_no, s32 offset, s32 nbytes, u8* data_buffer) {
