@@ -501,6 +501,8 @@ struct CheatsContext {
     int shown_stats[static_cast<size_t>(zelda64::PlayerStat::Count)] = {};
     // The game's value as of the last refresh, so only changes get dirtied.
     int game_stats[static_cast<size_t>(zelda64::PlayerStat::Count)] = {};
+    // Movement speed as a percentage, 100 = normal.
+    int speed_percent = 100;
     bool shown_stats_available = false;
 };
 
@@ -1264,6 +1266,12 @@ public:
         bind_warp_selection(constructor);
 
         constructor.BindFunc("cheat_stats_available", [](Rml::Variant& out) { out = cheats_context.shown_stats_available; });
+        constructor.BindFunc("cheat_speed_percent",
+            [](Rml::Variant& out) { out = cheats_context.speed_percent; },
+            [](const Rml::Variant& in) {
+                cheats_context.speed_percent = std::clamp(in.Get<int>(), 100, 150);
+                zelda64::set_player_speed_scale(cheats_context.speed_percent / 100.0f);
+            });
         for (const auto& [name, stat] : cheat_stat_names) {
             bind_player_stat(constructor, name, stat);
         }

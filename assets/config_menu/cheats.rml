@@ -44,11 +44,36 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>The game starts at Melrode Monastery, submap 17.
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">The game starts at Melrode Monastery, submap 17.
                                 Submaps are described by where their exits lead and
                                 entrances by where the game enters through them, so
                                 "interior" rooms only connect within their own map.</div>
                             </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label
+                                class="config-debug-option__label"
+                            >
+                                <div>Movement speed</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Speed: {{cheat_speed_percent}}%</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_speed_percent_input"
+                                            type="range"
+                                            data-value="cheat_speed_percent"
+                                            min="100"
+                                            max="150"
+                                            step="10"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="config-debug-option" data-if="cheat_stats_available">
                             <label
@@ -193,12 +218,12 @@
                         </div>
                         <div class="config-debug-option" data-if="!cheat_stats_available">
                             <label class="config-debug-option__label">
-                                <div>Start or load a game to edit Brian's stats.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Start or load a game to edit Brian's stats.</div>
                             </label>
                         </div>
                         <div class="config-debug-option" data-if="cheat_stats_available">
                             <label class="config-debug-option__label">
-                                <div>Stat changes apply as soon as you move a slider.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Stat changes apply as soon as you move a slider.</div>
                             </label>
                         </div>
                     </div>

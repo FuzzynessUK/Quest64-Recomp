@@ -37,3 +37,9 @@ before_vram = 0x80024260
 func = "func_80026658"
 text = "quest64_cheats_frame(rdram);"
 before_vram = 0x80026658
+# Scale Brian's per-frame velocity (player struct +0x18/+0x20, passed in a1)
+# right after the walk/run handlers compute it and before collision uses it.
+[[patches.hook]]
+func = "func_80005748"
+text = "quest64_scale_player_velocity(rdram, ctx);"
+before_vram = 0x80005748

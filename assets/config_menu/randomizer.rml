@@ -8,7 +8,7 @@
                     <div class="config-debug__scroll">
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>{{rnd_status}}</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">{{rnd_status}}</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
@@ -367,7 +367,7 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>Port of Merrow by Hangedman. Settings save as you change them and take effect the next time the game is launched; a spoiler log is written next to the settings files.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Port of Merrow by Hangedman. Settings save as you change them and take effect the next time the game is launched; a spoiler log is written next to the settings files.</div>
                             </label>
                         </div>
                     </div>
