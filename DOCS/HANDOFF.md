@@ -66,13 +66,11 @@ and door fade all extend to the screen edges. Key facts learned the hard way:
   + re-issued game scissor, then a reset; a real extended scissor breaks
   RT64's frame aspect detection and stretches the whole game.
 
-**Open issue**: thin blue bars at the far left/right edges appeared in
-fullscreen / larger windows after the last change (vertex decode fix made
-the field overlay redirect active). Suspects: the extended frame-clear fill
-(8..311 -> full width) or the overlay fill at fractional edge columns.
-There is a General-tab toggle "Widescreen 2D Fixes" to compare with. The
-F9 frame dump and per-rect logging (`log_rects`) are still compiled in and
-should be removed once this is settled.
+Blue bars at the far edges outdoors were the extended frame clear painting
+the sky colour into the border; the clear (8..311) is now left alone and
+only fills starting at x=0 are extended. Remaining cleanup: remove the F9
+frame dump and per-rect logging (`log_rects`) once the fixes have had more
+play-testing; the General-tab toggle "Widescreen 2D Fixes" stays.
 
 ## Reverse-engineering facts worth keeping
 

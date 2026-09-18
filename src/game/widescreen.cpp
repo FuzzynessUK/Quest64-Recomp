@@ -279,6 +279,13 @@ namespace {
         return ulx <= full_width_margin && lrx >= screen_width - 1 - full_width_margin;
     }
 
+    // Fills to extend: the fades (0..336 x 0..960). The frame clear is
+    // 8..311 and must stay put: extending it paints the clear colour (the
+    // sky, outdoors) into the border the 3D viewport never covers.
+    bool is_full_screen_fill(int ulx, int lrx) {
+        return ulx == 0 && lrx >= screen_width - 1;
+    }
+
     // Menu backdrops are drawn inset (the pause menu's strips run 23..297);
     // anything this wide made of a repeating tile is a backdrop.
     constexpr int backdrop_min_width = 256;
@@ -417,7 +424,7 @@ namespace {
                     int lrx = (w0 >> 12) & 0xFFF;
                     int ulx = (w1 >> 12) & 0xFFF;
                     log_rect(op, ulx >> 2, (w1 & 0xFFF) >> 2, lrx >> 2, (w0 & 0xFFF) >> 2);
-                    if (spans_full_width(ulx >> 2, lrx >> 2)) {
+                    if (is_full_screen_fill(ulx >> 2, lrx >> 2)) {
                         extend_fillrect(rdram, addr, w0, w1);
                     }
                     break;
