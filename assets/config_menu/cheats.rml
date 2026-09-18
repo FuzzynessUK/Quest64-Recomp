@@ -1,0 +1,209 @@
+<template name="config-menu__cheats">
+    <head>
+    </head>
+    <body>
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option">
+                            <label
+                                class="config-debug-option__label"
+                            >
+                                <div>Warp to map</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Map</div></div>
+                                        <select data-value="cheat_warp_map" id="cheat_warp_map_select" style="nav-up: #tab_cheats">
+                                            <option data-for="name, i : cheat_warp_map_names" data-attr-value="i">{{name}}</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Submap</div></div>
+                                        <select data-value="cheat_warp_submap" id="cheat_warp_submap_select">
+                                            <option data-for="name, i : cheat_warp_submap_names" data-attr-value="i">{{name}}</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Entrance</div></div>
+                                        <select data-value="cheat_warp_entrance" id="cheat_warp_entrance_select">
+                                            <option data-for="name, i : cheat_warp_entrance_names" data-attr-value="i">{{name}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button
+                                        class="icon-button icon-button--success" onclick="do_map_warp"
+                                    >
+                                        <svg src="icons/Arrow.svg" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>The game starts at Melrode Monastery, submap 17.
+                                Submaps are described by where their exits lead and
+                                entrances by where the game enters through them, so
+                                "interior" rooms only connect within their own map.</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option" data-if="cheat_stats_available">
+                            <label
+                                class="config-debug-option__label"
+                            >
+                                <div>Brian's stats</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>HP: {{cheat_stat_hp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_hp_input"
+                                            type="range"
+                                            data-value="cheat_stat_hp"
+                                            min="0"
+                                            max="999"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Max HP: {{cheat_stat_max_hp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_max_hp_input"
+                                            type="range"
+                                            data-value="cheat_stat_max_hp"
+                                            min="1"
+                                            max="999"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>MP: {{cheat_stat_mp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_mp_input"
+                                            type="range"
+                                            data-value="cheat_stat_mp"
+                                            min="0"
+                                            max="999"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Max MP: {{cheat_stat_max_mp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_max_mp_input"
+                                            type="range"
+                                            data-value="cheat_stat_max_mp"
+                                            min="1"
+                                            max="999"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Agility: {{cheat_stat_agility}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_agility_input"
+                                            type="range"
+                                            data-value="cheat_stat_agility"
+                                            min="0"
+                                            max="999"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Defense: {{cheat_stat_defense}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_defense_input"
+                                            type="range"
+                                            data-value="cheat_stat_defense"
+                                            min="0"
+                                            max="999"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Fire: {{cheat_stat_fire}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_fire_input"
+                                            type="range"
+                                            data-value="cheat_stat_fire"
+                                            min="0"
+                                            max="50"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Earth: {{cheat_stat_earth}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_earth_input"
+                                            type="range"
+                                            data-value="cheat_stat_earth"
+                                            min="0"
+                                            max="50"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Wind: {{cheat_stat_wind}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_wind_input"
+                                            type="range"
+                                            data-value="cheat_stat_wind"
+                                            min="0"
+                                            max="50"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Water: {{cheat_stat_water}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="cheat_stat_water_input"
+                                            type="range"
+                                            data-value="cheat_stat_water"
+                                            min="0"
+                                            max="50"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option" data-if="!cheat_stats_available">
+                            <label class="config-debug-option__label">
+                                <div>Start or load a game to edit Brian's stats.</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option" data-if="cheat_stats_available">
+                            <label class="config-debug-option__label">
+                                <div>Stat changes apply as soon as you move a slider.</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

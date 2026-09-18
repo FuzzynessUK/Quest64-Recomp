@@ -707,10 +707,18 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
         if (!config_was_open && ultramodern::is_game_started()) {
             bool open_config = false;
 
+            bool open_cheats = false;
+
             switch (cur_event.type) {
             case SDL_EventType::SDL_KEYDOWN:
                 if (cur_event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_ESCAPE) {
                     open_config = true;
+                }
+                // F1-F4 are swallowed by RT64's SDL event filter whenever its
+                // developer mode is on, so they never reach the game.
+                else if (cur_event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_F5) {
+                    open_config = true;
+                    open_cheats = true;
                 }
                 break;
             case SDL_EventType::SDL_CONTROLLERBUTTONDOWN:
@@ -726,6 +734,9 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
 
             if (open_config) {
                 recompui::show_context(recompui::get_config_context_id(), "");
+                if (open_cheats) {
+                    recompui::set_config_tab(recompui::ConfigTab::Cheats);
+                }
             }
         }
     } // end dequeue event loop
@@ -754,6 +765,10 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
 
     if (recompui::is_any_context_shown()) {
         ui_state->update_contexts();
+
+        if (recompui::is_context_shown(recompui::get_config_context_id())) {
+            recompui::update_cheats_model();
+        }
 
         int width = swap_chain_framebuffer->getWidth();
         int height = swap_chain_framebuffer->getHeight();

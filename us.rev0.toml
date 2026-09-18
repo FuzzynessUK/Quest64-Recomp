@@ -31,3 +31,9 @@ before_vram = 0x80024690
 func = "dma_write"
 text = "load_overlays(ctx->r4, ctx->r5, ctx->r6);"
 before_vram = 0x80024260
+
+# Run queued cheats (map warp, stat edits) once per frame of every game-mode loop.
+[[patches.hook]]
+func = "func_80026658"
+text = "quest64_cheats_frame(rdram);"
+before_vram = 0x80026658

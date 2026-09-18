@@ -65,10 +65,13 @@ namespace recompui {
         Graphics,
         Sound,
         Mods,
+        Cheats,
         Debug,
     };
 
     void set_config_tab(ConfigTab tab);
+    // Refresh the cheats tab's live values from the game.
+    void update_cheats_model();
     int config_tab_to_index(ConfigTab tab);
     Rml::ElementTabSet* get_config_tabset();
     Rml::Element* get_mod_tab();

@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "recomp_ui.h"
 #include "recomp_input.h"
 #include "zelda_sound.h"
@@ -34,8 +36,10 @@ int recompui::config_tab_to_index(recompui::ConfigTab tab) {
         return 3;
     case recompui::ConfigTab::Mods:
         return 4;
-    case recompui::ConfigTab::Debug:
+    case recompui::ConfigTab::Cheats:
         return 5;
+    case recompui::ConfigTab::Debug:
+        return 6;
     default:
         assert(false && "Unknown config tab.");
         return 0;
@@ -474,6 +478,137 @@ struct DebugContext {
 
 DebugContext debug_context;
 
+struct CheatsContext {
+    Rml::DataModelHandle model_handle;
+
+    int warp_map = 13;
+    int warp_submap = 17;
+    int warp_entrance = 0;
+    // Dropdown labels, indexed by id. The map list is fixed; the other two
+    // are rebuilt for the selected map and submap.
+    std::vector<std::string> warp_map_names;
+    std::vector<std::string> warp_submap_names;
+    std::vector<std::string> warp_entrance_names;
+
+    // What the sliders show. Follows the game's value except right after the
+    // user moves a slider, when it holds the new value until the game reports
+    // it back.
+    int shown_stats[static_cast<size_t>(zelda64::PlayerStat::Count)] = {};
+    // The game's value as of the last refresh, so only changes get dirtied.
+    int game_stats[static_cast<size_t>(zelda64::PlayerStat::Count)] = {};
+    bool shown_stats_available = false;
+};
+
+CheatsContext cheats_context;
+
+void init_warp_map_names() {
+    for (int map = 0; map < zelda64::map_count(); map++) {
+        cheats_context.warp_map_names.emplace_back(std::to_string(map) + ": " + zelda64::map_name(map));
+    }
+}
+
+constexpr std::pair<const char*, zelda64::PlayerStat> cheat_stat_names[] = {
+    { "cheat_stat_hp", zelda64::PlayerStat::HP },
+    { "cheat_stat_max_hp", zelda64::PlayerStat::MaxHP },
+    { "cheat_stat_mp", zelda64::PlayerStat::MP },
+    { "cheat_stat_max_mp", zelda64::PlayerStat::MaxMP },
+    { "cheat_stat_agility", zelda64::PlayerStat::Agility },
+    { "cheat_stat_defense", zelda64::PlayerStat::Defense },
+    { "cheat_stat_fire", zelda64::PlayerStat::Fire },
+    { "cheat_stat_earth", zelda64::PlayerStat::Earth },
+    { "cheat_stat_wind", zelda64::PlayerStat::Wind },
+    { "cheat_stat_water", zelda64::PlayerStat::Water },
+};
+
+// Warp map/submap/entrance sliders. Each map has a different number of
+// submaps and each submap a different number of entrances, so choosing a
+// map re-ranges the sliders below it and pulls their values into range.
+void clamp_warp_selection() {
+    int& map = cheats_context.warp_map;
+    int& submap = cheats_context.warp_submap;
+    int& entrance = cheats_context.warp_entrance;
+    map = std::clamp(map, 0, zelda64::map_count() - 1);
+    submap = std::clamp(submap, 0, zelda64::submap_count(map) - 1);
+    entrance = std::clamp(entrance, 0, zelda64::entrance_count(map, submap) - 1);
+
+    cheats_context.warp_submap_names.clear();
+    for (int i = 0; i < zelda64::submap_count(map); i++) {
+        cheats_context.warp_submap_names.push_back(zelda64::submap_label(map, i));
+    }
+    cheats_context.warp_entrance_names.clear();
+    for (int i = 0; i < zelda64::entrance_count(map, submap); i++) {
+        cheats_context.warp_entrance_names.push_back(zelda64::entrance_label(map, submap, i));
+    }
+}
+
+void dirty_warp_selection() {
+    for (const char* name : { "cheat_warp_map", "cheat_warp_submap", "cheat_warp_submap_names", "cheat_warp_entrance", "cheat_warp_entrance_names" }) {
+        cheats_context.model_handle.DirtyVariable(name);
+    }
+}
+
+void bind_warp_selection(Rml::DataModelConstructor& constructor) {
+    auto bind_field = [&constructor](const char* name, int CheatsContext::* field) {
+        constructor.BindFunc(name,
+            [field](Rml::Variant& out) { out = cheats_context.*field; },
+            [field](const Rml::Variant& in) {
+                cheats_context.*field = in.Get<int>();
+                clamp_warp_selection();
+                dirty_warp_selection();
+            }
+        );
+    };
+    bind_field("cheat_warp_map", &CheatsContext::warp_map);
+    bind_field("cheat_warp_submap", &CheatsContext::warp_submap);
+    bind_field("cheat_warp_entrance", &CheatsContext::warp_entrance);
+
+    clamp_warp_selection();
+    constructor.Bind("cheat_warp_submap_names", &cheats_context.warp_submap_names);
+    constructor.Bind("cheat_warp_entrance_names", &cheats_context.warp_entrance_names);
+}
+
+// The slider shows the value the game last reported and a change is queued
+// straight back to the game, so there is no separate apply step.
+void bind_player_stat(Rml::DataModelConstructor& constructor, const char* name, zelda64::PlayerStat stat) {
+    constructor.BindFunc(name,
+        [stat](Rml::Variant& out) {
+            out = cheats_context.shown_stats[static_cast<size_t>(stat)];
+        },
+        [stat](const Rml::Variant& in) {
+            int value = in.Get<int>();
+            cheats_context.shown_stats[static_cast<size_t>(stat)] = value;
+            zelda64::set_player_stat(stat, value);
+        }
+    );
+}
+
+// Pull the game's latest stat values into the cheats model. Runs on the UI
+// thread each frame the menu is open.
+void recompui::update_cheats_model() {
+    if (!cheats_context.model_handle) {
+        return;
+    }
+
+    bool available = zelda64::player_stats_available();
+    if (available != cheats_context.shown_stats_available) {
+        cheats_context.shown_stats_available = available;
+        cheats_context.model_handle.DirtyVariable("cheat_stats_available");
+    }
+    if (!available) {
+        return;
+    }
+
+    for (const auto& [name, stat] : cheat_stat_names) {
+        int value = zelda64::get_player_stat(stat);
+        int& game_value = cheats_context.game_stats[static_cast<size_t>(stat)];
+        if (value != game_value) {
+            game_value = value;
+            cheats_context.shown_stats[static_cast<size_t>(stat)] = value;
+            cheats_context.model_handle.DirtyVariable(name);
+        }
+    }
+}
+
 recompui::ContextId config_context;
 
 recompui::ContextId recompui::get_config_context_id() {
@@ -607,6 +742,11 @@ public:
         recompui::register_event(listener, "set_time",
             [](const std::string& param, Rml::Event& event) {
                 zelda64::set_time(debug_context.set_time_day, debug_context.set_time_hour, debug_context.set_time_minute);
+            });
+
+        recompui::register_event(listener, "do_map_warp",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::do_map_warp(cheats_context.warp_map, cheats_context.warp_submap, cheats_context.warp_entrance);
             });
     }
 
@@ -1000,6 +1140,27 @@ public:
         debug_context.model_handle = constructor.GetModelHandle();
     }
 
+    void make_cheats_bindings(Rml::Context* context) {
+        Rml::DataModelConstructor constructor = context->CreateDataModel("cheats_model");
+        if (!constructor) {
+            throw std::runtime_error("Failed to make RmlUi data model for the cheats menu");
+        }
+
+        bind_config_list_events(constructor);
+
+        constructor.RegisterArray<std::vector<std::string>>();
+        init_warp_map_names();
+        constructor.Bind("cheat_warp_map_names", &cheats_context.warp_map_names);
+        bind_warp_selection(constructor);
+
+        constructor.BindFunc("cheat_stats_available", [](Rml::Variant& out) { out = cheats_context.shown_stats_available; });
+        for (const auto& [name, stat] : cheat_stat_names) {
+            bind_player_stat(constructor, name, stat);
+        }
+
+        cheats_context.model_handle = constructor.GetModelHandle();
+    }
+
     void make_bindings(Rml::Context* context) override {
         // initially set cont state for ui help
         //recomp::config_menu_set_cont_or_kb(recompui::get_cont_active());
@@ -1009,6 +1170,7 @@ public:
         make_graphics_bindings(context);
         make_sound_options_bindings(context);
         make_debug_bindings(context);
+        make_cheats_bindings(context);
     }
 };
 
