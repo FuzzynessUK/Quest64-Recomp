@@ -159,6 +159,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/config.cpp
     ${CMAKE_SOURCE_DIR}/src/game/scene_table.cpp
     ${CMAKE_SOURCE_DIR}/src/game/map_table.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/widescreen.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/randomizer.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/debug.cpp

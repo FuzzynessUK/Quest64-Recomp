@@ -43,3 +43,10 @@ before_vram = 0x80026658
 func = "func_80005748"
 text = "quest64_scale_player_velocity(rdram, ctx);"
 before_vram = 0x80005748
+
+# Post-process each frame's display list for widescreen just before the
+# graphics task is loaded; a0 holds the NUScTask at this point.
+[[patches.hook]]
+func = "nnScExecuteGraphics"
+text = "quest64_widescreen_task(rdram, ctx);"
+before_vram = 0x80000B08

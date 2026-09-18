@@ -14,6 +14,10 @@ namespace RT64 {
 
 namespace zelda64 {
     namespace renderer {
+        // Extends the game's full-width 2D rectangles (fades, menu backdrops)
+        // to the screen edges when the aspect ratio is expanded.
+        void set_widescreen_2d_enabled(bool value);
+
         inline const std::string special_option_texture_pack_enabled = "_recomp_texture_pack_enabled";
 
         class RT64Context final : public ultramodern::renderer::RendererContext {
