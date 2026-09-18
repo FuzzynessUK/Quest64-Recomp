@@ -35,6 +35,21 @@ namespace {
     constexpr uint8_t op_settilesize = 0xF2;
     constexpr uint8_t op_settile = 0xF5;
     constexpr uint8_t op_vtx = 0x04;
+    constexpr uint8_t op_moveword = 0xBC;
+    constexpr uint8_t mw_segment = 0x06;
+
+    // RSP segment table as set by gSPSegment while walking; the game keeps
+    // its 2D display lists behind segment 1.
+    uint32_t segments[16] = {};
+
+    // Resolve a display list or vertex address to a physical RDRAM address.
+    uint32_t resolve(uint32_t addr) {
+        if ((addr & 0xF0000000u) == 0x80000000u || (addr & 0xF0000000u) == 0xA0000000u) {
+            return addr & 0x1FFFFFFFu;
+        }
+        uint32_t segment = (addr >> 24) & 0xF;
+        return (segments[segment] & 0x1FFFFFFFu) + (addr & 0x00FFFFFFu);
+    }
 
     // Texture state per tile descriptor as the walk sees it, so a texture
     // rectangle can be judged by what it draws: a full-width strip of a
@@ -54,6 +69,7 @@ namespace {
     constexpr uint32_t ex_texrect = 0x000002;
     constexpr uint32_t ex_origin_left = 0x0;
     constexpr uint32_t ex_origin_right = 0x400;
+    constexpr uint32_t ex_origin_none = 0x800;
     // gEXEnable for a non-F3DEX2 microcode: the hook opcode is G_SPNOOP.
     constexpr uint32_t ex_enable_w0 = 0x00525464;
     constexpr uint32_t ex_enable_w1 = (0x1u << 28) | ex_opcode;
@@ -74,6 +90,16 @@ namespace {
     constexpr int max_commands = 1 << 16;
 
     std::atomic<bool> enabled = true;
+    // Set by the F8 key; the next frame's whole command stream is written
+    // out with rect/vertex details.
+    std::atomic<bool> dump_next_frame = false;
+    FILE* dump_file = nullptr;
+
+    void dump(const char* fmt, auto... args) {
+        if (dump_file) {
+            fprintf(dump_file, fmt, args...);
+        }
+    }
 
     // Diagnostics: every distinct rectangle seen, written once.
     std::mutex log_mutex;
@@ -145,6 +171,110 @@ namespace {
         }
     }
 
+    // Full-screen overlays (the fade to black, the dim behind the item menu)
+    // are a quad from -160..160 x -120..120 in a static list, drawn under an
+    // orthographic projection that RT64 keeps within the 4:3 area. The list
+    // is entered through a gSPDisplayList in the frame's list; that branch is
+    // redirected to a sub-list drawing the same overlay as an edge-aligned
+    // fill rectangle. The game's combiner for the quad is shade * env, which
+    // the sub-list reproduces with the quad's vertex colour as the primitive
+    // colour, so the env-alpha fade animation still works.
+    constexpr int overlay_half_width = 160;
+    constexpr int screen_height = 240;
+
+    bool is_overlay_quad(uint8_t* rdram, int32_t vtx) {
+        int minx = 32767, maxx = -32768, miny = 32767, maxy = -32768;
+        for (int i = 0; i < 4; i++) {
+            int x = MEM_H(0, vtx + i * 16 + 0);
+            int y = MEM_H(0, vtx + i * 16 + 2);
+            minx = std::min(minx, x); maxx = std::max(maxx, x);
+            miny = std::min(miny, y); maxy = std::max(maxy, y);
+        }
+        return minx == -overlay_half_width && maxx == overlay_half_width && maxy - miny >= 200;
+    }
+
+    // The game's scissor (8..312 for the whole frame) is converted to the 4:3
+    // area for every draw with regular origins, so an edge-aligned rectangle
+    // is clipped straight back to 4:3 unless the scissor is widened too. Each
+    // sub-list therefore sets an extended full-width scissor, draws, and
+    // restores the scissor the game had set (tracked while walking).
+    constexpr uint32_t op_setscissor = 0xED;
+    uint32_t game_scissor_w0 = 0xED020020; // 8,8 .. 312,232, the game's default
+    uint32_t game_scissor_w1 = 0x004E03A0;
+
+    // Appends commands to a sub-list allocated from the ring.
+    struct SubList {
+        uint8_t* rdram;
+        int32_t start;
+        int32_t cursor;
+
+        SubList(uint8_t* rdram_, size_t max_words) : rdram(rdram_), start(alloc_sublist(max_words)), cursor(start) {}
+
+        void cmd(uint32_t w0, uint32_t w1) {
+            write_w(rdram, cursor, w0);
+            write_w(rdram, cursor + 4, w1);
+            cursor += 8;
+        }
+
+        void enable_ex() {
+            cmd(ex_enable_w0, ex_enable_w1);
+        }
+
+        void pipe_sync() {
+            cmd(0xE7000000, 0);
+        }
+
+        // gEXSetScissorAlign changes how the *next* gDPSetScissor is placed, so
+        // the game's own scissor command is re-issued after each alignment.
+        // Origins LEFT/RIGHT with a -320 right offset keep the stored scissor
+        // numbers as the game set them (which RT64's aspect detection relies
+        // on) while pinning its edges to the real screen edges for the draw.
+        void scissor_align(uint32_t lorigin, uint32_t rorigin, int lrx_offset) {
+            cmd((ex_opcode << 24) | 0x000008, lorigin | (rorigin << 12));
+            cmd(0, (static_cast<uint32_t>(lrx_offset * 4) & 0xFFFFu) << 16);
+            cmd(0, 0xFFFFFFFFu);
+        }
+
+        void wide_scissor() {
+            pipe_sync();
+            scissor_align(ex_origin_left, ex_origin_right, -screen_width);
+            cmd(game_scissor_w0, game_scissor_w1);
+        }
+
+        void restore_scissor() {
+            pipe_sync();
+            scissor_align(ex_origin_none, ex_origin_none, 0);
+            cmd(game_scissor_w0, game_scissor_w1);
+        }
+
+        void end() {
+            cmd(static_cast<uint32_t>(op_enddl) << 24, 0);
+        }
+    };
+
+    // `branch_addr` is the gSPDisplayList command that entered the quad's list.
+    void redirect_overlay_branch(uint8_t* rdram, int32_t branch_addr, int32_t vtx) {
+        uint32_t rgba = (static_cast<uint32_t>(MEM_BU(0, vtx + 12)) << 24) | (static_cast<uint32_t>(MEM_BU(0, vtx + 13)) << 16)
+            | (static_cast<uint32_t>(MEM_BU(0, vtx + 14)) << 8) | static_cast<uint32_t>(MEM_BU(0, vtx + 15));
+
+        SubList sub(rdram, 40);
+        sub.enable_ex();
+        sub.wide_scissor();
+        // gDPSetCombineLERP(PRIMITIVE, 0, ENVIRONMENT, 0, PRIMITIVE, 0, ENVIRONMENT, 0) both cycles
+        sub.cmd(0xFC32BA65, 0xFF77FFFF);
+        // gDPSetPrimColor with the quad's vertex colour
+        sub.cmd(0xFA000000, rgba);
+        // gEXFillRectangle(LEFT, RIGHT, 0, 0, 320, 240)
+        sub.cmd((ex_opcode << 24) | ex_fillrect, ex_origin_left | (ex_origin_right << 12));
+        sub.cmd(0, (static_cast<uint32_t>(screen_width * 4) << 16) | static_cast<uint32_t>(screen_height * 4));
+        sub.restore_scissor();
+        // The combiner the quad list would have left behind.
+        sub.cmd(0xFC42CA85, 0xFF97FFFF);
+        sub.end();
+
+        write_w(rdram, branch_addr + 4, static_cast<uint32_t>(sub.start));
+    }
+
     bool spans_full_width(int ulx, int lrx) {
         return ulx <= full_width_margin && lrx >= screen_width - 1 - full_width_margin;
     }
@@ -162,19 +292,17 @@ namespace {
         int lry = w0 & 0xFFF;
         int uly = w1 & 0xFFF;
 
-        int32_t sub = alloc_sublist(8);
-        write_w(rdram, sub + 0, ex_enable_w0);
-        write_w(rdram, sub + 4, ex_enable_w1);
-        write_w(rdram, sub + 8, (ex_opcode << 24) | ex_fillrect);
-        write_w(rdram, sub + 12, ex_origin_left | (ex_origin_right << 12));
-        // Already 10.2 fixed point, which is what the command holds.
-        write_w(rdram, sub + 16, (0u << 16) | static_cast<uint32_t>(uly));
-        write_w(rdram, sub + 20, (static_cast<uint32_t>(screen_width * 4) << 16) | static_cast<uint32_t>(lry));
-        write_w(rdram, sub + 24, static_cast<uint32_t>(op_enddl) << 24);
-        write_w(rdram, sub + 28, 0);
+        SubList sub(rdram, 32);
+        sub.enable_ex();
+        sub.wide_scissor();
+        // Coordinates are already 10.2 fixed point, which is what the command holds.
+        sub.cmd((ex_opcode << 24) | ex_fillrect, ex_origin_left | (ex_origin_right << 12));
+        sub.cmd(static_cast<uint32_t>(uly), (static_cast<uint32_t>(screen_width * 4) << 16) | static_cast<uint32_t>(lry));
+        sub.restore_scissor();
+        sub.end();
 
         write_w(rdram, addr, static_cast<uint32_t>(op_dl) << 24);
-        write_w(rdram, addr + 4, static_cast<uint32_t>(sub));
+        write_w(rdram, addr + 4, static_cast<uint32_t>(sub.start));
     }
 
     // Replace the texture rectangle (three commands) at `addr` with a branch
@@ -184,28 +312,24 @@ namespace {
         int uly = w1 & 0xFFF;
         int tile = (w1 >> 24) & 0x7;
 
-        int32_t sub = alloc_sublist(10);
-        write_w(rdram, sub + 0, ex_enable_w0);
-        write_w(rdram, sub + 4, ex_enable_w1);
-        write_w(rdram, sub + 8, (ex_opcode << 24) | ex_texrect);
-        write_w(rdram, sub + 12, static_cast<uint32_t>(tile) | (ex_origin_left << 3) | (ex_origin_right << 15));
-        write_w(rdram, sub + 16, (0u << 16) | static_cast<uint32_t>(uly));
-        write_w(rdram, sub + 20, (static_cast<uint32_t>(screen_width * 4) << 16) | static_cast<uint32_t>(lry));
-        write_w(rdram, sub + 24, st);
-        write_w(rdram, sub + 28, dsdt);
-        write_w(rdram, sub + 32, static_cast<uint32_t>(op_enddl) << 24);
-        write_w(rdram, sub + 36, 0);
+        SubList sub(rdram, 34);
+        sub.enable_ex();
+        sub.wide_scissor();
+        sub.cmd((ex_opcode << 24) | ex_texrect, static_cast<uint32_t>(tile) | (ex_origin_left << 3) | (ex_origin_right << 15));
+        sub.cmd(static_cast<uint32_t>(uly), (static_cast<uint32_t>(screen_width * 4) << 16) | static_cast<uint32_t>(lry));
+        sub.cmd(st, dsdt);
+        sub.restore_scissor();
+        sub.end();
 
         write_w(rdram, addr, static_cast<uint32_t>(op_dl) << 24);
-        write_w(rdram, addr + 4, static_cast<uint32_t>(sub));
+        write_w(rdram, addr + 4, static_cast<uint32_t>(sub.start));
         // The two RDPHALF commands that carried the texture coordinates.
         write_w(rdram, addr + 8, static_cast<uint32_t>(op_spnoop) << 24);
         write_w(rdram, addr + 12, 0);
         write_w(rdram, addr + 16, static_cast<uint32_t>(op_spnoop) << 24);
         write_w(rdram, addr + 20, 0);
     }
-
-    void walk(uint8_t* rdram, int32_t addr, int depth, int& budget) {
+    void walk(uint8_t* rdram, int32_t addr, int depth, int& budget, int32_t branch_addr = 0) {
         if (depth > max_depth) {
             return;
         }
@@ -213,13 +337,29 @@ namespace {
             uint32_t w0 = read_w(rdram, addr);
             uint32_t w1 = read_w(rdram, addr + 4);
             uint8_t op = w0 >> 24;
+            dump("%08X: %02X %08X %08X\n", addr, op, w0, w1);
 
             switch (op) {
                 case op_enddl:
                     return;
 
+                case op_setscissor:
+                    game_scissor_w0 = w0;
+                    game_scissor_w1 = w1;
+                    break;
+
+                case op_moveword: {
+                    if ((w0 & 0xFF) == mw_segment) {
+                        uint32_t segment = ((w0 >> 8) & 0xFFFF) / 4;
+                        if (segment < 16) {
+                            segments[segment] = w1;
+                        }
+                    }
+                    break;
+                }
+
                 case op_dl: {
-                    uint32_t physical = w1 & 0x1FFFFFFFu;
+                    uint32_t physical = resolve(w1);
                     int32_t target = static_cast<int32_t>(physical | 0x80000000u);
                     // Only follow lists in the game's 4MB; ours live above it
                     // and have already been handled.
@@ -228,17 +368,33 @@ namespace {
                             addr = target; // branch, no return
                             continue;
                         }
-                        walk(rdram, target, depth + 1, budget);
+                        walk(rdram, target, depth + 1, budget, addr);
                     }
                     break;
                 }
 
                 case op_vtx: {
-                    // gSPVertex: n-1 in bits 20-23, address in w1. Only quads
-                    // are of interest (2D overlays drawn as two triangles).
-                    int n = ((w0 >> 20) & 0xF) + 1;
-                    if (n == 4 && log_rects) {
-                        log_quad(rdram, static_cast<int32_t>((w1 & 0x1FFFFFFFu) | 0x80000000u));
+                    // F3DEX 1.x gSPVertex: w0 = 04 | v0*2 << 16 | n << 10 | (16n-1).
+                    int n = (w0 >> 10) & 0x3F;
+                    if (dump_file) {
+                        int32_t v = static_cast<int32_t>(resolve(w1) | 0x80000000u);
+                        for (int i = 0; i < n; i++) {
+                            dump("    v%d: x=%d y=%d z=%d rgba=%02X%02X%02X%02X\n", i,
+                                (int)MEM_H(0, v + i * 16), (int)MEM_H(0, v + i * 16 + 2), (int)MEM_H(0, v + i * 16 + 4),
+                                (int)MEM_BU(0, v + i * 16 + 12), (int)MEM_BU(0, v + i * 16 + 13),
+                                (int)MEM_BU(0, v + i * 16 + 14), (int)MEM_BU(0, v + i * 16 + 15));
+                        }
+                    }
+                    if (n == 4) {
+                        int32_t v = static_cast<int32_t>(resolve(w1) | 0x80000000u);
+                        if (log_rects) {
+                            log_quad(rdram, v);
+                        }
+                        if (enabled.load() && branch_addr != 0 && is_overlay_quad(rdram, v)) {
+                            redirect_overlay_branch(rdram, branch_addr, v);
+                            // The rest of the quad's list is no longer drawn.
+                            return;
+                        }
                     }
                     break;
                 }
@@ -297,6 +453,10 @@ void zelda64::renderer::set_widescreen_2d_enabled(bool value) {
     enabled.store(value);
 }
 
+void zelda64::renderer::request_widescreen_frame_dump() {
+    dump_next_frame.store(true);
+}
+
 // Hooked in nnScExecuteGraphics just before osSpTaskLoad, with the NUScTask
 // in a0; the OSTask follows at +0x10 and its display list pointer at +0x30.
 extern "C" void quest64_widescreen_task(uint8_t* rdram, recomp_context* ctx) {
@@ -308,6 +468,19 @@ extern "C" void quest64_widescreen_task(uint8_t* rdram, recomp_context* ctx) {
     if (data_ptr == 0) {
         return;
     }
+    if (dump_next_frame.exchange(false)) {
+        std::filesystem::path path = zelda64::get_app_folder_path() / "widescreen_frame.txt";
+        dump_file = fopen(path.string().c_str(), "w");
+    }
+    for (uint32_t& segment : segments) {
+        segment = 0;
+    }
+    game_scissor_w0 = 0xED020020;
+    game_scissor_w1 = 0x004E03A0;
     int budget = max_commands;
     walk(rdram, static_cast<int32_t>(data_ptr | 0x80000000u), 0, budget);
+    if (dump_file) {
+        fclose(dump_file);
+        dump_file = nullptr;
+    }
 }

@@ -35,6 +35,19 @@ namespace zelda64 {
         {zelda64::FilmGrainMode::Off, "Off"}
     });
 
+    // Extends the game's 2D fades, dims and menu backdrops to the screen
+    // edges when the aspect ratio is expanded (src/game/widescreen.cpp).
+    enum class Widescreen2DMode {
+        On,
+        Off,
+        OptionCount
+    };
+
+    NLOHMANN_JSON_SERIALIZE_ENUM(zelda64::Widescreen2DMode, {
+        {zelda64::Widescreen2DMode::On, "On"},
+        {zelda64::Widescreen2DMode::Off, "Off"}
+    });
+
     enum class TargetingMode {
         Switch,
         Hold,
@@ -90,6 +103,8 @@ namespace zelda64 {
 
     FilmGrainMode get_film_grain_mode();
     void set_film_grain_mode(FilmGrainMode mode);
+    Widescreen2DMode get_widescreen_2d_mode();
+    void set_widescreen_2d_mode(Widescreen2DMode mode);
 
     AimInvertMode get_invert_y_axis_mode();
     void set_invert_y_axis_mode(AimInvertMode mode);

@@ -238,6 +238,7 @@ bool save_general_config(const std::filesystem::path& path) {
     config_json["mouse_sensitivity"] = recomp::get_mouse_sensitivity();
     config_json["joystick_deadzone"] = recomp::get_joystick_deadzone();
     config_json["film_grain_mode"] = zelda64::get_film_grain_mode();
+    config_json["widescreen_2d_mode"] = zelda64::get_widescreen_2d_mode();
     config_json["radio_comm_box_mode"] = zelda64::get_radio_comm_box_mode();
     config_json["invert_y_axis_mode"] = zelda64::get_invert_y_axis_mode();
     config_json["analog_camera_invert_mode"] = zelda64::get_analog_camera_invert_mode();
@@ -254,6 +255,7 @@ void set_general_settings_from_json(const nlohmann::json& config_json) {
     recomp::set_mouse_sensitivity(from_or_default(config_json, "mouse_sensitivity", is_steam_deck ? 50 : 0));
     recomp::set_joystick_deadzone(from_or_default(config_json, "joystick_deadzone", 0));
     zelda64::set_film_grain_mode(from_or_default(config_json, "film_grain_mode", zelda64::FilmGrainMode::On));
+    zelda64::set_widescreen_2d_mode(from_or_default(config_json, "widescreen_2d_mode", zelda64::Widescreen2DMode::On));
     zelda64::set_radio_comm_box_mode(from_or_default(config_json, "radio_comm_box_mode", zelda64::RadioBoxMode::Original));
     zelda64::set_invert_y_axis_mode(from_or_default(config_json, "invert_y_axis_mode", zelda64::AimInvertMode::On));
     zelda64::set_analog_camera_invert_mode(from_or_default(config_json, "analog_camera_invert_mode", zelda64::AimInvertMode::On));

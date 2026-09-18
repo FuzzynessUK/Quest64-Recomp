@@ -104,6 +104,34 @@
                         </div>
                     </div>
 
+                    <!-- Widescreen 2D fixes -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(6)">
+                        <label class="config-option__title">Widescreen 2D Fixes</label>
+                        <div class="config-option__list">
+                            <input
+                                type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(6)"
+                                name="widescreen_2d_mode"
+                                data-checked="widescreen_2d_mode"
+                                value="On"
+                                id="widescreen_2d_mode_on"
+                            />
+                            <label class="config-option__tab-label" for="widescreen_2d_mode_on">On</label>
+
+                            <input
+                                type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(6)"
+                                name="widescreen_2d_mode"
+                                data-checked="widescreen_2d_mode"
+                                value="Off"
+                                id="widescreen_2d_mode_off"
+                            />
+                            <label class="config-option__tab-label" for="widescreen_2d_mode_off">Off</label>
+                        </div>
+                    </div>
+
                     <!-- Invert Y Axis -->
                     <div class="config-option" data-event-mouseover="set_cur_config_index(7)">
                         <label class="config-option__title">Invert Y Axis</label>

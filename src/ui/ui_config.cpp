@@ -246,6 +246,7 @@ struct ControlOptionsContext {
     zelda64::TargetingMode targeting_mode;
     recomp::BackgroundInputMode background_input_mode;
     zelda64::FilmGrainMode film_grain_mode;
+    zelda64::Widescreen2DMode widescreen_2d_mode = zelda64::Widescreen2DMode::On;
     zelda64::RadioBoxMode radio_comm_box_mode;
     zelda64::AimInvertMode invert_y_axis_mode;
     zelda64::AimInvertMode analog_camera_invert_mode;
@@ -333,6 +334,18 @@ void zelda64::set_film_grain_mode(zelda64::FilmGrainMode mode) {
     control_options_context.film_grain_mode = mode;
     if (general_model_handle) {
         general_model_handle.DirtyVariable("film_grain_mode");
+    }
+}
+
+zelda64::Widescreen2DMode zelda64::get_widescreen_2d_mode() {
+    return control_options_context.widescreen_2d_mode;
+}
+
+void zelda64::set_widescreen_2d_mode(zelda64::Widescreen2DMode mode) {
+    control_options_context.widescreen_2d_mode = mode;
+    zelda64::renderer::set_widescreen_2d_enabled(mode == zelda64::Widescreen2DMode::On);
+    if (general_model_handle) {
+        general_model_handle.DirtyVariable("widescreen_2d_mode");
     }
 }
 
@@ -1197,6 +1210,15 @@ public:
         bind_option(constructor, "targeting_mode", &control_options_context.targeting_mode);
         bind_option(constructor, "background_input_mode", &control_options_context.background_input_mode);
         bind_option(constructor, "film_grain_mode", &control_options_context.film_grain_mode);
+        // Applied immediately rather than only stored, so the renderer hook
+        // follows the switch without a restart.
+        constructor.BindFunc("widescreen_2d_mode",
+            [](Rml::Variant& out) { get_option(control_options_context.widescreen_2d_mode, out); },
+            [](const Rml::Variant& in) {
+                zelda64::Widescreen2DMode mode = control_options_context.widescreen_2d_mode;
+                set_option(mode, in);
+                zelda64::set_widescreen_2d_mode(mode);
+            });
         bind_option(constructor, "radio_comm_box_mode", &control_options_context.radio_comm_box_mode);
         bind_option(constructor, "invert_y_axis_mode", &control_options_context.invert_y_axis_mode);
         bind_option(constructor, "analog_camera_invert_mode", &control_options_context.analog_camera_invert_mode);

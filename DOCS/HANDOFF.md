@@ -55,14 +55,24 @@ menu background (8 strips at x 23..297 drawn with a 64×32 wrapping tile).
 The title screen's 320×6 image strips are deliberately left alone (texture
 width > 128 = image, keep centred).
 
-**Still to do**: the dim overlay drawn over the field when the pause menu
-opens is not a rectangle. The current build logs every 4-vertex quad
-(`quad x=.. y=.. rgb a=`) to `widescreen_rects.txt`; the next step is to
-open the pause menu in the field, read that log, identify the overlay quad
-(likely black, alpha < 255, x spanning 0..320 or -160..160) and widen its
-vertices in the walker (`G_VTX` = 0x04) by the aspect factor. After that,
-remove the diagnostic logging (`log_rects`) and add a graphics-menu toggle
-(`zelda64::renderer::set_widescreen_2d_enabled` already exists).
+**State at end of 2026-09-18**: title fade, pause backdrop, item-menu dim
+and door fade all extend to the screen edges. Key facts learned the hard way:
+- The game's 2D lists sit behind RSP segment 1; the walker tracks gSPSegment.
+- F3DEX 1.x gSPVertex packs n in bits 10-15 of w0 (not the SDK nibble).
+- The fade/dim is a static -160..160 x -120..120 quad list (0x8004D4F0,
+  vertices 0x8004D4B0) drawn as shade*env; the walker redirects the branch
+  into it to a sub-list drawing gEXFillRectangle with prim=vertex colour.
+- Every redirected draw needs gEXSetScissorAlign(LEFT, RIGHT, 0,0,-320,0)
+  + re-issued game scissor, then a reset; a real extended scissor breaks
+  RT64's frame aspect detection and stretches the whole game.
+
+**Open issue**: thin blue bars at the far left/right edges appeared in
+fullscreen / larger windows after the last change (vertex decode fix made
+the field overlay redirect active). Suspects: the extended frame-clear fill
+(8..311 -> full width) or the overlay fill at fractional edge columns.
+There is a General-tab toggle "Widescreen 2D Fixes" to compare with. The
+F9 frame dump and per-rect logging (`log_rects`) are still compiled in and
+should be removed once this is settled.
 
 ## Reverse-engineering facts worth keeping
 

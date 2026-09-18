@@ -17,6 +17,8 @@ namespace zelda64 {
         // Extends the game's full-width 2D rectangles (fades, menu backdrops)
         // to the screen edges when the aspect ratio is expanded.
         void set_widescreen_2d_enabled(bool value);
+        // Writes the next frame's display list to widescreen_frame.txt (F9).
+        void request_widescreen_frame_dump();
 
         inline const std::string special_option_texture_pack_enabled = "_recomp_texture_pack_enabled";
 

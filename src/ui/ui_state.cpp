@@ -17,6 +17,7 @@
 #include "RmlUi_Platform_SDL.h"
 
 #include "recomp_ui.h"
+#include "zelda_render.h"
 #include "recomp_input.h"
 #include "librecomp/game.hpp"
 #include "zelda_config.h"
@@ -724,6 +725,10 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
                 else if (cur_event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_F6) {
                     open_config = true;
                     open_randomizer = true;
+                }
+                else if (cur_event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_F9) {
+                    // Diagnostic: dump the next frame's display list.
+                    zelda64::renderer::request_widescreen_frame_dump();
                 }
                 break;
             case SDL_EventType::SDL_CONTROLLERBUTTONDOWN:
