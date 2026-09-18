@@ -34,6 +34,7 @@
 #include "zelda_render.h"
 #include "zelda_support.h"
 #include "zelda_game.h"
+#include "randomizer.h"
 #include "recomp_data.h"
 #include "ovl_patches.hpp"
 #include "librecomp/game.hpp"
@@ -347,6 +348,12 @@ RspUcodeFunc* get_rsp_microcode(const OSTask* task) {
 extern "C" void recomp_entrypoint(uint8_t * rdram, recomp_context * ctx);
 gpr get_entrypoint_address();
 
+// Runs once the stored ROM is loaded and the boot segment copied, before
+// mods; the randomizer patches the ROM in memory here.
+void quest64_on_init(uint8_t* rdram, recomp_context* ctx) {
+    zelda64::randomizer::apply_at_boot(rdram);
+}
+
 // array of supported GameEntry objects
 std::vector<recomp::GameEntry> supported_games = {
     {
@@ -358,6 +365,7 @@ std::vector<recomp::GameEntry> supported_games = {
         .is_enabled = true,
         .entrypoint_address = get_entrypoint_address(),
         .entrypoint = recomp_entrypoint,
+        .on_init_callback = quest64_on_init,
     },
 };
 

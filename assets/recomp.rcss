@@ -2284,7 +2284,8 @@ scrollbarhorizontal sliderbar {
   display: block;
   position: relative;
   width: 100%;
-  max-height: 100%;
+  height: 100%;
+  box-sizing: border-box;
   padding: 8dp;
 }
 
@@ -2509,4 +2510,23 @@ button {
   100% {
     background-color: #17D6E8;
   }
+}
+
+/* Text fields in debug-style panels (the randomizer seed) get the dropdown look. */
+.config-debug__select-wrapper input.text {
+  border-width: 1.1dp;
+  border-color: rgba(255, 255, 255, 0.5);
+  display: block;
+  box-sizing: border-box;
+  flex: 1 1 100%;
+  width: auto;
+  height: 48dp;
+  border-radius: 12dp;
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 14dp;
+  color: #FFFFFF;
+  cursor: text;
+}
+.config-debug__select-wrapper input.text:hover, .config-debug__select-wrapper input.text:focus {
+  border-color: rgba(255, 255, 255, 0.8);
 }

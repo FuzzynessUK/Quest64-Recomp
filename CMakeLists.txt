@@ -159,6 +159,8 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/config.cpp
     ${CMAKE_SOURCE_DIR}/src/game/scene_table.cpp
     ${CMAKE_SOURCE_DIR}/src/game/map_table.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/randomizer.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/debug.cpp
     ${CMAKE_SOURCE_DIR}/src/game/quicksaving.cpp
     ${CMAKE_SOURCE_DIR}/src/game/recomp_api.cpp
@@ -210,6 +212,7 @@ endif()
 
 target_include_directories(Quest64Recompiled PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer
     ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/N64Recomp/include
     ${CMAKE_SOURCE_DIR}/lib/concurrentqueue
     ${CMAKE_SOURCE_DIR}/lib/GamepadMotionHelpers

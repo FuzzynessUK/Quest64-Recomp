@@ -66,6 +66,7 @@ namespace recompui {
         Sound,
         Mods,
         Cheats,
+        Randomizer,
         Debug,
     };
 

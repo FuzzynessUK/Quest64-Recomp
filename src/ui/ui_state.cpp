@@ -708,6 +708,7 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
             bool open_config = false;
 
             bool open_cheats = false;
+            bool open_randomizer = false;
 
             switch (cur_event.type) {
             case SDL_EventType::SDL_KEYDOWN:
@@ -719,6 +720,10 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
                 else if (cur_event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_F5) {
                     open_config = true;
                     open_cheats = true;
+                }
+                else if (cur_event.key.keysym.scancode == SDL_Scancode::SDL_SCANCODE_F6) {
+                    open_config = true;
+                    open_randomizer = true;
                 }
                 break;
             case SDL_EventType::SDL_CONTROLLERBUTTONDOWN:
@@ -736,6 +741,9 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
                 recompui::show_context(recompui::get_config_context_id(), "");
                 if (open_cheats) {
                     recompui::set_config_tab(recompui::ConfigTab::Cheats);
+                }
+                if (open_randomizer) {
+                    recompui::set_config_tab(recompui::ConfigTab::Randomizer);
                 }
             }
         }

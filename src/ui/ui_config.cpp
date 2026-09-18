@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <random>
+#include <type_traits>
 
 #include "recomp_ui.h"
 #include "recomp_input.h"
 #include "zelda_sound.h"
 #include "zelda_config.h"
 #include "zelda_debug.h"
+#include "randomizer.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
 #include "promptfont.h"
@@ -38,8 +41,10 @@ int recompui::config_tab_to_index(recompui::ConfigTab tab) {
         return 4;
     case recompui::ConfigTab::Cheats:
         return 5;
-    case recompui::ConfigTab::Debug:
+    case recompui::ConfigTab::Randomizer:
         return 6;
+    case recompui::ConfigTab::Debug:
+        return 7;
     default:
         assert(false && "Unknown config tab.");
         return 0;
@@ -567,6 +572,97 @@ void bind_warp_selection(Rml::DataModelConstructor& constructor) {
     constructor.Bind("cheat_warp_entrance_names", &cheats_context.warp_entrance_names);
 }
 
+// Randomizer tab. Every control writes straight back to the options file, so
+// what the file says is always what the menu shows; the game reads the file
+// once at boot.
+struct RandomizerContext {
+    Rml::DataModelHandle model_handle;
+    zelda64::randomizer::Options edited;
+};
+
+RandomizerContext randomizer_context;
+
+std::string randomizer_status() {
+    return "This session: " + zelda64::randomizer::describe(zelda64::randomizer::active_options()) + ". Changes apply when the game is next launched.";
+}
+
+void randomizer_option_changed() {
+    zelda64::randomizer::save_options(randomizer_context.edited);
+    randomizer_context.model_handle.DirtyVariable("rnd_status");
+}
+
+template <typename T>
+void bind_randomizer_field(Rml::DataModelConstructor& constructor, const char* name, T zelda64::randomizer::Options::* field) {
+    constructor.BindFunc(name,
+        [field](Rml::Variant& out) {
+            if constexpr (std::is_same_v<T, std::string>) {
+                out = randomizer_context.edited.*field;
+            }
+            else {
+                out = static_cast<int>(randomizer_context.edited.*field);
+            }
+        },
+        [field](const Rml::Variant& in) {
+            if constexpr (std::is_same_v<T, std::string>) {
+                randomizer_context.edited.*field = in.Get<std::string>();
+            }
+            else {
+                randomizer_context.edited.*field = static_cast<T>(in.Get<int>());
+            }
+            randomizer_option_changed();
+        }
+    );
+}
+
+void make_randomizer_bindings(Rml::Context* context) {
+    using zelda64::randomizer::Options;
+    Rml::DataModelConstructor constructor = context->CreateDataModel("randomizer_model");
+    if (!constructor) {
+        throw std::runtime_error("Failed to make RmlUi data model for the randomizer menu");
+    }
+
+    randomizer_context.edited = zelda64::randomizer::load_options();
+
+    constructor.BindFunc("rnd_status", [](Rml::Variant& out) { out = randomizer_status(); });
+    bind_randomizer_field(constructor, "rnd_mode", &Options::mode);
+    bind_randomizer_field(constructor, "rnd_seed", &Options::seed);
+    bind_randomizer_field(constructor, "rnd_spell_shuffle", &Options::spell_shuffle);
+    bind_randomizer_field(constructor, "rnd_hinted_spell_names", &Options::hinted_spell_names);
+    bind_randomizer_field(constructor, "rnd_linear_spell_names", &Options::linear_spell_names);
+    bind_randomizer_field(constructor, "rnd_early_healing", &Options::early_healing);
+    bind_randomizer_field(constructor, "rnd_extra_healing", &Options::extra_healing);
+    bind_randomizer_field(constructor, "rnd_distribute_spells", &Options::distribute_spells);
+    bind_randomizer_field(constructor, "rnd_spell_overrides", &Options::spell_overrides);
+    bind_randomizer_field(constructor, "rnd_spell_rebalance", &Options::spell_rebalance);
+    bind_randomizer_field(constructor, "rnd_bubble", &Options::bubble);
+    bind_randomizer_field(constructor, "rnd_level_1_spells", &Options::level_1_spells);
+    bind_randomizer_field(constructor, "rnd_max_accuracy", &Options::max_accuracy);
+    bind_randomizer_field(constructor, "rnd_max_accuracy_all", &Options::max_accuracy_all);
+    bind_randomizer_field(constructor, "rnd_soul_search", &Options::soul_search);
+    bind_randomizer_field(constructor, "rnd_invalidity", &Options::invalidity);
+    bind_randomizer_field(constructor, "rnd_chests", &Options::chests);
+    bind_randomizer_field(constructor, "rnd_drops", &Options::drops);
+    bind_randomizer_field(constructor, "rnd_gifts", &Options::gifts);
+    bind_randomizer_field(constructor, "rnd_wingsmiths", &Options::wingsmiths);
+    bind_randomizer_field(constructor, "rnd_shuffle_shannon", &Options::shuffle_shannon);
+    bind_randomizer_field(constructor, "rnd_monster_stats", &Options::monster_stats);
+    bind_randomizer_field(constructor, "rnd_variance", &Options::variance);
+    bind_randomizer_field(constructor, "rnd_monster_scale", &Options::monster_scale);
+    bind_randomizer_field(constructor, "rnd_scale_percent", &Options::scale_percent);
+    bind_randomizer_field(constructor, "rnd_exp_by_bst", &Options::exp_by_bst);
+    bind_randomizer_field(constructor, "rnd_exp_boost", &Options::exp_boost);
+    bind_randomizer_field(constructor, "rnd_boss_order", &Options::boss_order);
+    bind_randomizer_field(constructor, "rnd_boss_element", &Options::boss_element);
+    bind_randomizer_field(constructor, "rnd_start_hp", &Options::start_hp);
+    bind_randomizer_field(constructor, "rnd_start_mp", &Options::start_mp);
+    bind_randomizer_field(constructor, "rnd_start_agility", &Options::start_agility);
+    bind_randomizer_field(constructor, "rnd_start_defense", &Options::start_defense);
+    bind_randomizer_field(constructor, "rnd_fast_monastery", &Options::fast_monastery);
+    bind_randomizer_field(constructor, "rnd_fast_blue_cave", &Options::fast_blue_cave);
+
+    randomizer_context.model_handle = constructor.GetModelHandle();
+}
+
 // The slider shows the value the game last reported and a change is queued
 // straight back to the game, so there is no separate apply step.
 void bind_player_stat(Rml::DataModelConstructor& constructor, const char* name, zelda64::PlayerStat stat) {
@@ -575,7 +671,14 @@ void bind_player_stat(Rml::DataModelConstructor& constructor, const char* name, 
             out = cheats_context.shown_stats[static_cast<size_t>(stat)];
         },
         [stat](const Rml::Variant& in) {
+            // Sliders fire a change while the document loads (a min="1" slider
+            // clamps its initial 0), long before the game has values. Only
+            // treat a change as the user's once the game has reported its
+            // stats, and only if it is actually different.
             int value = in.Get<int>();
+            if (!cheats_context.shown_stats_available || value == cheats_context.game_stats[static_cast<size_t>(stat)]) {
+                return;
+            }
             cheats_context.shown_stats[static_cast<size_t>(stat)] = value;
             zelda64::set_player_stat(stat, value);
         }
@@ -747,6 +850,13 @@ public:
         recompui::register_event(listener, "do_map_warp",
             [](const std::string& param, Rml::Event& event) {
                 zelda64::do_map_warp(cheats_context.warp_map, cheats_context.warp_submap, cheats_context.warp_entrance);
+            });
+
+        recompui::register_event(listener, "rnd_new_seed",
+            [](const std::string& param, Rml::Event& event) {
+                randomizer_context.edited.seed = std::to_string(std::random_device{}() % 100000000u);
+                randomizer_option_changed();
+                randomizer_context.model_handle.DirtyVariable("rnd_seed");
             });
     }
 
@@ -1171,6 +1281,7 @@ public:
         make_sound_options_bindings(context);
         make_debug_bindings(context);
         make_cheats_bindings(context);
+        make_randomizer_bindings(context);
     }
 };
 

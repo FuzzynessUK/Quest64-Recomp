@@ -1,0 +1,378 @@
+<template name="config-menu__randomizer">
+    <head>
+    </head>
+    <body>
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>{{rnd_status}}</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Mode</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Game</div></div>
+                                        <select data-value="rnd_mode" id="rnd_mode_select" style="nav-up: #tab_randomizer">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Randomizer</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Seed</div></div>
+                                        <input type="text" id="rnd_seed_input" data-value="rnd_seed" maxlength="32" />
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="icon-button icon-button--success" onclick="rnd_new_seed">
+                                        <svg src="icons/Arrow.svg" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Spells</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Shuffle spells</div></div>
+                                        <select data-value="rnd_spell_shuffle" id="rnd_spell_shuffle_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Hinted spell names</div></div>
+                                        <select data-value="rnd_hinted_spell_names" id="rnd_hinted_spell_names_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Linear hint names</div></div>
+                                        <select data-value="rnd_linear_spell_names" id="rnd_linear_spell_names_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Early healing</div></div>
+                                        <select data-value="rnd_early_healing" id="rnd_early_healing_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Extra healing</div></div>
+                                        <select data-value="rnd_extra_healing" id="rnd_extra_healing_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Distribute powerful spells</div></div>
+                                        <select data-value="rnd_distribute_spells" id="rnd_distribute_spells_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Spell combination fixes</div></div>
+                                        <select data-value="rnd_spell_overrides" id="rnd_spell_overrides_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Spell damage rebalance</div></div>
+                                        <select data-value="rnd_spell_rebalance" id="rnd_spell_rebalance_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Bubble</div></div>
+                                        <select data-value="rnd_bubble" id="rnd_bubble_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>All spells at level 1</div></div>
+                                        <select data-value="rnd_level_1_spells" id="rnd_level_1_spells_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Status spells always hit</div></div>
+                                        <select data-value="rnd_max_accuracy" id="rnd_max_accuracy_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>All spells always hit</div></div>
+                                        <select data-value="rnd_max_accuracy_all" id="rnd_max_accuracy_all_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Soul Search</div></div>
+                                        <select data-value="rnd_soul_search" id="rnd_soul_search_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Invalidity</div></div>
+                                        <select data-value="rnd_invalidity" id="rnd_invalidity_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Items</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Chests</div></div>
+                                        <select data-value="rnd_chests" id="rnd_chests_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Monster drops</div></div>
+                                        <select data-value="rnd_drops" id="rnd_drops_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Gifts</div></div>
+                                        <select data-value="rnd_gifts" id="rnd_gifts_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Wingsmiths</div></div>
+                                        <select data-value="rnd_wingsmiths" id="rnd_wingsmiths_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Shuffle final Shannons</div></div>
+                                        <select data-value="rnd_shuffle_shannon" id="rnd_shuffle_shannon_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Monsters</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Randomize stats</div></div>
+                                        <select data-value="rnd_monster_stats" id="rnd_monster_stats_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Stat variance: {{rnd_variance}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_variance_input"
+                                            type="range"
+                                            data-value="rnd_variance"
+                                            min="0"
+                                            max="5"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Scale stats</div></div>
+                                        <select data-value="rnd_monster_scale" id="rnd_monster_scale_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Stat scale %: {{rnd_scale_percent}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_scale_percent_input"
+                                            type="range"
+                                            data-value="rnd_scale_percent"
+                                            min="50"
+                                            max="150"
+                                            step="10"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>EXP follows stats</div></div>
+                                        <select data-value="rnd_exp_by_bst" id="rnd_exp_by_bst_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>EXP boost (quarters): {{rnd_exp_boost}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_exp_boost_input"
+                                            type="range"
+                                            data-value="rnd_exp_boost"
+                                            min="0"
+                                            max="12"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Shuffle boss order</div></div>
+                                        <select data-value="rnd_boss_order" id="rnd_boss_order_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Random Guilty element</div></div>
+                                        <select data-value="rnd_boss_element" id="rnd_boss_element_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Brian's starting stats</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>HP: {{rnd_start_hp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_hp_input"
+                                            type="range"
+                                            data-value="rnd_start_hp"
+                                            min="1"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>MP: {{rnd_start_mp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_mp_input"
+                                            type="range"
+                                            data-value="rnd_start_mp"
+                                            min="0"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Agility: {{rnd_start_agility}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_agility_input"
+                                            type="range"
+                                            data-value="rnd_start_agility"
+                                            min="0"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Defense: {{rnd_start_defense}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_defense_input"
+                                            type="range"
+                                            data-value="rnd_start_defense"
+                                            min="0"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>World</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Fast Monastery</div></div>
+                                        <select data-value="rnd_fast_monastery" id="rnd_fast_monastery_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Fast Blue Cave</div></div>
+                                        <select data-value="rnd_fast_blue_cave" id="rnd_fast_blue_cave_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Port of Merrow by Hangedman. Settings save as you change them and take effect the next time the game is launched; a spoiler log is written next to the settings files.</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>
