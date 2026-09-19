@@ -7,6 +7,7 @@
 
 #include "randomizer.h"
 #include "merrow_data.h"
+#include "merrow_mapdata.h"
 #include "zelda_config.h"
 #include "json/json.hpp"
 #include "librecomp/game.hpp"
@@ -18,7 +19,9 @@
 // (Hangedman), MIT licence.
 
 namespace data = merrow::data;
+namespace mapdata = merrow::mapdata;
 using zelda64::randomizer::ListMode;
+using zelda64::randomizer::Mode;
 using zelda64::randomizer::Options;
 using zelda64::randomizer::Write;
 
@@ -165,6 +168,50 @@ namespace {
         return out;
     }
 
+    // Merrow only ever rotates the hue, which preserves each texture's
+    // saturation and lightness: a muted palette stays muted and the result
+    // only ever reaches colours that sit on the source's own cylinder. With
+    // the full-spectrum option a saturation multiplier and a lightness offset
+    // are rolled alongside the hue, so a palette can land anywhere in the RGB
+    // cube. All three are rolled once per palette, not per colour, so the
+    // texture's internal shading survives.
+    struct ColourRoll {
+        double hue = 0.0;
+        double saturation = 1.0;
+        double lightness = 0.0;
+
+        bool plain_hue() const {
+            return saturation == 1.0 && lightness == 0.0;
+        }
+
+        std::string describe() const {
+            std::string out = std::to_string(static_cast<int>(std::lround(hue)));
+            if (!plain_hue()) {
+                out += ", sat x" + std::to_string(static_cast<int>(std::lround(saturation * 100.0))) + "%";
+                out += ", light " + std::to_string(static_cast<int>(std::lround(lightness * 100.0))) + "%";
+            }
+            return out;
+        }
+    };
+
+    Rgba apply_roll(const Rgba& col, const ColourRoll& roll) {
+        Rgba out = hue_shift(col, roll.hue);
+        if (roll.plain_hue()) {
+            return out;
+        }
+        // Saturation is scaled about the colour's own luma so black and white
+        // stay put, then the whole thing is slid up or down in lightness.
+        double luma = 0.299 * out.r + 0.587 * out.g + 0.114 * out.b;
+        auto adjust = [&](int channel) {
+            double value = luma + (channel - luma) * roll.saturation + roll.lightness * 255.0;
+            return clamp_255(std::lround(value));
+        };
+        out.r = adjust(out.r);
+        out.g = adjust(out.g);
+        out.b = adjust(out.b);
+        return out;
+    }
+
     // Merrow's TranslateString: ASCII to the game's text encoding. Digits,
     // upper and lower case each live on a row selected by a prefix byte;
     // punctuation and the #/$/% controls come from two lookup tables.
@@ -243,6 +290,19 @@ namespace {
         std::vector<int> monster_stats = data::monsterstatvanilla;
         std::vector<int> boss_order = std::vector<int>(boss_count);
         int guilty_element = 4;
+        // Lost Keys: what each boss now carries, the gem order the hints
+        // name, where each gem landed, and the ten coin flips the hint
+        // wording uses.
+        std::vector<int> lk_boss_items = std::vector<int>(boss_count, 255);
+        std::vector<int> gem_ids = { 20, 21, 22, 23, 24 };
+        std::vector<int> hints = std::vector<int>(5, -1);
+        std::vector<int> hint_coins = std::vector<int>(10, 0);
+        // Working copies of the encounter tables, and what the shared-pack
+        // clamps had to do.
+        std::vector<mapdata::Area> enemy_areas;
+        std::vector<mapdata::MonsterPack> enemy_packs;
+        std::vector<mapdata::Region> enemy_regions;
+        std::string enemy_group_notes;
         bool beigis_moved = false;
 
         Builder(const Options& opts, uint32_t seed) : options(opts), rng(seed) {}
@@ -253,6 +313,19 @@ namespace {
 
         double extremity() const {
             return options.variance * 0.1;
+        }
+
+        // One roll per palette, across the whole RGB cube: hue, then a
+        // saturation multiplier (0.4x-2.2x) and a lightness offset (+/-25%),
+        // which together reach pastels, neons and near-monochrome. Merrow
+        // only ever rotated hue, which could not leave the source palette's
+        // own saturation and lightness.
+        ColourRoll roll_colour() {
+            ColourRoll roll;
+            roll.hue = rng.next_double() * 360.0;
+            roll.saturation = 0.4 + rng.next_double() * 1.8;
+            roll.lightness = (rng.next_double() - 0.5) * 0.5;
+            return roll;
         }
 
         void add(uint32_t rom_offset, std::vector<uint8_t> bytes) {
@@ -288,6 +361,216 @@ namespace {
         }
 
         // Shuffle.cs -------------------------------------------------------
+
+        // Shuffle.cs's Lost Keys rulesets.
+        //
+        // Lost Keys takes the four gems and the Eletale Book off their bosses
+        // and scatters them across the world along with the six pairs of
+        // wings. A placement is an index into one of the area_* tables: the
+        // low values mean a boss, the middle a chest and the top a gift, with
+        // the exact ranges differing per region. Progressive keeps each gem
+        // inside its own region so the run stays completable in order; Open
+        // World puts anything anywhere and moves the progression locks to the
+        // endgame instead.
+        void place_lost_keys() {
+            if (options.lost_keys == 0) {
+                return;
+            }
+
+            auto put = [&](const std::vector<int>& area, int value, int item, bool is_gift) {
+                size_t slot = static_cast<size_t>(area[static_cast<size_t>(value)]);
+                if (is_gift) {
+                    if (slot < gifts.size()) {
+                        gifts[slot] = item;
+                    }
+                }
+                else if (slot < chests.size()) {
+                    chests[slot] = item;
+                }
+            };
+
+            if (options.lost_keys == 1) {
+                // Progressive. Each gem travels with the wings of its own
+                // region. Ivory Wings moves the White Wings from earth to
+                // fire, which changes both lists' lengths.
+                std::vector<int> earth_items = { 20, 14, 15 };
+                std::vector<int> wind_items = { 21, 16, 17 };
+                std::vector<int> fire_items = { 23, 18, 19 };
+                if (options.ivory_wings) {
+                    earth_items = { 20, 15 };
+                    fire_items = { 23, 14, 18, 19 };
+                }
+
+                // Shuffled so the items within a region can never collide.
+                std::vector<int> earth_locs = rng.count_and_shuffle(19);
+                std::vector<int> wind_locs = rng.count_and_shuffle(18);
+                std::vector<int> fire_locs = rng.count_and_shuffle(37);
+
+                std::vector<int> wind_vals(wind_items.size());
+                for (size_t i = 0; i < wind_vals.size(); i++) {
+                    wind_vals[i] = wind_locs[i];
+                }
+                std::vector<int> fire_vals(fire_items.size());
+                for (size_t i = 0; i < fire_vals.size(); i++) {
+                    fire_vals[i] = fire_locs[i];
+                }
+
+                // Water and the book are single items, so they are rolled
+                // directly and re-rolled off anything they would land on. The
+                // water pool's first entries are the wind region's.
+                int water_val = rng.next(26);
+                while (std::find(wind_vals.begin(), wind_vals.end(), water_val) != wind_vals.end()) {
+                    water_val = rng.next(26);
+                }
+                int book_val = 0;
+                if (!options.fire_book) {
+                    book_val = rng.next(22);
+                }
+                else {
+                    book_val = rng.next(58);
+                    while (std::find(fire_vals.begin(), fire_vals.end(), book_val) != fire_vals.end()) {
+                        book_val = rng.next(58);
+                    }
+                }
+
+                for (size_t i = 0; i < earth_items.size(); i++) {
+                    int value = earth_locs[i];
+                    int item = earth_items[i];
+                    if (value == 0) { lk_boss_items[0] = item; }          // Solvaring
+                    else if (value <= 15) { put(data::area_earth, value, item, false); }
+                    else if (value <= 18) { put(data::area_earth, value, item, true); }
+                    if (hints[0] == -1) { hints[0] = value; }
+                }
+                for (size_t i = 0; i < wind_items.size(); i++) {
+                    int value = wind_vals[i];
+                    int item = wind_items[i];
+                    if (value == 0) { lk_boss_items[1] = item; }          // Zelse
+                    else if (value <= 15) { put(data::area_wind, value, item, false); }
+                    else if (value <= 17) { put(data::area_wind, value, item, true); }
+                    if (hints[1] == -1) { hints[1] = value; }
+                }
+                {
+                    int value = water_val;
+                    if (value == 0) { lk_boss_items[1] = 22; }            // Zelse
+                    else if (value <= 15) { put(data::area_water_nowings, value, 22, false); }
+                    else if (value <= 17) { put(data::area_water_nowings, value, 22, true); }
+                    else if (value == 18) { lk_boss_items[2] = 22; }      // Nepty
+                    else if (value <= 25) { put(data::area_water_nowings, value, 22, false); }
+                    hints[2] = value;
+                }
+                for (size_t i = 0; i < fire_items.size(); i++) {
+                    int value = fire_vals[i];
+                    int item = fire_items[i];
+                    if (value == 0) { lk_boss_items[3] = item; }          // Shilf
+                    else if (value == 1) { lk_boss_items[4] = item; }     // Fargo
+                    else if (value <= 34) { put(data::area_fire, value, item, false); }
+                    else if (value <= 36) { put(data::area_fire, value, item, true); }
+                    if (hints[3] == -1) { hints[3] = value; }
+                }
+                {
+                    int value = book_val;
+                    if (!options.fire_book) {
+                        if (value == 0) { lk_boss_items[5] = 24; }        // Guilty
+                        else if (value == 1) { lk_boss_items[6] = 24; }   // Beigis
+                        else if (value <= 19) { put(data::area_book, value, 24, false); }
+                        else if (value <= 21) { put(data::area_book, value, 24, true); }
+                        hints[4] = value == 1 ? 1 : value;
+                    }
+                    else {
+                        if (value == 0) { lk_boss_items[3] = 24; }        // Shilf
+                        else if (value == 1) { lk_boss_items[4] = 24; }   // Fargo
+                        else if (value <= 34) { put(data::area_fire, value, 24, false); }
+                        else if (value <= 36) { put(data::area_fire, value, 24, true); }
+                        else if (value == 37) { lk_boss_items[5] = 24; }  // Guilty
+                        else if (value == 38) { lk_boss_items[6] = 24; }  // Beigis
+                        else if (value <= 56) { put(data::area_bookf_beigis_nowings, value, 24, false); }
+                        else if (value <= 58) { put(data::area_bookf_beigis_nowings, value, 24, true); }
+                        hints[4] = value == 38 ? 1 : value;
+                    }
+                }
+            }
+            else {
+                // Open World. One pool covers every location in the game; the
+                // wings take the first six entries and each gem then takes the
+                // next entry inside its own region's range, which is what keeps
+                // the Shannon hints meaningful.
+                std::vector<int> pool = rng.count_and_shuffle(104);
+                std::vector<int> wing_ids = { 14, 15, 16, 17, 18, 19 };
+                std::vector<int> wing_vals(pool.begin(), pool.begin() + 6);
+
+                rng.shuffle(gem_ids);
+                std::vector<int> gem_vals(5, -1);
+                for (size_t i = 6; i < pool.size(); i++) {
+                    int value = pool[i];
+                    if (gem_vals[0] == -1 && value <= 18) {
+                        gem_vals[0] = value;
+                        hints[0] = value;
+                    }
+                    if (gem_vals[1] == -1 && value >= 19 && value <= 36 && value != gem_vals[2]) {
+                        gem_vals[1] = value;
+                        hints[1] = value - 19;
+                    }
+                    if (gem_vals[2] == -1 && value >= 19 && value <= 44 && value != gem_vals[1]) {
+                        gem_vals[2] = value;
+                        hints[2] = value - 19;
+                    }
+                    if (!options.fire_book) {
+                        if (gem_vals[3] == -1 && value >= 45 && value <= 81) {
+                            gem_vals[3] = value;
+                            hints[3] = value - 45;
+                        }
+                        if (gem_vals[4] == -1 && value >= 82 && value <= 103) {
+                            gem_vals[4] = value;
+                            hints[4] = value - 82;
+                        }
+                    }
+                    else {
+                        if (gem_vals[3] == -1 && value >= 45 && value <= 81 && value != gem_vals[4]) {
+                            gem_vals[3] = value;
+                            hints[3] = value - 45;
+                        }
+                        if (gem_vals[4] == -1 && value >= 45 && value <= 103 && value != gem_vals[3]) {
+                            gem_vals[4] = value;
+                            hints[4] = value - 45;
+                        }
+                    }
+                    if (std::find(gem_vals.begin(), gem_vals.end(), -1) == gem_vals.end()) {
+                        break;
+                    }
+                }
+
+                auto place_open = [&](int value, int item) {
+                    if (value < 0) { return; }
+                    if (value == 0) { lk_boss_items[0] = item; }          // Solvaring
+                    else if (value <= 15) { put(data::area_open_beigis, value, item, false); }
+                    else if (value <= 18) { put(data::area_open_beigis, value, item, true); }
+                    else if (value == 19) { lk_boss_items[1] = item; }    // Zelse
+                    else if (value <= 34) { put(data::area_open_beigis, value, item, false); }
+                    else if (value <= 36) { put(data::area_open_beigis, value, item, true); }
+                    else if (value == 37) { lk_boss_items[2] = item; }    // Nepty
+                    else if (value <= 44) { put(data::area_open_beigis, value, item, false); }
+                    else if (value == 45) { lk_boss_items[3] = item; }    // Shilf
+                    else if (value == 46) { lk_boss_items[4] = item; }    // Fargo
+                    else if (value <= 79) { put(data::area_open_beigis, value, item, false); }
+                    else if (value <= 81) { put(data::area_open_beigis, value, item, true); }
+                    else if (value == 82) { lk_boss_items[5] = item; }    // Guilty
+                    else if (value == 83) { lk_boss_items[6] = item; }    // Beigis
+                    else if (value <= 101) { put(data::area_open_beigis, value, item, false); }
+                    else if (value <= 103) { put(data::area_open_beigis, value, item, true); }
+                };
+
+                for (size_t i = 0; i < wing_vals.size(); i++) {
+                    place_open(wing_vals[i], wing_ids[i]);
+                }
+                for (size_t i = 0; i < gem_vals.size(); i++) {
+                    place_open(gem_vals[i], gem_ids[i]);
+                }
+            }
+
+            for (int& coin : hint_coins) {
+                coin = rng.next(2);
+            }
+        }
 
         void shuffle_spells() {
             for (int i = 0; i < player_spells; i++) {
@@ -431,12 +714,24 @@ namespace {
             // sequence the same by doing likewise.
             roll_list(chests, options.chests);
 
-            for (int l = 0; l < drop_count; l++) {
+            // Lost Keys widens the drop list to take in the seven bosses, so
+            // their items shuffle with everything else, then splits them back
+            // off. The writes still only cover the first drop_count entries.
+            int drop_slots = options.lost_keys != 0 ? drop_count + boss_count : drop_count;
+            drops.assign(drop_slots, 0);
+            for (int l = 0; l < drop_slots; l++) {
                 drops[l] = data::dropdata[l * 2 + 1];
             }
             roll_list(drops, options.drops);
+            if (options.lost_keys != 0) {
+                for (int i = 0; i < boss_count; i++) {
+                    lk_boss_items[i] = drops[drop_count + i];
+                }
+            }
 
-            gifts.assign(options.shuffle_shannon ? 8 : 10, 0);
+            // Lost Keys needs all ten gift slots addressable, so the final
+            // Shannons are only trimmed off when it is not running.
+            gifts.assign(options.shuffle_shannon && options.lost_keys == 0 ? 8 : 10, 0);
             for (size_t l = 0; l < gifts.size(); l++) {
                 gifts[l] = data::itemgranters[l * 2 + 1];
             }
@@ -476,6 +771,8 @@ namespace {
             if (options.wingsmiths != ListMode::Off) {
                 roll_list(wings, options.wingsmiths);
             }
+
+            place_lost_keys();
         }
 
         void shuffle_monsters() {
@@ -715,6 +1012,11 @@ namespace {
                 }
             }
 
+            if (options.ivory_wings) {
+                // The gifter text below has to name the new item.
+                item_capital_case[14] = "Ivory Wings";
+            }
+
             // Updated Gifter/Wingsmith text
             if (options.gifts != ListMode::Off || options.wingsmiths != ListMode::Off) {
                 // Which gift slot each of the 28 text blocks refers to.
@@ -775,7 +1077,7 @@ namespace {
 
             // Boss Order Shuffle
             if (options.boss_order) {
-                constexpr int boss_items[boss_count] = { 20, 21, 22, 255, 23, 255, 255 };
+                constexpr int vanilla_boss_items[boss_count] = { 20, 21, 22, 255, 23, 255, 255 };
                 constexpr uint32_t boss_addresses[boss_count] = { 14186532, 14186588, 14186644, 14186700, 14186756, 14186812, 14186868 };
                 static const char* const boss_names[boss_count] = { "Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis" };
                 log("");
@@ -784,7 +1086,9 @@ namespace {
                     add_hex(data::bosslocdata[boss_order[i] * 4], data::bosslocdata[(i * 4) + 1]);
                     add_hex(data::bosslocdata[(boss_order[i] * 4) + 2], data::bosslocdata[(i * 4) + 3]);
                     add_hex(data::rewardhpdata[boss_order[i] * 2], data::rewardhpdata[(i * 2) + 1]);
-                    add_u8(boss_addresses[boss_order[i]], boss_items[i]);
+                    // Lost Keys replaces what every boss carries.
+                    int carried = options.lost_keys != 0 ? lk_boss_items[i] : vanilla_boss_items[i];
+                    add_u8(boss_addresses[boss_order[i]], carried);
                     log(std::string("  ") + boss_names[boss_order[i]] + "'s arena: " + boss_names[i]);
                 }
                 // Merrow also patches code at 0x01D4D7 to skip Beigis's map
@@ -892,6 +1196,138 @@ namespace {
                 add_hex("65F273", "180018001A00000007");
                 log("Fast Blue Cave: on.");
             }
+            if (options.unlock_doors) {
+                // The 18 progression locks (gems, book, key). Each pair is an
+                // address and its replacement record; the record's own length
+                // decides how many bytes are written.
+                for (int i = 0; i < 18; i++) {
+                    add_hex(data::unlockedDoorData[i * 2], data::unlockedDoorData[i * 2 + 1]);
+                }
+                log("All progression locks (gems/book/key) unlocked.");
+            }
+            if (options.locked_endgame) {
+                // Entries 21-24 put the Elemental Gems back on the final
+                // staircase instead.
+                for (int i = 21; i < 25; i++) {
+                    add_hex(data::unlockedDoorData[i * 2], data::unlockedDoorData[i * 2 + 1]);
+                }
+                log("Approach to Mammon's World locked by Elemental Gems.");
+            }
+            if (options.fast_shamwood) {
+                add_hex(data::unlockedDoorData[19 * 2], data::unlockedDoorData[19 * 2 + 1]);
+                log("Fast Shamwood: on.");
+            }
+            if (options.brannoch_return) {
+                add_hex(data::unlockedDoorData[20 * 2], data::unlockedDoorData[20 * 2 + 1]);
+                log("Brannoch return warp enabled.");
+            }
+            if (options.crystal_return) {
+                // The Water Jewel requirement is dropped from the record when
+                // the progression locks are already open.
+                add_hex("206EB0", options.unlock_doors
+                    ? "42020000C3BC0000BFC90FF940C0000040E0000001060000000000020000001A00020003"
+                    : "42020000C3BC0000BFC90FF940C0000040E0000001160016000000020000001A00020003");
+                log("Crystal Valley return warp enabled.");
+            }
+            if (options.fast_mammon) {
+                add_hex("84EDFE", "000E000D");
+                add_hex("607920", "0000000F000D0000");
+                log("Fast Mammon's World: on.");
+            }
+            if (options.mammon_door) {
+                add_hex(data::mammonbackwarddoordata[0], data::mammonbackwarddoordata[2]);
+                log("Locked the useless backward door in Mammon's World.");
+            }
+            if (options.restless_npcs) {
+                // Every NPC's movement byte becomes 02, which makes them wander.
+                for (int address : data::npcmovement) {
+                    add(static_cast<uint32_t>(address), { 0x02 });
+                }
+                log("NPCs are restless.");
+            }
+            if (options.max_message_speed) {
+                add_hex("060600", "00");
+                log("Message speed: max.");
+            }
+            if (options.hud_lock) {
+                add_hex("01F0AF", "00");
+                log("HUD onscreen lock enabled.");
+            }
+            if (options.celtland_drift) {
+                add_hex("071B50", "3FF44444");
+                log("Celtland Drift enabled.");
+            }
+            if (options.level_2_spells) {
+                // The four base spells unlock at level 2 instead of 1.
+                for (int i = 0; i < 60; i += 15) {
+                    add_hex(data::spells[(i * 4) + 1], "0002");
+                }
+                log("Base spells unlocked at level 2.");
+            }
+            if (options.reveal_spirits) {
+                add_hex("609970", "A20800003208");
+                add_hex("56FAE0", "C210000041E8");
+                log("Hidden spirits moved to clearer locations.");
+            }
+            if (options.better_dew_drop) {
+                // Makes the Dew Drop a full revive, and rewrites its and the
+                // Dragon Potion's descriptions to match.
+                add_hex("D86B01", "14");
+                add_hex(data::newdewdropdesc[0], data::newdewdropdesc[1]);
+                add_hex(data::newdewdropdesc[2], data::newdewdropdesc[3]);
+                add_hex(data::newdewdropdesc[4], data::newdewdropdesc[5]);
+                log("Dew Drop made useful.");
+            }
+            if (options.zoom_out != 0) {
+                // 0x3FF0 is the stock camera distance and 0x3FE4 the lowest
+                // stable one, so each step backs the camera off by one unit.
+                int zoom = std::clamp(options.zoom_out, 1, 4) + 1;
+                add_u16(hex_addr("03698A"), 16368 - zoom);
+                add_u16(hex_addr("036A26"), 16368 - zoom);
+                log("Zoom out factor set to " + std::to_string(zoom - 1) + ".");
+            }
+            if (options.ivory_wings) {
+                // White Wings become the Ivory Wings, granted by Lavaar.
+                for (int i = 0; i < 4; i++) {
+                    add_hex(data::ivorywings[i * 3], data::ivorywings[i * 3 + 2]);
+                }
+                // Melrode wingsmith actor type, then Lavaar's NPC type and
+                // second dialogue.
+                add_hex("49F90F", "01");
+                add_hex("5EBB13", "02");
+                add_hex("5EBB1A", "1CA0");
+                if (options.wingsmiths == ListMode::Off) {
+                    // Nothing else is rewriting what Lavaar hands over.
+                    add_hex("5EBB16", "000E");
+                }
+                log("White Wings replaced with Ivory Wings (granted by Lavaar).");
+            }
+            if (options.text_improvements) {
+                // Merrow also rewrites two Lost Keys texts here; those wait
+                // until Lost Keys itself is ported.
+                if (auto encoded = translate_string(data::newsavetext)) {
+                    std::vector<uint8_t> bytes = { 0xA0, 0xC0 };
+                    bytes.insert(bytes.end(), encoded->begin(), encoded->end());
+                    add(hex_addr("06B268"), bytes);
+                    log("Text improvements added.");
+                }
+                if (options.lost_keys != 0) {
+                    // Abbott and the Melrode Shannon explain the Lost Keys
+                    // premise instead of the vanilla opening.
+                    const std::pair<const char*, const std::string*> lk_texts[2] = {
+                        { "055428", &data::newAbbottIntroLK },
+                        { "D305E0", &data::newMelrodeShannonLK },
+                    };
+                    for (const auto& entry : lk_texts) {
+                        if (auto lk = translate_string(*entry.second)) {
+                            std::vector<uint8_t> lk_bytes = { 0xA0, 0xC0 };
+                            lk_bytes.insert(lk_bytes.end(), lk->begin(), lk->end());
+                            add(hex_addr(entry.first), lk_bytes);
+                        }
+                    }
+                    log("Lost Keys intro text added.");
+                }
+            }
 
             if (options.start_hp != 50 || options.start_mp != 15 || options.start_agility != 5 || options.start_defense != 4) {
                 std::string stats = hex4(options.start_hp) + hex4(options.start_hp) + hex4(options.start_mp) + hex4(options.start_mp) + hex4(options.start_agility) + hex4(options.start_defense);
@@ -922,17 +1358,16 @@ namespace {
                 if (choice == 1) {
                     // A random hue rotation of either the light or the dark
                     // base palette, as Merrow's "random" setting does.
-                    double hue = rng.next_double() * 360.0;
+                    ColourRoll roll = roll_colour();
                     bool light = rng.next(2) != 0;
                     const std::vector<std::string>& base =
                         light ? data::baseRedTextPalette : data::baseDarkTextPalette;
                     std::string palette = "F83E";
                     for (int i = 0; i < 3; i++) {
-                        palette += rgba_to_rgba5551(hue_shift(rgba5551_to_rgba(base[i]), hue));
+                        palette += rgba_to_rgba5551(apply_roll(rgba5551_to_rgba(base[i]), roll));
                     }
                     add_hex("D3E240", palette);
-                    log("Text palette: random (" + std::to_string(static_cast<int>(std::lround(hue))) +
-                        (light ? " light)." : " dark)."));
+                    log("Text palette: random (" + roll.describe() + (light ? ", light)." : ", dark)."));
                 }
                 else if (fixed_palettes[choice] != nullptr) {
                     add_hex("D3E240", fixed_palettes[choice]);
@@ -941,16 +1376,352 @@ namespace {
             }
 
             if (options.staff_palette) {
-                // The staff texture is 768 RGBA5551 colours, all rotated by
-                // the same hue.
-                double hue = rng.next_double() * 360.0;
+                // The staff texture is 768 RGBA5551 colours, all moved by the
+                // same roll.
+                ColourRoll roll = roll_colour();
                 std::string palette;
                 palette.reserve(768 * 4);
                 for (int i = 0; i < 768; i++) {
-                    palette += rgba_to_rgba5551(hue_shift(rgba5551_to_rgba(data::stafftexture.substr(i * 4, 4)), hue));
+                    palette += rgba_to_rgba5551(apply_roll(rgba5551_to_rgba(data::stafftexture.substr(i * 4, 4)), roll));
                 }
                 add_hex("86EB70", palette);
-                log("Staff palette: random (" + std::to_string(static_cast<int>(std::lround(hue))) + ").");
+                log("Staff palette: random (" + roll.describe() + ").");
+            }
+
+            if (options.cloak_palette) {
+                // One flat RGBA8888 colour, written over each of the six
+                // cloak palette entries.
+                char rgb[8];
+                snprintf(rgb, sizeof(rgb), "%06X", rng.next(0x1000000));
+                for (const std::string& location : data::cloaklocations) {
+                    add_hex(location, std::string(rgb) + "FF");
+                }
+                log(std::string("Cloak colour: #") + rgb + ".");
+            }
+
+            if (options.brian_palette) {
+                // Brian's clothes are two texture pages of 0x980 bytes each,
+                // rotated by a hue of their own. briantexture2 holds more
+                // colours than the write covers, so only the first 1216 of
+                // each are used, as Merrow does.
+                constexpr int brian_colours = 1216;
+                static const struct { const char* address; const std::string& texture; } pages[2] = {
+                    { "86D5F0", data::briantexture1 },
+                    { "86DFF0", data::briantexture2 },
+                };
+                std::string hues;
+                for (const auto& page : pages) {
+                    ColourRoll roll = roll_colour();
+                    std::string colours;
+                    colours.reserve(brian_colours * 4);
+                    for (int i = 0; i < brian_colours; i++) {
+                        colours += rgba_to_rgba5551(apply_roll(rgba5551_to_rgba(page.texture.substr(i * 4, 4)), roll));
+                    }
+                    add_hex(page.address, colours);
+                    if (!hues.empty()) {
+                        hues += "/";
+                    }
+                    hues += roll.describe();
+                }
+                log("Brian's clothes: random (" + hues + ").");
+            }
+
+            if (options.spell_palette) {
+                // Each entry is an address and the vanilla halfword; only the
+                // low byte, the palette index, is rerolled (1-17).
+                for (size_t i = 0; i * 2 + 1 < data::allcolors.size(); i++) {
+                    char index[4];
+                    snprintf(index, sizeof(index), "%02X", rng.next(17) + 1);
+                    add_hex(data::allcolors[i * 2], data::allcolors[i * 2 + 1].substr(0, 2) + index);
+                }
+                log("Spell palettes randomized.");
+            }
+
+            if (options.music_shuffle) {
+                // 73 track slots. The usable tracks are 0-26 and 31-41, so a
+                // roll of 0-37 skips the unused four in the middle.
+                for (size_t i = 0; i * 2 + 1 < data::bgmdata.size(); i++) {
+                    int track = rng.next(38);
+                    if (track >= 27) {
+                        track += 4;
+                    }
+                    char value[4];
+                    snprintf(value, sizeof(value), "%02X", track);
+                    add_hex(data::bgmdata[i * 2], value);
+                }
+                log("Background music randomized.");
+            }
+        }
+
+
+        // QuestPatchBuild.cs's Lost Keys section: the door changes that keep a
+        // Lost Keys run completable, the boss items when boss order is not
+        // also shuffling them, and Shannon's hints about where the gems went.
+        void patch_lost_keys() {
+            if (options.lost_keys == 0) {
+                return;
+            }
+
+            log("");
+            log(std::string("LOST KEYS: ") + (options.lost_keys == 1 ? "progressive." : "open world."));
+            log("  Chest, drop and gift shuffling forced on, wingsmith shuffling off, Ivory Wings on.");
+
+            if (!options.unlock_doors) {
+                // Only reachable in Progressive, since Open World is meant to
+                // be played with the progression locks already open. Colleen's
+                // side is opened up and the castle gate is locked behind the
+                // Fire Ruby instead.
+                for (int entry : { 7, 8, 9, 10, 18 }) {
+                    add_hex(data::unlockedDoorData[entry * 2], data::unlockedDoorData[entry * 2 + 1]);
+                }
+                // The fire symbol that now appears on the Brannoch Castle gate.
+                add_hex("0E72F0", data::firegate);
+            }
+
+            if (!options.boss_order) {
+                // With boss order shuffling on, patch_monsters writes these as
+                // part of its own loop; this covers the case where it is off.
+                // Merrow indexes a six-entry address table here and would run
+                // off the end at Beigis, so the addresses come from dropdata,
+                // which is where Merrow reads them for the boss-order path.
+                log("");
+                log("BOSS ITEMS (Lost Keys):");
+                for (int i = 0; i < boss_count; i++) {
+                    add_u8(data::dropdata[(i + drop_count) * 2], lk_boss_items[i]);
+                    log("  " + data::monsternames[(i + drop_count) * 2] + " carries " + item_name(lk_boss_items[i]));
+                }
+            }
+
+            if (options.shannon_hints) {
+                // Each of the five Shannons describes where one gem ended up.
+                // Two coin flips per gem pick the adjective and the sentence.
+                static const char* const region_names[5] = { "earth", "wind", "water", "fire", "book" };
+                log("");
+                log("SHANNON HINTS:");
+                for (int i = 0; i < 5; i++) {
+                    const std::vector<std::string>& words =
+                        i == 0 ? data::earthhints :
+                        i == 1 ? data::windhints :
+                        i == 2 ? data::waterhints :
+                        i == 3 ? data::firehints :
+                        (options.fire_book ? data::bookfhints : data::bookhints);
+
+                    int location = hints[i] < 0 ? 0 : hints[i];
+                    size_t word_index = static_cast<size_t>(location) * 2 + static_cast<size_t>(hint_coins[i]);
+                    if (word_index >= words.size()) {
+                        // Merrow's book hint tables stop one entry short of the
+                        // range its own roll can produce, so the last location
+                        // has no wording. Fall back rather than read past the
+                        // end; the hint is vaguer but never wrong.
+                        word_index = words.size() - (hint_coins[i] == 0 ? 2 : 1);
+                    }
+                    const std::string& word = words[word_index];
+                    const std::string& gem = data::gemnames[static_cast<size_t>(gem_ids[i] - 20)];
+
+                    std::string line;
+                    if (hint_coins[i + 5] == 0) {
+                        line = "The " + gem + " currently#rests somewhere " + word +
+                               ".#You must find it before any#darker purposes befall it.%";
+                    }
+                    else {
+                        line = "The " + gem + " resides#in a " + word +
+                               " place.#We must retrieve it for the#good of all Celtland.%";
+                    }
+
+                    auto encoded = translate_string(line);
+                    if (!encoded) {
+                        continue;
+                    }
+                    // Unlike the gifter text these are written without the
+                    // A0C0 header, as Merrow does.
+                    add(hex_addr(data::shannonhints[i]), *encoded);
+                    // Drop the Shannons' follow-up dialogue so the hint does
+                    // not depend on which order the items were found in.
+                    add_hex(data::shannonrules[i], "01");
+                    log(std::string("  ") + region_names[i] + ": " + gem + " is " + word);
+                }
+            }
+        }
+
+
+        // Util/AreaEncounterData.cs. Two independent shuffles:
+        //
+        //  - Tables: the areas swap which of the six global enemy tables they
+        //    draw from, so Holy Plains can end up fielding Brannoch's roster.
+        //    Pack enemy ids are then wrapped into the new table's size.
+        //  - Compositions: each encounter region rerolls which packs it can
+        //    spawn, and each pack rerolls which enemies it holds.
+        //
+        // Baragoon Moor, Brannoch Castle and Mammon's World share pack
+        // definitions across their submaps and so write to the same addresses.
+        // After both passes their enemy ids are wrapped to the smallest table
+        // any member of the group ended up with, or a submap could reference an
+        // enemy its own table does not have.
+        void shuffle_enemies() {
+            if (!options.enemy_tables && !options.enemy_composition) {
+                return;
+            }
+            enemy_areas = mapdata::areas;
+            enemy_packs = mapdata::packs;
+            enemy_regions = mapdata::regions;
+
+            auto table_size = [&](const mapdata::Area& area) {
+                size_t index = area.map.table_index;
+                return index < mapdata::monster_tables.size()
+                    ? static_cast<int>(mapdata::monster_tables[index].enemies.size())
+                    : 0;
+            };
+            auto cap_ids = [&](const mapdata::Area& area, int limit) {
+                if (limit <= 0) {
+                    return;
+                }
+                for (int p = 0; p < area.pack_count; p++) {
+                    for (mapdata::PackMember& member : enemy_packs[area.pack_start + p].members) {
+                        member.enemy_id %= limit;
+                    }
+                }
+            };
+
+            if (options.enemy_tables) {
+                std::vector<int> table_indices;
+                table_indices.reserve(enemy_areas.size());
+                for (const mapdata::Area& area : enemy_areas) {
+                    table_indices.push_back(area.map.table_index);
+                }
+                rng.shuffle(table_indices);
+                for (size_t k = 0; k < enemy_areas.size(); k++) {
+                    enemy_areas[k].map.table_index = static_cast<uint16_t>(table_indices[k]);
+                    cap_ids(enemy_areas[k], table_size(enemy_areas[k]));
+                }
+            }
+
+            if (options.enemy_composition) {
+                for (const mapdata::Area& area : enemy_areas) {
+                    // Every region gets a full seven presets, wrapping if the
+                    // area has fewer packs than that.
+                    for (int r = 0; r < area.region_count; r++) {
+                        mapdata::Region& region = enemy_regions[area.region_start + r];
+                        std::vector<int> pool = rng.count_and_shuffle(area.pack_count);
+                        region.presets.assign(7, 0);
+                        if (!pool.empty()) {
+                            for (int k = 0; k < 7; k++) {
+                                region.presets[static_cast<size_t>(k)] =
+                                    pool[static_cast<size_t>(k) % pool.size()];
+                            }
+                        }
+                        region.preset_count = 7;
+                    }
+
+                    int available = table_size(area);
+                    for (int p = 0; p < area.pack_count; p++) {
+                        std::vector<int> ids = rng.count_and_shuffle(available);
+                        if (ids.empty()) {
+                            continue;
+                        }
+                        std::vector<mapdata::PackMember>& members = enemy_packs[area.pack_start + p].members;
+                        for (size_t m = 0; m < members.size(); m++) {
+                            members[m].enemy_id = ids[m % ids.size()];
+                        }
+                    }
+                }
+            }
+
+            auto clamp_group = [&](int start, int last, const char* what) {
+                int smallest = 20;
+                for (int k = start; k <= last; k++) {
+                    smallest = std::min(smallest, table_size(enemy_areas[static_cast<size_t>(k)]));
+                }
+                for (int k = start; k <= last; k++) {
+                    cap_ids(enemy_areas[static_cast<size_t>(k)], smallest);
+                }
+                enemy_group_notes += std::string("  ") + what + " capped to " +
+                    std::to_string(smallest) + " enemies (shared packs).\n";
+            };
+            clamp_group(13, 14, "Baragoon Moor");
+            clamp_group(15, 20, "Brannoch Castle");
+            clamp_group(21, 26, "Mammon's World");
+        }
+
+        // The three write shapes from AreaEncounterData.cs: each pack as
+        // packCount groups of three big-endian words, the area's 0x18-byte map
+        // header with its (possibly new) table index folded back in, and each
+        // region's preset list, which starts 8 bytes past the region address.
+        void patch_enemies() {
+            if (!options.enemy_tables && !options.enemy_composition) {
+                return;
+            }
+
+            auto push_u32 = [](std::vector<uint8_t>& out, uint32_t value) {
+                out.push_back(static_cast<uint8_t>((value >> 24) & 0xFF));
+                out.push_back(static_cast<uint8_t>((value >> 16) & 0xFF));
+                out.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+                out.push_back(static_cast<uint8_t>(value & 0xFF));
+            };
+            auto push_u16 = [](std::vector<uint8_t>& out, uint32_t value) {
+                out.push_back(static_cast<uint8_t>((value >> 8) & 0xFF));
+                out.push_back(static_cast<uint8_t>(value & 0xFF));
+            };
+
+            log("");
+            log("ENEMIES:");
+            if (options.enemy_tables) {
+                log("  Area enemy tables shuffled.");
+            }
+            if (options.enemy_composition) {
+                log("  Encounter compositions shuffled.");
+            }
+
+            for (const mapdata::Area& area : enemy_areas) {
+                for (int p = 0; p < area.pack_count; p++) {
+                    const mapdata::MonsterPack& pack = enemy_packs[area.pack_start + p];
+                    std::vector<uint8_t> bytes;
+                    bytes.reserve(pack.members.size() * 12);
+                    for (const mapdata::PackMember& member : pack.members) {
+                        push_u32(bytes, static_cast<uint32_t>(member.enemy_id));
+                        push_u32(bytes, static_cast<uint32_t>(member.min_count));
+                        push_u32(bytes, static_cast<uint32_t>(member.extra_count));
+                    }
+                    if (!bytes.empty()) {
+                        add(pack.rom_address, std::move(bytes));
+                    }
+                }
+
+                std::vector<uint8_t> header;
+                header.reserve(24);
+                push_u32(header, area.map.unk0);
+                push_u32(header, area.map.ptr_door_data);
+                push_u32(header, area.map.door_count);
+                push_u32(header, area.map.unk8);
+                push_u32(header, (static_cast<uint32_t>(area.map.unk10) << 16) | area.map.table_index);
+                push_u32(header, area.map.unk14);
+                add(area.map.rom_address, std::move(header));
+
+                // Only written when the compositions were actually rerolled.
+                // Two of Merrow's 72 regions carry preset lists that disagree
+                // with the ROM (they look swapped with each other), so writing
+                // unchanged region data back would quietly alter them.
+                for (int r = 0; options.enemy_composition && r < area.region_count; r++) {
+                    const mapdata::Region& region = enemy_regions[area.region_start + r];
+                    auto preset = [&](size_t i) {
+                        return i < region.presets.size() ? static_cast<uint32_t>(region.presets[i]) : 0u;
+                    };
+                    std::vector<uint8_t> bytes;
+                    bytes.reserve(16);
+                    push_u16(bytes, static_cast<uint32_t>(region.preset_count));
+                    for (size_t i = 0; i < 7; i++) {
+                        push_u16(bytes, preset(i));
+                    }
+                    add(region.rom_address + 8, std::move(bytes));
+                }
+
+                size_t table = area.map.table_index;
+                log("  " + area.name + ": table " + std::to_string(table) +
+                    (table < mapdata::monster_tables.size() && !mapdata::monster_tables[table].enemies.empty()
+                        ? " (" + mapdata::monster_tables[table].enemies[0] + ", ...)"
+                        : ""));
+            }
+            if (!enemy_group_notes.empty()) {
+                log(enemy_group_notes.substr(0, enemy_group_notes.size() - 1));
             }
         }
 
@@ -959,11 +1730,14 @@ namespace {
             shuffle_spell_names();
             shuffle_items();
             shuffle_monsters();
+            shuffle_enemies();
 
             patch_spells();
             patch_items();
             patch_monsters();
             patch_misc();
+            patch_lost_keys();
+            patch_enemies();
             patch_cosmetics();
         }
     };
@@ -978,6 +1752,30 @@ namespace {
 
     std::filesystem::path spoiler_path() {
         return zelda64::get_app_folder_path() / "randomizer_spoiler.txt";
+    }
+
+    std::filesystem::path presets_path() {
+        return zelda64::get_app_folder_path() / "randomizer_presets.json";
+    }
+
+    nlohmann::json load_presets_file() {
+        std::ifstream in(presets_path());
+        if (!in.good()) {
+            return nlohmann::json::object();
+        }
+        nlohmann::json j;
+        try {
+            in >> j;
+        }
+        catch (nlohmann::json::parse_error&) {
+            return nlohmann::json::object();
+        }
+        return j.is_object() ? j : nlohmann::json::object();
+    }
+
+    void write_presets_file(const nlohmann::json& j) {
+        std::ofstream out(presets_path());
+        out << j.dump(4);
     }
 
     const char* list_mode_name(ListMode mode) {
@@ -995,7 +1793,7 @@ namespace {
     }
 }
 
-void zelda64::randomizer::save_options(const Options& o) {
+static nlohmann::json options_to_json(const Options& o) {
     nlohmann::json j;
     j["mode"] = o.mode == Mode::Randomizer ? "randomizer" : "vanilla";
     j["seed"] = o.seed;
@@ -1032,6 +1830,28 @@ void zelda64::randomizer::save_options(const Options& o) {
     j["start_defense"] = o.start_defense;
     j["fast_monastery"] = o.fast_monastery;
     j["fast_blue_cave"] = o.fast_blue_cave;
+    j["fast_shamwood"] = o.fast_shamwood;
+    j["fast_mammon"] = o.fast_mammon;
+    j["unlock_doors"] = o.unlock_doors;
+    j["locked_endgame"] = o.locked_endgame;
+    j["crystal_return"] = o.crystal_return;
+    j["brannoch_return"] = o.brannoch_return;
+    j["mammon_door"] = o.mammon_door;
+    j["restless_npcs"] = o.restless_npcs;
+    j["max_message_speed"] = o.max_message_speed;
+    j["hud_lock"] = o.hud_lock;
+    j["celtland_drift"] = o.celtland_drift;
+    j["level_2_spells"] = o.level_2_spells;
+    j["reveal_spirits"] = o.reveal_spirits;
+    j["better_dew_drop"] = o.better_dew_drop;
+    j["zoom_out"] = o.zoom_out;
+    j["ivory_wings"] = o.ivory_wings;
+    j["text_improvements"] = o.text_improvements;
+    j["lost_keys"] = o.lost_keys;
+    j["fire_book"] = o.fire_book;
+    j["shannon_hints"] = o.shannon_hints;
+    j["enemy_tables"] = o.enemy_tables;
+    j["enemy_composition"] = o.enemy_composition;
     j["encounter_rate"] = o.encounter_rate;
     j["mp_regain"] = o.mp_regain;
     j["staff_hit_mp"] = o.staff_hit_mp;
@@ -1041,25 +1861,20 @@ void zelda64::randomizer::save_options(const Options& o) {
     j["wing_unlock_skye"] = o.wing_unlock_skye;
     j["text_palette"] = o.text_palette;
     j["staff_palette"] = o.staff_palette;
-
-    std::ofstream out(options_path());
-    out << j.dump(4);
+    j["cloak_palette"] = o.cloak_palette;
+    j["brian_palette"] = o.brian_palette;
+    j["spell_palette"] = o.spell_palette;
+    j["music_shuffle"] = o.music_shuffle;
+    return j;
 }
 
-zelda64::randomizer::Options zelda64::randomizer::load_options() {
-    Options o;
-    std::ifstream in(options_path());
-    if (!in.good()) {
-        return o;
-    }
-    nlohmann::json j;
-    try {
-        in >> j;
-    }
-    catch (nlohmann::json::parse_error&) {
-        return o;
-    }
+void zelda64::randomizer::save_options(const Options& o) {
+    std::ofstream out(options_path());
+    out << options_to_json(o).dump(4);
+}
 
+static Options options_from_json(const nlohmann::json& j) {
+    Options o;
     auto get = [&j](const char* key, auto& out) {
         auto it = j.find(key);
         if (it != j.end()) {
@@ -1107,6 +1922,30 @@ zelda64::randomizer::Options zelda64::randomizer::load_options() {
     get("start_defense", o.start_defense);
     get("fast_monastery", o.fast_monastery);
     get("fast_blue_cave", o.fast_blue_cave);
+    get("fast_shamwood", o.fast_shamwood);
+    get("fast_mammon", o.fast_mammon);
+    get("unlock_doors", o.unlock_doors);
+    get("locked_endgame", o.locked_endgame);
+    get("crystal_return", o.crystal_return);
+    get("brannoch_return", o.brannoch_return);
+    get("mammon_door", o.mammon_door);
+    get("restless_npcs", o.restless_npcs);
+    get("max_message_speed", o.max_message_speed);
+    get("hud_lock", o.hud_lock);
+    get("celtland_drift", o.celtland_drift);
+    get("level_2_spells", o.level_2_spells);
+    get("reveal_spirits", o.reveal_spirits);
+    get("better_dew_drop", o.better_dew_drop);
+    get("zoom_out", o.zoom_out);
+    get("ivory_wings", o.ivory_wings);
+    get("text_improvements", o.text_improvements);
+    get("lost_keys", o.lost_keys);
+    get("fire_book", o.fire_book);
+    get("shannon_hints", o.shannon_hints);
+    get("enemy_tables", o.enemy_tables);
+    get("enemy_composition", o.enemy_composition);
+    o.lost_keys = std::clamp(o.lost_keys, 0, 2);
+    o.zoom_out = std::clamp(o.zoom_out, 0, 4);
     get("encounter_rate", o.encounter_rate);
     get("mp_regain", o.mp_regain);
     get("staff_hit_mp", o.staff_hit_mp);
@@ -1116,6 +1955,10 @@ zelda64::randomizer::Options zelda64::randomizer::load_options() {
     get("wing_unlock_skye", o.wing_unlock_skye);
     get("text_palette", o.text_palette);
     get("staff_palette", o.staff_palette);
+    get("cloak_palette", o.cloak_palette);
+    get("brian_palette", o.brian_palette);
+    get("spell_palette", o.spell_palette);
+    get("music_shuffle", o.music_shuffle);
 
     o.encounter_rate = std::clamp(o.encounter_rate, 0, 4);
     o.text_palette = std::clamp(o.text_palette, 0, 5);
@@ -1134,6 +1977,65 @@ zelda64::randomizer::Options zelda64::randomizer::load_options() {
     return o;
 }
 
+zelda64::randomizer::Options zelda64::randomizer::load_options() {
+    std::ifstream in(options_path());
+    if (!in.good()) {
+        return Options{};
+    }
+    nlohmann::json j;
+    try {
+        in >> j;
+    }
+    catch (nlohmann::json::parse_error&) {
+        return Options{};
+    }
+    return options_from_json(j);
+}
+
+std::vector<std::string> zelda64::randomizer::preset_names() {
+    std::vector<std::string> names;
+    nlohmann::json presets = load_presets_file();
+    for (auto it = presets.begin(); it != presets.end(); ++it) {
+        names.push_back(it.key());
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+bool zelda64::randomizer::save_preset(const std::string& name, const Options& options) {
+    if (name.empty()) {
+        return false;
+    }
+    nlohmann::json presets = load_presets_file();
+    nlohmann::json entry = options_to_json(options);
+    // Settings only: the seed belongs to the run, not the preset.
+    entry.erase("seed");
+    presets[name] = std::move(entry);
+    write_presets_file(presets);
+    return true;
+}
+
+bool zelda64::randomizer::load_preset(const std::string& name, Options& out) {
+    nlohmann::json presets = load_presets_file();
+    auto it = presets.find(name);
+    if (it == presets.end() || !it->is_object()) {
+        return false;
+    }
+    std::string seed = out.seed;
+    out = options_from_json(*it);
+    out.seed = seed;
+    return true;
+}
+
+bool zelda64::randomizer::delete_preset(const std::string& name) {
+    nlohmann::json presets = load_presets_file();
+    if (presets.erase(name) == 0) {
+        return false;
+    }
+    write_presets_file(presets);
+    return true;
+}
+
 const zelda64::randomizer::Options& zelda64::randomizer::active_options() {
     if (!active_loaded) {
         active = load_options();
@@ -1146,7 +2048,27 @@ zelda64::randomizer::Result zelda64::randomizer::generate(const Options& options
     Result result;
     result.seed_value = seed_value_from_text(options.seed);
 
-    Builder builder(options, result.seed_value);
+    // Merrow's UI forces these whenever Lost Keys is on and disables the
+    // toggles, because Lost Keys scatters the gems and wings through the
+    // chest and gift lists and hands the wings out itself. Without the
+    // same coercion a Lost Keys seed could place a gem into a list that is
+    // never written, leaving it unobtainable.
+    Options effective = options;
+    if (effective.lost_keys != 0) {
+        if (effective.chests == ListMode::Off) {
+            effective.chests = ListMode::Shuffle;
+        }
+        if (effective.gifts == ListMode::Off) {
+            effective.gifts = ListMode::Shuffle;
+        }
+        if (effective.drops == ListMode::Off) {
+            effective.drops = ListMode::Shuffle;
+        }
+        effective.wingsmiths = ListMode::Off;
+        effective.ivory_wings = true;
+    }
+
+    Builder builder(effective, result.seed_value);
     builder.log("Quest 64 Recompiled randomizer (port of Merrow)");
     builder.log("Seed: " + options.seed + " (" + std::to_string(result.seed_value) + ")");
     builder.log("");

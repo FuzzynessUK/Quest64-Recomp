@@ -574,6 +574,40 @@ void reorder_texture_pack(recomp::mods::ModContext&) {
 
 #define REGISTER_FUNC(name) recomp::overlays::register_base_export(#name, name)
 
+
+// Reset, as offered on the General tab and as the bindable "Reset Game" input.
+//
+// ultramodern can start a game but has nothing to tear a running one down:
+// quit() ends the whole application and the game thread only unwinds when the
+// game's own threads destroy themselves. So rather than a true soft reset this
+// relaunches the application, which comes back up on the boot menu. That also
+// re-runs the boot-time randomizer patch, so settings that only apply at boot
+// take effect straight away. A real in-place reset would need new teardown and
+// re-init code in the N64ModernRuntime submodule.
+void zelda64::restart_application() {
+#ifdef _WIN32
+    wchar_t exe_path[MAX_PATH];
+    DWORD length = GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+    bool have_path = length != 0 && length < MAX_PATH;
+#endif
+
+    // Shut this instance down first so its saving thread flushes before the
+    // new one starts looking at the same files.
+    ultramodern::quit();
+
+#ifdef _WIN32
+    if (have_path) {
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        PROCESS_INFORMATION process{};
+        if (CreateProcessW(exe_path, nullptr, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process)) {
+            CloseHandle(process.hThread);
+            CloseHandle(process.hProcess);
+        }
+    }
+#endif
+}
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;

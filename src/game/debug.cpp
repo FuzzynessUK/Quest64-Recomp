@@ -5,7 +5,16 @@
 #include <mutex>
 #include <optional>
 #include "zelda_debug.h"
+#include "randomizer/merrow_data.h"
 #include "librecomp/helpers.hpp"
+
+namespace {
+    // Master switch for everything on the cheats tab; defined with the
+    // inventory code at the bottom of this file.
+    extern std::atomic<bool> cheats_on;
+    void apply_pending_item(uint8_t* rdram);
+}
+
 // #include "../patches/input.h"
 
 std::atomic<uint16_t> pending_warp = 0xFFFF;
@@ -88,6 +97,9 @@ void zelda64::do_map_warp(int map, int submap, int entrance) {
 // The request stays queued until the game is in the field and idle, so a warp
 // asked for mid-transition fires once that transition has settled.
 static void apply_map_warp(uint8_t* rdram) {
+    if (!cheats_on.load()) {
+        return;
+    }
     if (!map_warp_queued.load()) {
         return;
     }
@@ -180,7 +192,7 @@ namespace {
     void sync_player_stats(uint8_t* rdram) {
         for (size_t i = 0; i < stat_count; i++) {
             int32_t pending = pending_stats.values[i].exchange(no_pending_stat);
-            if (pending != no_pending_stat) {
+            if (pending != no_pending_stat && cheats_on.load()) {
                 write_stat(rdram, stat_fields[i], pending);
             }
             live_stats[i].store(read_stat(rdram, stat_fields[i]));
@@ -206,6 +218,7 @@ void zelda64::set_player_stat(PlayerStat stat, int value) {
 extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     apply_map_warp(rdram);
     sync_player_stats(rdram);
+    apply_pending_item(rdram);
 }
 
 // Movement speed.
@@ -237,7 +250,7 @@ void zelda64::set_player_speed_scale(float scale) {
 }
 
 float zelda64::get_player_speed_scale() {
-    return player_speed_scale.load();
+    return cheats_on.load() ? player_speed_scale.load() : 1.0f;
 }
 
 // Walls are about 3.5 units thick and the collision test is on position +
@@ -262,4 +275,59 @@ extern "C" void quest64_scale_player_velocity(uint8_t* rdram, recomp_context* ct
 
     write_f32(rdram, player + 0x18, vx);
     write_f32(rdram, player + 0x20, vz);
+}
+
+// Master switch, inventory and the kill button.
+//
+// gInventory (0x8008CF78) is a flat list of 150 item ids with 0xFF for an
+// empty slot. func_8000FFE8 walks the whole list looking for a match rather
+// than indexing it, so a granted item only has to land in some free slot.
+// Item ids run 0x00-0x19 and the names come from the randomizer's table, which
+// was extracted from the ROM.
+namespace {
+    constexpr int32_t gInventory = 0x8008CF78;
+    constexpr int inventory_slots = 150;
+    constexpr int32_t inventory_empty = 0xFF;
+    constexpr int32_t no_pending_item = -1;
+
+    std::atomic<bool> cheats_on = true;
+    std::atomic<int32_t> pending_item = no_pending_item;
+
+    void apply_pending_item(uint8_t* rdram) {
+        int32_t item = pending_item.exchange(no_pending_item);
+        if (item == no_pending_item || !cheats_on.load()) {
+            return;
+        }
+        for (int slot = 0; slot < inventory_slots; slot++) {
+            if (MEM_BU(0, gInventory + slot) == inventory_empty) {
+                MEM_B(0, gInventory + slot) = static_cast<int8_t>(item);
+                return;
+            }
+        }
+    }
+}
+
+void zelda64::set_cheats_enabled(bool enabled) {
+    cheats_on.store(enabled);
+}
+
+bool zelda64::cheats_enabled() {
+    return cheats_on.load();
+}
+
+const std::vector<std::string>& zelda64::item_names() {
+    return merrow::data::itemcapitalcase;
+}
+
+void zelda64::give_item(int item_id) {
+    if (item_id < 0 || static_cast<size_t>(item_id) >= merrow::data::itemcapitalcase.size()) {
+        return;
+    }
+    pending_item.store(item_id);
+}
+
+void zelda64::kill_player() {
+    // Reuses the stat queue, so the write lands on the next frame like any
+    // other stat edit and the game's own death handling takes it from there.
+    set_player_stat(PlayerStat::HP, 0);
 }

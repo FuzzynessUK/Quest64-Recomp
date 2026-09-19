@@ -192,6 +192,14 @@
                         </div>
                     </div>
 
+                    <!-- Reset -->
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(10)">
+                        <label class="config-option__title">Reset</label>
+                        <div class="config-option__list">
+                            <button class="button" onclick="reset_game">Reset Game</button>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Descriptions -->
@@ -235,6 +243,9 @@
                     </p>
                     <p data-if="cur_config_index == 9">
                         Inverts the camera controls for the analog camera if it's enabled. <b>None</b> is the default.
+                    </p>
+                    <p data-if="cur_config_index == 10">
+                        Restarts the application and returns to the boot menu. Randomizer settings, which the game only reads at boot, take effect on the restart.
                     </p>
                 </div>
             </div>

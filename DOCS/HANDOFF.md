@@ -69,6 +69,71 @@ source is checked out next to it at `D:\Games\reference\merrow` for reference.
   sections.
 - Stage 3: cosmetics done (text and staff palettes). Lost Keys mode and enemy
   composition shuffle are still open — see "Randomizer work still open".
+- Stage 4 (2026-09-19, **untested**): 16 more data-only options, all pure ROM
+  writes with no new hooks. Cosmetics: cloak colour, Brian's clothes, spell
+  palettes, background music shuffle. World/QoL: fast Shamwood, fast Mammon's
+  World, unlock progression locks, gem-locked endgame, Crystal Valley return,
+  Brannoch return, lock Mammon's back door, restless NPCs, max message speed,
+  HUD lock, Celtland drift, base spells at level 2. Text and staff palettes
+  (Stage 3) are confirmed working in game.
+- **The "still open" list below was incomplete.** Comparing our Options struct
+  against Merrow's toggle list showed ~25 unported options, not the handful
+  recorded. Checking which `data::` tables `randomizer.cpp` never references
+  is a quick way to re-derive what is left.
+- Stage 5 (2026-09-19, **untested**): reveal hidden spirits, useful Dew Drop,
+  zoom out (1-4), Ivory Wings, text improvements. Corrections to the notes
+  above while porting these:
+  - `translate_string` in `randomizer.cpp` **already implements** Merrow's
+    `TranslateString`, and gifter/wingsmith text already uses it. The "text
+    cluster is blocked on the encoder" note was wrong.
+  - **Shannon hints are a Lost Keys feature.** Merrow only ever assigns
+    `hints[]` inside the two Lost Keys branches of `Shuffle.cs`; with Lost
+    Keys off it stays all zeros, so a standalone port would emit the same
+    index-0 hint for every gem. It has to wait for Lost Keys.
+  - Merrow's region-aware gem placement (the `area_*` tables) is **also**
+    Lost Keys only. Outside it Merrow shuffles all 67 drops uniformly, gems
+    included, exactly as this port does, so the two match. Unreachable gems
+    are what "unlock progression locks" is for.
+- Stage 6 (2026-09-19, **untested**): **Lost Keys**, both rulesets, plus the
+  Shannon hints and Lost Keys intro texts it unblocks.
+  - `place_lost_keys()` ports Shuffle.cs: Progressive keeps each gem inside its
+    own region (`area_earth`/`area_wind`/`area_water_nowings`/`area_fire`/
+    `area_book`, or `area_bookf_beigis_nowings` with Fire Book); Open World
+    uses one 104-slot pool via `area_open_beigis`. Drops widen from 67 to 74 so
+    boss items shuffle in, then split back out into `lk_boss_items`.
+  - `patch_lost_keys()` writes the door changes and fire gate (Progressive
+    only, i.e. when progression locks are not already open), the boss items
+    when boss-order shuffling is not already writing them, and the hints.
+  - **Lost Keys coerces other options**, as Merrow's UI does by force-checking
+    and disabling them: chests, drops and gifts on, wingsmiths off, Ivory
+    Wings on. Without this a gem can land in a list that is never written and
+    become unobtainable. The coercion is in `generate()` on a copy, so the
+    saved settings are left alone.
+  - Two Merrow bugs were not reproduced. Its non-boss-order Lost Keys path
+    indexes a six-entry address table with seven bosses (out of range at
+    Beigis); the addresses come from `dropdata` instead, which is where Merrow
+    reads them on its other path. And `bookhints`/`bookfhints` each stop one
+    entry short of the range its own roll produces, so the hint lookup is
+    bounds-checked and falls back to the last wording.
+- Stage 7 (2026-09-19, **untested**): **enemy shuffling**, both options.
+  - The encounter data Merrow keeps as nested C# objects is now extracted by
+    `tools/convert_merrow_mapdata.pl` into `merrow_mapdata.cpp`/`.h` (6 enemy
+    tables, 189 packs, 72 regions, 27 areas). Like `merrow_data.cpp` it is
+    GENERATED; never edit it by hand. Areas that share a pack array in Merrow
+    get their own copy, matching its AreaEncounterData.Copy().
+  - `shuffle_enemies()` / `patch_enemies()` port Util/AreaEncounterData.cs:
+    table shuffling swaps which roster each area draws from (wrapping pack
+    enemy ids into the new table's size), composition shuffling rerolls each
+    region's seven presets and each pack's enemies. Baragoon Moor, Brannoch
+    Castle and Mammon's World then get their ids capped to the smallest table
+    in the group, because their submaps share pack addresses.
+  - **The extraction was verified against the ROM**: all 189 packs (798 words)
+    and all 27 area headers (162 words) match byte for byte. 70 of 72 regions
+    match; the two that do not (0x85323C and 0x85329C) have preset lists that
+    look swapped with each other in Merrow's data. Region data is therefore
+    only written when composition shuffling actually changed it, so the bad
+    pair is never propagated. Re-run the ROM comparison if the data is ever
+    regenerated.
 
 ### How the Stage 2 hooks work
 
@@ -167,6 +232,21 @@ play-testing; the General-tab toggle "Widescreen 2D Fixes" stays.
 - Analog stick lands in 0x80092871/2; `func_80003B60` is the player control
   handler (via the state table at 0x8004C230), `func_80005748` then does
   collision on position + velocity.
+
+
+### Merrow branding: deliberately not ported (decided 2026-09-19)
+
+Merrow replaces the title-screen logo and can stamp the seed digits over the
+menu background. **Do not port this.** The tables are present in the generated
+data but must stay unreferenced:
+
+- `merrowlogo`, `merrowlogostatic`, `randologo` — title/animation logos
+- `menubg`, `icondigits` — menu background and the seed-digit overlay
+- `gemtexture` — only used by Merrow's own title art
+
+This is a project decision, not an oversight, so a future pass should not treat
+these as missing features. Everything else in "Randomizer work still open"
+below is still fair game.
 
 ## Randomizer work still open
 

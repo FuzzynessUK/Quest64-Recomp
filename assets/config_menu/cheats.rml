@@ -7,6 +7,22 @@
                 <div class="config-debug">
                     <div class="config-debug__scroll">
                         <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>All cheats</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Enabled</div></div>
+                                        <select data-value="cheat_all_enabled" id="cheat_all_enabled_select" style="nav-up: #tab_cheats">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
                             <label
                                 class="config-debug-option__label"
                             >
@@ -39,6 +55,37 @@
                                     >
                                         <svg src="icons/Arrow.svg" />
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Get item</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Item</div></div>
+                                        <select data-value="cheat_item_index" id="cheat_item_index_select">
+                                            <option data-for="name, i : cheat_item_names" data-attr-value="i">{{name}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="cheat_give_item">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Kill Brian</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-label"><div>Sets HP to zero</div></div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="cheat_kill_player">Kill</button>
                                 </div>
                             </div>
                         </div>

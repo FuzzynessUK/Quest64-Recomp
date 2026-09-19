@@ -162,6 +162,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/widescreen.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/randomizer.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_data.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_mapdata.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/native_hooks.cpp
     ${CMAKE_SOURCE_DIR}/src/game/debug.cpp
     ${CMAKE_SOURCE_DIR}/src/game/quicksaving.cpp

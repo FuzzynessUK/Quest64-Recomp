@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <fstream>
 
 #include "randomizer.h"
 #include "recomp.h"
+#include "zelda_config.h"
 
 // Stage 2 of the Merrow port: the options that patch game *code* rather than
 // data. The recomp never executes ROM code (see CLAUDE.md's "Conventions that
@@ -36,6 +38,27 @@ namespace {
     }
 }
 
+namespace {
+    // Stage 2 diagnostic. Each hook records, the first time it runs, whether
+    // its option was on. That separates "the hook never fires" (the function
+    // is not the live gate, or is never reached) from "the hook fires but the
+    // option never arrived", which look identical from in-game. Written to
+    // randomizer_hooks.txt next to the spoiler log.
+    void note_hook(const char* name, bool applied) {
+        std::ofstream out(zelda64::get_app_folder_path() / "randomizer_hooks.txt", std::ios::app);
+        out << name << ": fired, option " << (applied ? "ON (value overridden)" : "off (left vanilla)") << "\n";
+    }
+}
+
+#define QUEST64_NOTE_HOOK(applied)                       \
+    do {                                                 \
+        static bool noted_ = false;                      \
+        if (!noted_) {                                   \
+            noted_ = true;                               \
+            note_hook(__func__, (applied));              \
+        }                                                \
+    } while (0)
+
 extern "C" {
 
 // --- Encounter rate ---------------------------------------------------------
@@ -48,6 +71,7 @@ extern "C" {
 // before the `mtc1 $at, $f19` that consumes it.
 void quest64_randomizer_encounter_step(recomp_context* ctx) {
     const Options& options = active_options();
+    QUEST64_NOTE_HOOK(!(!randomizing() || options.encounter_rate == 2));
     if (!randomizing() || options.encounter_rate == 2) {
         return;
     }
@@ -62,6 +86,7 @@ void quest64_randomizer_encounter_step(recomp_context* ctx) {
 // still holds the countdown the roll was added to.
 void quest64_randomizer_encounter_roll_max(recomp_context* ctx) {
     const Options& options = active_options();
+    QUEST64_NOTE_HOOK(!(!randomizing() || options.encounter_rate == 2));
     if (!randomizing() || options.encounter_rate == 2) {
         return;
     }
@@ -79,6 +104,7 @@ void quest64_randomizer_encounter_roll_max(recomp_context* ctx) {
 // 0x00445B). The speed tiers patch a data byte instead, so they are handled by
 // the ROM writes and not here. Hooked before the `sh` that stores it.
 void quest64_randomizer_walk_mp_regain(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || active_options().mp_regain != 7));
     if (!randomizing() || active_options().mp_regain != 7) {
         return;
     }
@@ -90,6 +116,7 @@ void quest64_randomizer_walk_mp_regain(recomp_context* ctx) {
 // the `sh` that stores it, with r10 still holding the pre-hit MP.
 void quest64_randomizer_staff_hit_mp(recomp_context* ctx) {
     const Options& options = active_options();
+    QUEST64_NOTE_HOOK(!(!randomizing() || options.staff_hit_mp == 1));
     if (!randomizing() || options.staff_hit_mp == 1) {
         return;
     }
@@ -104,6 +131,7 @@ void quest64_randomizer_staff_hit_mp(recomp_context* ctx) {
 // threshold to 0x126 (ROM 0x00850A), which a level byte can never reach, so
 // the lookup path is always taken. Hooked before the `bne` that tests it.
 void quest64_randomizer_element_exp_gate(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().element_uncap));
     if (!randomizing() || !active_options().element_uncap) {
         return;
     }
@@ -113,6 +141,7 @@ void quest64_randomizer_element_exp_gate(recomp_context* ctx) {
 // Same function, `slti $at, $a0, 0x62` at 0x80007944 is the level-up gate
 // itself; Merrow raises it to 0x64 (ROM 0x008546) so growth reaches 99.
 void quest64_randomizer_element_growth_cap(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().element_uncap));
     if (!randomizing() || !active_options().element_uncap) {
         return;
     }
@@ -123,6 +152,7 @@ void quest64_randomizer_element_growth_cap(recomp_context* ctx) {
 // elements at this level" value the following bnel chain compares against;
 // Merrow raises it to 0x63 (ROM 0x008563). Hooked before the first compare.
 void quest64_randomizer_element_all_maxed(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().element_uncap));
     if (!randomizing() || !active_options().element_uncap) {
         return;
     }
@@ -132,6 +162,7 @@ void quest64_randomizer_element_all_maxed(recomp_context* ctx) {
 // func_80002F60, `addiu $a0, $zero, 0x32` at 0x800032D4 is the same "all
 // elements maxed" value for the overworld spirit grab (ROM 0x003ED7).
 void quest64_randomizer_element_spirit_grab(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().element_uncap));
     if (!randomizing() || !active_options().element_uncap) {
         return;
     }
@@ -143,6 +174,7 @@ void quest64_randomizer_element_spirit_grab(recomp_context* ctx) {
 // (Merrow's elementCapLocations 0-3), each followed by the `beq` this is
 // hooked before. One hook serves all four.
 void quest64_randomizer_element_cap(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().element_uncap));
     if (!randomizing() || !active_options().element_uncap) {
         return;
     }
@@ -155,6 +187,7 @@ void quest64_randomizer_element_cap(recomp_context* ctx) {
 // $v0 so it always branches (ROM 0x0042B1); forcing r2 to 0 makes the existing
 // `== 0` test pass, which is the same thing.
 void quest64_randomizer_drop_limit(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().drop_limit_disabled));
     if (!randomizing() || !active_options().drop_limit_disabled) {
         return;
     }
@@ -168,6 +201,7 @@ void quest64_randomizer_drop_limit(recomp_context* ctx) {
 // mask (ROM 0x022ECB) so the "disabled" branch is never taken. Hooked before
 // the `bne`.
 void quest64_randomizer_wings_indoors(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().wing_unlock_indoors));
     if (!randomizing() || !active_options().wing_unlock_indoors) {
         return;
     }
@@ -178,6 +212,7 @@ void quest64_randomizer_wings_indoors(recomp_context* ctx) {
 // Skye flag. Merrow rewrites its rs to $zero so it always branches (ROM
 // 0x022EE4); forcing r8 to 0 makes the existing `== 0` test pass.
 void quest64_randomizer_wings_skye(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !active_options().wing_unlock_skye));
     if (!randomizing() || !active_options().wing_unlock_skye) {
         return;
     }
@@ -191,6 +226,7 @@ void quest64_randomizer_wings_skye(recomp_context* ctx) {
 // moves Beigis out of his own arena that path misfires, so Merrow changes the
 // compared value to 10 (ROM 0x01D4D7), which nothing matches, disabling it.
 void quest64_randomizer_beigis_map_check(recomp_context* ctx) {
+    QUEST64_NOTE_HOOK(!(!randomizing() || !native_state().beigis_moved));
     if (!randomizing() || !native_state().beigis_moved) {
         return;
     }

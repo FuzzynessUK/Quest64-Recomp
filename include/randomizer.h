@@ -88,6 +88,13 @@ namespace zelda64::randomizer {
         // gives the same colours.
         int text_palette = 0;
         bool staff_palette = false;
+        // A single random colour for Brian's cloak, a hue rotation of each
+        // of his two clothing texture pages, a random palette index for every
+        // spell effect, and a reshuffle of the 73 background tracks.
+        bool cloak_palette = false;
+        bool brian_palette = false;
+        bool spell_palette = false;
+        bool music_shuffle = false;
 
         // Brian
         int start_hp = 50;
@@ -98,11 +105,61 @@ namespace zelda64::randomizer {
         // World
         bool fast_monastery = false;
         bool fast_blue_cave = false;
+        bool fast_shamwood = false;
+        bool fast_mammon = false;
+        // Open every gem/book/key progression lock, or instead move the gem
+        // locks onto the final staircase.
+        bool unlock_doors = false;
+        bool locked_endgame = false;
+        // Return warps out of Crystal Valley and Brannoch, and the useless
+        // backward door in Mammon's World locked off.
+        bool crystal_return = false;
+        bool brannoch_return = false;
+        bool mammon_door = false;
+        // Quality of life: wandering NPCs, instant text, a HUD that stays put,
+        // looser movement friction, and base spells from level 2.
+        bool restless_npcs = false;
+        bool max_message_speed = false;
+        bool hud_lock = false;
+        bool celtland_drift = false;
+        bool level_2_spells = false;
+        // Move the two hidden spirits somewhere findable, make the Dew Drop
+        // a full revive, and pull the camera back a step at a time (0 off,
+        // 1-4 increasingly far out).
+        bool reveal_spirits = false;
+        bool better_dew_drop = false;
+        int zoom_out = 0;
+        // White Wings become the Ivory Wings, handed over by Lavaar, and
+        // Merrow's clearer save prompt replaces the vanilla one.
+        bool ivory_wings = false;
+        bool text_improvements = false;
+        // Lost Keys: the gems and the Eletale Book come off their bosses and
+        // are scattered. 0 off, 1 progressive (each gem stays inside its own
+        // region so the run is completable in order), 2 open world (anything
+        // anywhere, meant to be played with the progression locks opened).
+        // Fire Book widens the book's pool to take in the fire region, and
+        // Shannon hints tell you roughly where each gem went.
+        int lost_keys = 0;
+        bool fire_book = false;
+        bool shannon_hints = false;
+        // Enemy shuffling. Tables swap which roster each area draws from;
+        // compositions reroll which packs a region spawns and which enemies
+        // each pack holds. Independent, and either can be used alone.
+        bool enemy_tables = false;
+        bool enemy_composition = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.
     Options load_options();
     void save_options(const Options& options);
+
+    // Named settings presets, kept in randomizer_presets.json next to the
+    // options. A preset stores every setting except the seed, so loading one
+    // leaves whatever seed the menu currently has alone.
+    std::vector<std::string> preset_names();
+    bool save_preset(const std::string& name, const Options& options);
+    bool load_preset(const std::string& name, Options& out);
+    bool delete_preset(const std::string& name);
     // The options the game booted with. What the menu edits only takes effect
     // on the next launch, so the UI can show whether a restart is pending.
     const Options& active_options();

@@ -61,6 +61,19 @@ namespace zelda64 {
     // Multiplier applied to Brian's field/battle movement each frame.
     void set_player_speed_scale(float scale);
     float get_player_speed_scale();
+
+    // Master switch for the cheats tab. With it off nothing on the tab
+    // writes to the game: stat edits, the speed scale, queued warps and
+    // item grants are all dropped, while the live readouts keep updating.
+    void set_cheats_enabled(bool enabled);
+    bool cheats_enabled();
+
+    // Every item the game has, indexed by item id (0x00-0x19).
+    const std::vector<std::string>& item_names();
+    // Queue `item_id` into the first free inventory slot on the next frame.
+    void give_item(int item_id);
+    // Drop Brian to 0 HP on the next frame.
+    void kill_player();
 }
 
 #endif

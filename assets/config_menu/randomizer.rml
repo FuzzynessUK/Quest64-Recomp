@@ -38,6 +38,48 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
+                                <div>Presets</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Saved</div></div>
+                                        <select data-value="rnd_preset_index" id="rnd_preset_index_select">
+                                            <option data-for="name, i : rnd_preset_list" data-attr-value="i">{{name}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="rnd_save_preset">Save</button>
+                                    <button class="button" onclick="rnd_load_preset">Load</button>
+                                    <button class="button" onclick="rnd_delete_preset">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option" data-if="rnd_preset_naming">
+                            <label class="config-debug-option__label">
+                                <div>New preset name</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Name</div></div>
+                                        <input type="text" id="rnd_preset_name_input" data-value="rnd_preset_name" maxlength="32" />
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="rnd_confirm_preset">Confirm</button>
+                                    <button class="button" onclick="rnd_cancel_preset">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">{{rnd_current_preset}} - {{rnd_presets}}</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
                                 <div>Spells</div>
                             </label>
                             <div class="config-debug__option-split">
@@ -274,6 +316,20 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Shuffle enemy tables</div></div>
+                                        <select data-value="rnd_enemy_tables" id="rnd_enemy_tables_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Shuffle encounters</div></div>
+                                        <select data-value="rnd_enemy_composition" id="rnd_enemy_composition_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -363,6 +419,128 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Fast Shamwood</div></div>
+                                        <select data-value="rnd_fast_shamwood" id="rnd_fast_shamwood_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Fast Mammon's World</div></div>
+                                        <select data-value="rnd_fast_mammon" id="rnd_fast_mammon_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Unlock progression locks</div></div>
+                                        <select data-value="rnd_unlock_doors" id="rnd_unlock_doors_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Gem-locked endgame</div></div>
+                                        <select data-value="rnd_locked_endgame" id="rnd_locked_endgame_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Crystal Valley return</div></div>
+                                        <select data-value="rnd_crystal_return" id="rnd_crystal_return_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Brannoch return warp</div></div>
+                                        <select data-value="rnd_brannoch_return" id="rnd_brannoch_return_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Lock Mammon back door</div></div>
+                                        <select data-value="rnd_mammon_door" id="rnd_mammon_door_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Restless NPCs</div></div>
+                                        <select data-value="rnd_restless_npcs" id="rnd_restless_npcs_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Max message speed</div></div>
+                                        <select data-value="rnd_max_message_speed" id="rnd_max_message_speed_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Lock HUD onscreen</div></div>
+                                        <select data-value="rnd_hud_lock" id="rnd_hud_lock_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Celtland drift</div></div>
+                                        <select data-value="rnd_celtland_drift" id="rnd_celtland_drift_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Base spells at level 2</div></div>
+                                        <select data-value="rnd_level_2_spells" id="rnd_level_2_spells_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Reveal hidden spirits</div></div>
+                                        <select data-value="rnd_reveal_spirits" id="rnd_reveal_spirits_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Useful Dew Drop</div></div>
+                                        <select data-value="rnd_better_dew_drop" id="rnd_better_dew_drop_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Ivory Wings</div></div>
+                                        <select data-value="rnd_ivory_wings" id="rnd_ivory_wings_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Text improvements</div></div>
+                                        <select data-value="rnd_text_improvements" id="rnd_text_improvements_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Zoom out</div></div>
+                                        <select data-value="rnd_zoom_out" id="rnd_zoom_out_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option value="3">3</option>
+                                            <option value="4">4</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label"><div>Encounter rate</div></div>
                                         <select data-value="rnd_encounter_rate" id="rnd_encounter_rate_select">
                                             <option value="0">Halved</option>
@@ -430,6 +608,37 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
+                                <div>Lost Keys</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Mode</div></div>
+                                        <select data-value="rnd_lost_keys" id="rnd_lost_keys_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Progressive</option>
+                                            <option value="2">Open world</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Fire Book</div></div>
+                                        <select data-value="rnd_fire_book" id="rnd_fire_book_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Shannon hints</div></div>
+                                        <select data-value="rnd_shannon_hints" id="rnd_shannon_hints_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
                                 <div>Cosmetics</div>
                             </label>
                             <div class="config-debug__option-split">
@@ -452,6 +661,38 @@
                                             <option value="1">Random</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Cloak colour</div></div>
+                                        <select data-value="rnd_cloak_palette" id="rnd_cloak_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Brian's clothes</div></div>
+                                        <select data-value="rnd_brian_palette" id="rnd_brian_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Spell palettes</div></div>
+                                        <select data-value="rnd_spell_palette" id="rnd_spell_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Background music</div></div>
+                                        <select data-value="rnd_music_shuffle" id="rnd_music_shuffle_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Shuffled</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="rnd_cosmetics_default">All default</button>
+                                    <button class="button" onclick="rnd_cosmetics_random">All random</button>
                                 </div>
                             </div>
                         </div>

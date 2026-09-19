@@ -7,6 +7,7 @@
 #include "zelda_sound.h"
 #include "zelda_config.h"
 #include "zelda_debug.h"
+#include "zelda_game.h"
 #include "randomizer.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
@@ -508,6 +509,11 @@ struct CheatsContext {
     std::vector<std::string> warp_submap_names;
     std::vector<std::string> warp_entrance_names;
 
+    // Get Item list, and the master switch for the whole tab.
+    int item_index = 0;
+    std::vector<std::string> item_names;
+    bool all_cheats_enabled = true;
+
     // What the sliders show. Follows the game's value except right after the
     // user moves a slider, when it holds the new value until the game reports
     // it back.
@@ -593,9 +599,42 @@ void bind_warp_selection(Rml::DataModelConstructor& constructor) {
 struct RandomizerContext {
     Rml::DataModelHandle model_handle;
     zelda64::randomizer::Options edited;
+    // The saved presets, which one is selected in the list, and which one
+    // was last loaded or saved. preset_naming is true while the Save button
+    // has the name box open.
+    std::vector<std::string> preset_list;
+    int preset_index = 0;
+    std::string current_preset;
+    std::string preset_name;
+    bool preset_naming = false;
+    std::string preset_message;
 };
 
 RandomizerContext randomizer_context;
+
+// Keeps the preset list in sync with what is on disk.
+void refresh_preset_list() {
+    randomizer_context.preset_list = zelda64::randomizer::preset_names();
+    int last = static_cast<int>(randomizer_context.preset_list.size()) - 1;
+    randomizer_context.preset_index = last < 0 ? 0 : std::clamp(randomizer_context.preset_index, 0, last);
+}
+
+std::string selected_preset() {
+    const std::vector<std::string>& list = randomizer_context.preset_list;
+    if (list.empty()) {
+        return std::string();
+    }
+    int last = static_cast<int>(list.size()) - 1;
+    return list[static_cast<size_t>(std::clamp(randomizer_context.preset_index, 0, last))];
+}
+
+// What the last Save/Load/Delete did, shown under the preset controls.
+std::string randomizer_presets_status() {
+    if (randomizer_context.preset_message.empty()) {
+        return "Presets keep every setting except the seed.";
+    }
+    return randomizer_context.preset_message;
+}
 
 std::string randomizer_status() {
     return "This session: " + zelda64::randomizer::describe(zelda64::randomizer::active_options()) + ". Changes apply when the game is next launched.";
@@ -639,6 +678,21 @@ void make_randomizer_bindings(Rml::Context* context) {
     randomizer_context.edited = zelda64::randomizer::load_options();
 
     constructor.BindFunc("rnd_status", [](Rml::Variant& out) { out = randomizer_status(); });
+    constructor.BindFunc("rnd_presets", [](Rml::Variant& out) { out = randomizer_presets_status(); });
+    constructor.RegisterArray<std::vector<std::string>>();
+    refresh_preset_list();
+    constructor.Bind("rnd_preset_list", &randomizer_context.preset_list);
+    constructor.Bind("rnd_preset_index", &randomizer_context.preset_index);
+    constructor.BindFunc("rnd_current_preset", [](Rml::Variant& out) {
+        out = randomizer_context.current_preset.empty()
+            ? std::string("Current preset: none")
+            : "Current preset: " + randomizer_context.current_preset;
+    });
+    constructor.BindFunc("rnd_preset_naming", [](Rml::Variant& out) { out = randomizer_context.preset_naming ? 1 : 0; });
+    constructor.BindFunc("rnd_preset_name",
+        [](Rml::Variant& out) { out = randomizer_context.preset_name; },
+        [](const Rml::Variant& in) { randomizer_context.preset_name = in.Get<std::string>(); }
+    );
     bind_randomizer_field(constructor, "rnd_mode", &Options::mode);
     bind_randomizer_field(constructor, "rnd_seed", &Options::seed);
     bind_randomizer_field(constructor, "rnd_spell_shuffle", &Options::spell_shuffle);
@@ -674,6 +728,28 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_start_defense", &Options::start_defense);
     bind_randomizer_field(constructor, "rnd_fast_monastery", &Options::fast_monastery);
     bind_randomizer_field(constructor, "rnd_fast_blue_cave", &Options::fast_blue_cave);
+    bind_randomizer_field(constructor, "rnd_fast_shamwood", &Options::fast_shamwood);
+    bind_randomizer_field(constructor, "rnd_fast_mammon", &Options::fast_mammon);
+    bind_randomizer_field(constructor, "rnd_unlock_doors", &Options::unlock_doors);
+    bind_randomizer_field(constructor, "rnd_locked_endgame", &Options::locked_endgame);
+    bind_randomizer_field(constructor, "rnd_crystal_return", &Options::crystal_return);
+    bind_randomizer_field(constructor, "rnd_brannoch_return", &Options::brannoch_return);
+    bind_randomizer_field(constructor, "rnd_mammon_door", &Options::mammon_door);
+    bind_randomizer_field(constructor, "rnd_restless_npcs", &Options::restless_npcs);
+    bind_randomizer_field(constructor, "rnd_max_message_speed", &Options::max_message_speed);
+    bind_randomizer_field(constructor, "rnd_hud_lock", &Options::hud_lock);
+    bind_randomizer_field(constructor, "rnd_celtland_drift", &Options::celtland_drift);
+    bind_randomizer_field(constructor, "rnd_level_2_spells", &Options::level_2_spells);
+    bind_randomizer_field(constructor, "rnd_reveal_spirits", &Options::reveal_spirits);
+    bind_randomizer_field(constructor, "rnd_better_dew_drop", &Options::better_dew_drop);
+    bind_randomizer_field(constructor, "rnd_zoom_out", &Options::zoom_out);
+    bind_randomizer_field(constructor, "rnd_ivory_wings", &Options::ivory_wings);
+    bind_randomizer_field(constructor, "rnd_text_improvements", &Options::text_improvements);
+    bind_randomizer_field(constructor, "rnd_lost_keys", &Options::lost_keys);
+    bind_randomizer_field(constructor, "rnd_fire_book", &Options::fire_book);
+    bind_randomizer_field(constructor, "rnd_shannon_hints", &Options::shannon_hints);
+    bind_randomizer_field(constructor, "rnd_enemy_tables", &Options::enemy_tables);
+    bind_randomizer_field(constructor, "rnd_enemy_composition", &Options::enemy_composition);
     bind_randomizer_field(constructor, "rnd_encounter_rate", &Options::encounter_rate);
     bind_randomizer_field(constructor, "rnd_mp_regain", &Options::mp_regain);
     bind_randomizer_field(constructor, "rnd_staff_hit_mp", &Options::staff_hit_mp);
@@ -683,6 +759,10 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_wing_unlock_skye", &Options::wing_unlock_skye);
     bind_randomizer_field(constructor, "rnd_text_palette", &Options::text_palette);
     bind_randomizer_field(constructor, "rnd_staff_palette", &Options::staff_palette);
+    bind_randomizer_field(constructor, "rnd_cloak_palette", &Options::cloak_palette);
+    bind_randomizer_field(constructor, "rnd_brian_palette", &Options::brian_palette);
+    bind_randomizer_field(constructor, "rnd_spell_palette", &Options::spell_palette);
+    bind_randomizer_field(constructor, "rnd_music_shuffle", &Options::music_shuffle);
 
     randomizer_context.model_handle = constructor.GetModelHandle();
 }
@@ -876,11 +956,122 @@ public:
                 zelda64::do_map_warp(cheats_context.warp_map, cheats_context.warp_submap, cheats_context.warp_entrance);
             });
 
+        recompui::register_event(listener, "cheat_give_item",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::give_item(cheats_context.item_index);
+            });
+
+        recompui::register_event(listener, "reset_game",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::restart_application();
+            });
+
+        recompui::register_event(listener, "cheat_kill_player",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::kill_player();
+            });
+
         recompui::register_event(listener, "rnd_new_seed",
             [](const std::string& param, Rml::Event& event) {
                 randomizer_context.edited.seed = std::to_string(std::random_device{}() % 100000000u);
                 randomizer_option_changed();
                 randomizer_context.model_handle.DirtyVariable("rnd_seed");
+            });
+
+        // Save opens the name box; Confirm is what actually writes the preset.
+        recompui::register_event(listener, "rnd_save_preset",
+            [](const std::string& param, Rml::Event& event) {
+                randomizer_context.preset_naming = true;
+                randomizer_context.preset_name = randomizer_context.current_preset;
+                randomizer_context.preset_message = "Type a name, then press Confirm.";
+                randomizer_context.model_handle.DirtyAllVariables();
+            });
+
+        recompui::register_event(listener, "rnd_confirm_preset",
+            [](const std::string& param, Rml::Event& event) {
+                const std::string name = randomizer_context.preset_name;
+                if (zelda64::randomizer::save_preset(name, randomizer_context.edited)) {
+                    randomizer_context.current_preset = name;
+                    randomizer_context.preset_naming = false;
+                    randomizer_context.preset_message = "Saved \"" + name + "\".";
+                    refresh_preset_list();
+                    // Select what was just saved.
+                    for (size_t i = 0; i < randomizer_context.preset_list.size(); i++) {
+                        if (randomizer_context.preset_list[i] == name) {
+                            randomizer_context.preset_index = static_cast<int>(i);
+                            break;
+                        }
+                    }
+                }
+                else {
+                    randomizer_context.preset_message = "Give the preset a name first.";
+                }
+                randomizer_context.model_handle.DirtyAllVariables();
+            });
+
+        recompui::register_event(listener, "rnd_cancel_preset",
+            [](const std::string& param, Rml::Event& event) {
+                randomizer_context.preset_naming = false;
+                randomizer_context.preset_message.clear();
+                randomizer_context.model_handle.DirtyAllVariables();
+            });
+
+        recompui::register_event(listener, "rnd_load_preset",
+            [](const std::string& param, Rml::Event& event) {
+                const std::string name = selected_preset();
+                if (!name.empty() && zelda64::randomizer::load_preset(name, randomizer_context.edited)) {
+                    randomizer_context.current_preset = name;
+                    randomizer_context.preset_message = "Loaded \"" + name + "\".";
+                    randomizer_option_changed();
+                }
+                else {
+                    randomizer_context.preset_message = "Nothing selected to load.";
+                }
+                // Loading can change every control on the tab.
+                randomizer_context.model_handle.DirtyAllVariables();
+            });
+
+        recompui::register_event(listener, "rnd_delete_preset",
+            [](const std::string& param, Rml::Event& event) {
+                const std::string name = selected_preset();
+                if (!name.empty() && zelda64::randomizer::delete_preset(name)) {
+                    randomizer_context.preset_message = "Deleted \"" + name + "\".";
+                    if (randomizer_context.current_preset == name) {
+                        randomizer_context.current_preset.clear();
+                    }
+                    refresh_preset_list();
+                }
+                else {
+                    randomizer_context.preset_message = "Nothing selected to delete.";
+                }
+                randomizer_context.model_handle.DirtyAllVariables();
+            });
+
+        // Cosmetics bulk set.
+        recompui::register_event(listener, "rnd_cosmetics_default",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::randomizer::Options& o = randomizer_context.edited;
+                o.text_palette = 0;
+                o.staff_palette = false;
+                o.cloak_palette = false;
+                o.brian_palette = false;
+                o.spell_palette = false;
+                o.music_shuffle = false;
+                randomizer_option_changed();
+                randomizer_context.model_handle.DirtyAllVariables();
+            });
+
+        recompui::register_event(listener, "rnd_cosmetics_random",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::randomizer::Options& o = randomizer_context.edited;
+                o.text_palette = 1;
+                o.staff_palette = true;
+                o.cloak_palette = true;
+                o.brian_palette = true;
+                o.spell_palette = true;
+                o.music_shuffle = true;
+                randomizer_option_changed();
+                randomizer_context.model_handle.DirtyAllVariables();
             });
     }
 
@@ -1295,6 +1486,16 @@ public:
         init_warp_map_names();
         constructor.Bind("cheat_warp_map_names", &cheats_context.warp_map_names);
         bind_warp_selection(constructor);
+
+        cheats_context.item_names = zelda64::item_names();
+        constructor.Bind("cheat_item_names", &cheats_context.item_names);
+        constructor.Bind("cheat_item_index", &cheats_context.item_index);
+        constructor.BindFunc("cheat_all_enabled",
+            [](Rml::Variant& out) { out = cheats_context.all_cheats_enabled ? 1 : 0; },
+            [](const Rml::Variant& in) {
+                cheats_context.all_cheats_enabled = in.Get<int>() != 0;
+                zelda64::set_cheats_enabled(cheats_context.all_cheats_enabled);
+            });
 
         constructor.BindFunc("cheat_stats_available", [](Rml::Variant& out) { out = cheats_context.shown_stats_available; });
         constructor.BindFunc("cheat_speed_percent",

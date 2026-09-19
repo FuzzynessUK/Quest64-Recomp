@@ -42,7 +42,8 @@ namespace recomp {
     #define DEFINE_RECOMP_UI_INPUTS() \
         DEFINE_INPUT(TOGGLE_MENU, 0, "Toggle Menu") \
         DEFINE_INPUT(ACCEPT_MENU, 0, "Accept (Menu)") \
-        DEFINE_INPUT(APPLY_MENU, 0, "Apply (Menu)")
+        DEFINE_INPUT(APPLY_MENU, 0, "Apply (Menu)") \
+        DEFINE_INPUT(RESET_GAME, 0, "Reset Game")
 
     #define DEFINE_ALL_INPUTS() \
         DEFINE_N64_BUTTON_INPUTS() \

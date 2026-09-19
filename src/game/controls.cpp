@@ -3,6 +3,7 @@
 #include "librecomp/helpers.hpp"
 #include "recomp_input.h"
 #include "ultramodern/ultramodern.hpp"
+#include "zelda_game.h"
 
 // Arrays that hold the mappings for every input for keyboard and controller respectively.
 using input_mapping = std::array<recomp::InputField, recomp::bindings_per_input>;
@@ -82,6 +83,19 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
     
     if (controller_num != 0) {
         return false;
+    }
+
+    // Reset is checked outside the game-input guard so the hotkey still works
+    // with the menu open, and on the press edge so holding it only fires once.
+    {
+        constexpr size_t reset_index = static_cast<size_t>(GameInput::RESET_GAME);
+        static bool reset_was_held = false;
+        bool reset_held = recomp::get_input_digital(keyboard_input_mappings[reset_index])
+                       || recomp::get_input_digital(controller_input_mappings[reset_index]);
+        if (reset_held && !reset_was_held) {
+            zelda64::restart_application();
+        }
+        reset_was_held = reset_held;
     }
 
     if (!recomp::game_input_disabled()) {
