@@ -674,6 +674,15 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_start_defense", &Options::start_defense);
     bind_randomizer_field(constructor, "rnd_fast_monastery", &Options::fast_monastery);
     bind_randomizer_field(constructor, "rnd_fast_blue_cave", &Options::fast_blue_cave);
+    bind_randomizer_field(constructor, "rnd_encounter_rate", &Options::encounter_rate);
+    bind_randomizer_field(constructor, "rnd_mp_regain", &Options::mp_regain);
+    bind_randomizer_field(constructor, "rnd_staff_hit_mp", &Options::staff_hit_mp);
+    bind_randomizer_field(constructor, "rnd_element_uncap", &Options::element_uncap);
+    bind_randomizer_field(constructor, "rnd_drop_limit_disabled", &Options::drop_limit_disabled);
+    bind_randomizer_field(constructor, "rnd_wing_unlock_indoors", &Options::wing_unlock_indoors);
+    bind_randomizer_field(constructor, "rnd_wing_unlock_skye", &Options::wing_unlock_skye);
+    bind_randomizer_field(constructor, "rnd_text_palette", &Options::text_palette);
+    bind_randomizer_field(constructor, "rnd_staff_palette", &Options::staff_palette);
 
     randomizer_context.model_handle = constructor.GetModelHandle();
 }

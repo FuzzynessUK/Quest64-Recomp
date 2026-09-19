@@ -362,6 +362,96 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Encounter rate</div></div>
+                                        <select data-value="rnd_encounter_rate" id="rnd_encounter_rate_select">
+                                            <option value="0">Halved</option>
+                                            <option value="1">Reduced</option>
+                                            <option value="2">Default</option>
+                                            <option value="3">Increased</option>
+                                            <option value="4">Doubled</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Walking MP regen</div></div>
+                                        <select data-value="rnd_mp_regain" id="rnd_mp_regain_select">
+                                            <option value="7">Off</option>
+                                            <option value="8">Slowest</option>
+                                            <option value="9">Slower</option>
+                                            <option value="10">Default</option>
+                                            <option value="11">Faster</option>
+                                            <option value="12">Fastest</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>MP per staff hit: {{rnd_staff_hit_mp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_staff_hit_mp_input"
+                                            type="range"
+                                            data-value="rnd_staff_hit_mp"
+                                            min="0"
+                                            max="9"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Element cap 99</div></div>
+                                        <select data-value="rnd_element_uncap" id="rnd_element_uncap_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>No enemy drop limit</div></div>
+                                        <select data-value="rnd_drop_limit_disabled" id="rnd_drop_limit_disabled_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Wings indoors</div></div>
+                                        <select data-value="rnd_wing_unlock_indoors" id="rnd_wing_unlock_indoors_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Wings on Skye</div></div>
+                                        <select data-value="rnd_wing_unlock_skye" id="rnd_wing_unlock_skye_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Cosmetics</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Text palette</div></div>
+                                        <select data-value="rnd_text_palette" id="rnd_text_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                            <option value="2">Red</option>
+                                            <option value="3">Blue</option>
+                                            <option value="4">White</option>
+                                            <option value="5">Black</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Staff palette</div></div>
+                                        <select data-value="rnd_staff_palette" id="rnd_staff_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>

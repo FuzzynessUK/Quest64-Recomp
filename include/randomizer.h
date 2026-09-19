@@ -61,6 +61,33 @@ namespace zelda64::randomizer {
         int exp_boost = 4;         // quarters: 4 = x1, 0 = no EXP
         bool boss_order = false;
         bool boss_element = false;
+        // Merrow's 5-tier encounter slider: 0 Halved, 1 Reduced, 2 Default
+        // (vanilla, no-op), 3 Increased, 4 Doubled. Needs native hooks since
+        // the step/roll/max values are baked into the recompiled code as C
+        // literals, not read from RAM. See native_hooks.cpp.
+        int encounter_rate = 2;
+
+        // World / mechanics (Merrow options that patch code, Stage 2).
+        // Walking MP regen, using Merrow's own trackbar encoding: 7 = off,
+        // 8-12 = speed tiers (10 is vanilla), anything else = vanilla. The
+        // speed tiers are a data byte so they go through the ROM writes; only
+        // "off" needs a hook.
+        int mp_regain = 10;
+        // MP restored per staff hit. Vanilla is 1; Merrow allows 1-9.
+        int staff_hit_mp = 1;
+        // Raise the element level cap from 50 to 99.
+        bool element_uncap = false;
+        // Let enemies keep dropping items past the vanilla limit.
+        bool drop_limit_disabled = false;
+        // Wings usable indoors / on the Isle of Skye.
+        bool wing_unlock_indoors = false;
+        bool wing_unlock_skye = false;
+
+        // Cosmetics. Text palette: 0 off, 1 random, 2 red, 3 blue, 4 white,
+        // 5 black. Unlike Merrow these roll off the seed, so a seed always
+        // gives the same colours.
+        int text_palette = 0;
+        bool staff_palette = false;
 
         // Brian
         int start_hp = 50;
@@ -89,7 +116,18 @@ namespace zelda64::randomizer {
         std::vector<Write> writes;
         std::string spoiler;
         uint32_t seed_value = 0;
+        // Boss order moved Beigis out of his own arena, which the native hook
+        // for his map check needs to know about.
+        bool beigis_moved = false;
     };
+
+    // What the Stage 2 native hooks need to know that isn't in Options,
+    // because it comes out of the shuffle rather than the menu. Filled in when
+    // the patch is generated at boot; all false before that.
+    struct NativeState {
+        bool beigis_moved = false;
+    };
+    const NativeState& native_state();
 
     // Runs the shuffles for the given options and returns the ROM writes.
     Result generate(const Options& options);

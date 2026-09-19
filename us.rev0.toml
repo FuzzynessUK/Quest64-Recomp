@@ -50,3 +50,92 @@ before_vram = 0x80005748
 func = "nnScExecuteGraphics"
 text = "quest64_widescreen_task(rdram, ctx);"
 before_vram = 0x80000B08
+
+# Randomizer Stage 2 (native hooks): options that patch code, not data, so
+# the ROM-write path (Merrow's Write records applied at boot) can't reach
+# them once N64Recomp has baked the vanilla immediates into C literals.
+# See src/game/randomizer/native_hooks.cpp for how each address was found.
+
+# Encounter rate: override the step size just before it's used (mtc1 reads
+# the register the previous lui set; this replaces that value).
+[[patches.hook]]
+func = "func_8001C5F4"
+text = "quest64_randomizer_encounter_step(ctx);"
+before_vram = 0x8001C654
+# Same function: override the roll/max just before get_rand(max) is called
+# and the roll-adjusted counter is stored.
+[[patches.hook]]
+func = "func_8001C5F4"
+text = "quest64_randomizer_encounter_roll_max(ctx);"
+before_vram = 0x8001C690
+
+# Walking MP regen amount, before the store that commits it.
+[[patches.hook]]
+func = "func_80002F60"
+text = "quest64_randomizer_walk_mp_regain(ctx);"
+before_vram = 0x8000385C
+# MP regained per staff hit, before the store that commits it.
+[[patches.hook]]
+func = "func_80004448"
+text = "quest64_randomizer_staff_hit_mp(ctx);"
+before_vram = 0x800044DC
+
+# Element level cap, raised from 50 to 99. The EXP-table gate and the level-up
+# gate in func_800074A0, then the "all elements maxed" value used by that
+# function and by the overworld spirit grab in func_80002F60.
+[[patches.hook]]
+func = "func_800074A0"
+text = "quest64_randomizer_element_exp_gate(ctx);"
+before_vram = 0x8000790C
+[[patches.hook]]
+func = "func_800074A0"
+text = "quest64_randomizer_element_growth_cap(ctx);"
+before_vram = 0x80007948
+[[patches.hook]]
+func = "func_800074A0"
+text = "quest64_randomizer_element_all_maxed(ctx);"
+before_vram = 0x80007964
+[[patches.hook]]
+func = "func_80002F60"
+text = "quest64_randomizer_element_spirit_grab(ctx);"
+before_vram = 0x800032D8
+# The four per-element gates, all the same shape.
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_randomizer_element_cap(ctx);"
+before_vram = 0x8001F700
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_randomizer_element_cap(ctx);"
+before_vram = 0x8001F740
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_randomizer_element_cap(ctx);"
+before_vram = 0x8001F780
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_randomizer_element_cap(ctx);"
+before_vram = 0x8001F7C8
+
+# Enemy drop limit: skip the write that marks a drop slot used up.
+[[patches.hook]]
+func = "func_80002F60"
+text = "quest64_randomizer_drop_limit(ctx);"
+before_vram = 0x800036B0
+
+# Wings indoors / on the Isle of Skye, both in the "may wings be used here"
+# check, before each branch that would disable them.
+[[patches.hook]]
+func = "func_800222B4"
+text = "quest64_randomizer_wings_indoors(ctx);"
+before_vram = 0x800222CC
+[[patches.hook]]
+func = "func_800222B4"
+text = "quest64_randomizer_wings_skye(ctx);"
+before_vram = 0x800222E4
+
+# Disable Beigis's special map check when boss order moved him out of his arena.
+[[patches.hook]]
+func = "func_8001C8C4"
+text = "quest64_randomizer_beigis_map_check(ctx);"
+before_vram = 0x8001C8DC

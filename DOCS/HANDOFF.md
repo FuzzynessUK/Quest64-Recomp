@@ -18,6 +18,31 @@ the fork branch `local/submodule-url-fix` (github.com/FuzzynessUK/Quest64-Recomp
 - Settings and logs live in `%LOCALAPPDATA%\Quest64Recompiled\`
   (`randomizer.json`, `randomizer_spoiler.txt`, `widescreen_rects.txt`).
 
+### On the laptop (set up 2026-09-18)
+
+The laptop has no Visual Studio, so the toolchain went in from scratch: VS2022
+Build Tools (Desktop C++ / Clang / CMake components), `make` via winget
+(`ezwinports.make`), and `N64Recomp.exe` + `RSPRecomp.exe` built from
+github.com/N64Recomp/N64Recomp and copied to the repo root. `rebuild.bat` in
+the repo root wraps the whole thing with the right absolute paths.
+
+The one non-obvious part: **the patches/ MIPS build needs a clang with the MIPS
+backend**, which neither VS's bundled clang nor the LLVM installer package has
+any more (both only register x86/ARM). Use the full release archive instead —
+`LLVM-19.1.3-Windows-X64.tar.xz`, the same one this repo's own
+`.github/workflows/validate.yml` downloads — unpacked at
+`D:\Games\tools\LLVM-19.1.3-Windows-X64`, and point CMake at it:
+
+```
+-DPATCHES_C_COMPILER="D:\Games\tools\LLVM-19.1.3-Windows-X64\bin\clang.exe"
+-DPATCHES_LD="D:\Games\tools\LLVM-19.1.3-Windows-X64\bin\ld.lld.exe"
+```
+
+`lib/sf64decomp` (libultra headers for patches/) was moved out of the repo to
+`D:\Games\reference\sf64decomp` and unregistered as a submodule;
+`patches/Makefile` now includes it from `../../reference/sf64decomp`. Merrow's
+source is checked out next to it at `D:\Games\reference\merrow` for reference.
+
 ## What exists now
 
 ### Cheats tab (F5)
@@ -37,10 +62,64 @@ the fork branch `local/submodule-url-fix` (github.com/FuzzynessUK/Quest64-Recomp
   applied to the in-memory ROM at boot (`on_init_callback`), ROM on disk is
   never touched. `src/game/randomizer/`; tables generated from Merrow's
   DataStore.cs by `tools/convert_merrow_datastore.pl`.
-- Stage 2 (not started): Merrow options that patch *code* need native hooks:
-  encounter rate, MP regain, staff-hit MP, wing unlock, element uncap,
-  drop limit, EXP display, Beigis map-check skip when boss order moves him.
-- Stage 3: Lost Keys mode, enemy composition shuffle, cosmetics.
+- Stage 2 (written 2026-09-18, **none of it play-tested yet**): the Merrow
+  options that patch *code* rather than data, as native hooks. See
+  `src/game/randomizer/native_hooks.cpp` and the Stage 2 block at the bottom
+  of `us.rev0.toml`. All of it is in the Randomizer tab's World and Cosmetics
+  sections.
+- Stage 3: cosmetics done (text and staff palettes). Lost Keys mode and enemy
+  composition shuffle are still open — see "Randomizer work still open".
+
+### How the Stage 2 hooks work
+
+Merrow writes its code options as raw ROM byte patches. Those can't work here:
+N64Recomp bakes instruction immediates into `RecompiledFuncs/` as C literals,
+so patching the ROM (or the mirrored RAM) does nothing at all. The ROM-write
+path in `randomizer.cpp` still handles every data-only option.
+
+Finding each hook site followed the same recipe, which is worth reusing:
+
+1. Translate Merrow's ROM offset to a VRAM address. The boot segment loads ROM
+   0x1000 at 0x80000400, so **RAM = ROM offset + 0x7FFFF400**. This holds for
+   everything up to about 0x80049D50; above that, as far as 0x80100000, is the
+   data segment (the map table, `gPlayerMainData` and friends all live there),
+   and addresses landing in it are genuine runtime data that the existing ROM
+   writes already reach.
+2. Merrow's offsets almost always point at the *low byte of a 16-bit
+   immediate*, i.e. three bytes into the instruction, so the instruction starts
+   at `offset - 3`. Grep `RecompiledFuncs/` for that address to read the real
+   mnemonic; `xxd` on `quest64.us.z64` plus a manual opcode decode confirms it.
+3. Register the hook at the instruction *after* the one that sets the register,
+   so it overwrites the vanilla value in the window between "set" and "used".
+   Nothing else in the function has to change, which matters — several of these
+   sites sit inside large movement/collision functions that would be far riskier
+   to replace wholesale.
+4. Where Merrow rewrote an instruction to force a branch (changing its rs/rt to
+   `$zero` so a `beq`/`bne` always takes), the hook instead forces the value the
+   existing comparison already tests. Same effect, no control-flow surgery.
+
+Sites, for reference: encounter step/roll/max in `func_8001C5F4`; walking MP
+regen in `func_80002F60`; staff-hit MP in `func_80004448`; element cap across
+`func_800074A0`, `func_80002F60` and four identical gates in `func_8001F3DC`;
+drop limit in `func_80002F60`; wings in `func_800222B4`; Beigis's map check in
+`func_8001C8C4`.
+
+### What to look for when testing Stage 2
+
+Every one of these is unverified. In rough order of "most likely to be wrong":
+
+- **Encounter rate** — the step value is the low byte of a `lui` that builds the
+  high half of a *double*, so it is the setting most likely to misbehave in a
+  way that isn't just "wrong rate". Watch for encounters that never fire or
+  fire constantly.
+- **Element cap 99** — four per-element gates are assumed identical because they
+  are byte-identical in the disassembly and Merrow patches them identically;
+  only the first was read in full.
+- **Beigis map check** — only triggers when boss order actually moves him, so it
+  needs a seed where `boss_order[6] != 6`. The spoiler log now says when that
+  happened.
+- **Wings indoors / on Skye**, **no drop limit**, **MP regen off**, **staff-hit
+  MP** — simplest of the set, each a single register override.
 
 ### Widescreen 2D fix — IN PROGRESS
 `src/game/widescreen.cpp`, hooked in `nnScExecuteGraphics` at `0x80000B08`
@@ -88,6 +167,35 @@ play-testing; the General-tab toggle "Widescreen 2D Fixes" stays.
 - Analog stick lands in 0x80092871/2; `func_80003B60` is the player control
   handler (via the state table at 0x8004C230), `func_80005748` then does
   collision on position + velocity.
+
+## Randomizer work still open
+
+- **Combat EXP display** (Merrow's numerical EXP readout) is the one Stage 2
+  option deliberately skipped. It is not an immediate tweak: Merrow rewrites 14
+  separate instruction halves in the 0x02A3xx-0x02A6xx range, changing what the
+  code *does*, not just a constant. Doing it here means replacing the display
+  routine outright, either through `patches/` as MIPS or natively — not a hook.
+- **Menu element caps** (Merrow's `elementCapLocations` 4-7, at ROM 0x02A3DF,
+  0x02A3FB, 0x02A417, 0x02A433) are the "max 50" number the menu gauges show,
+  in `func_80029448`. Each is a delay-slot `addiu $a3, $zero, 0x32` feeding a
+  draw call, and a hook keyed to the jal fires *before* the delay slot sets the
+  register, so it gets stomped. Cosmetic only, so it was left alone rather than
+  guessing at the hook placement. The four gameplay gates are done.
+- **Lost Keys mode** — the biggest remaining piece. Threaded through Shuffle.cs
+  rather than localised: it widens the drop array from 67 to 74 to include
+  bosses, changes the gift array size, adds its own boss item list, and
+  interacts with the progression-door unlocks (`rndUnlockDoorsToggle` behaves
+  differently for `rndLostKeysDropdown` index 1). Data-driven throughout, so it
+  needs no new hooks — but it does need the surrounding shuffle logic ported
+  carefully, not just a table write.
+- **Enemy composition shuffle** — needs `Merrow/Util/AreaEncounterData.cs`
+  (596 lines) ported: `MapData`, `RandomizeMonsterTables`,
+  `RandomizeAllMonsterPresets`, the `FixBaragoonMoor`/`FixBrannochCastle`/
+  `FixMammonsWorld` clamps (Brannoch and Mammon's World share pack definitions
+  across submaps) and `GetMapWriteOperations`. Mechanical but voluminous; also
+  data-only, so no hooks.
+- Cosmetics that Merrow has and this doesn't: cloak colour, text content
+  shuffle, seed digits on the title screen, the Merrow logo.
 
 ## Known gaps / ideas
 - Warp could accept an explicit X/Y/Z (`D_80085370 = -1` + pos in

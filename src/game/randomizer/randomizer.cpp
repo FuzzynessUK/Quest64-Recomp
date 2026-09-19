@@ -116,6 +116,55 @@ namespace {
         return buf;
     }
 
+    // VarFunctions.cs colour helpers, used by the cosmetic palettes. The game
+    // stores colours as RGBA5551; Merrow widens them to 8 bits per channel,
+    // rotates the hue and narrows them again, so the same rounding is kept
+    // here to match its output.
+    struct Rgba {
+        int r = 0, g = 0, b = 0, a = 255;
+    };
+
+    int clamp_255(double value) {
+        return std::min(255, std::max(0, static_cast<int>(value)));
+    }
+
+    Rgba rgba5551_to_rgba(const std::string& hex) {
+        unsigned int packed = static_cast<unsigned int>(std::stoul(hex, nullptr, 16)) & 0xFFFF;
+        Rgba out;
+        out.r = static_cast<int>(std::lround(((packed >> 11) & 0x1F) / 31.0 * 255.0));
+        out.g = static_cast<int>(std::lround(((packed >> 6) & 0x1F) / 31.0 * 255.0));
+        out.b = static_cast<int>(std::lround(((packed >> 1) & 0x1F) / 31.0 * 255.0));
+        out.a = (packed & 1) ? 255 : 0;
+        return out;
+    }
+
+    std::string rgba_to_rgba5551(const Rgba& col) {
+        int r = static_cast<int>(std::lround(col.r / 255.0 * 31.0));
+        int g = static_cast<int>(std::lround(col.g / 255.0 * 31.0));
+        int b = static_cast<int>(std::lround(col.b / 255.0 * 31.0));
+        int packed = (r << 11) | (g << 6) | (b << 1) | (col.a == 0 ? 0 : 1);
+        return hex4(packed);
+    }
+
+    // Merrow's HueShift: rotate about the grey axis by the given degrees.
+    Rgba hue_shift(const Rgba& col, double degrees) {
+        double radians = degrees * std::acos(-1.0) / 180.0;
+        double cos_a = std::cos(radians);
+        double sin_a = std::sin(radians);
+        double third = 1.0 / 3.0;
+        double root = std::sqrt(third);
+        double m0 = cos_a + (1.0 - cos_a) * third;
+        double m1 = third * (1.0 - cos_a) - root * sin_a;
+        double m2 = third * (1.0 - cos_a) + root * sin_a;
+
+        Rgba out;
+        out.r = clamp_255(col.r * m0 + col.g * m1 + col.b * m2);
+        out.g = clamp_255(col.r * m2 + col.g * m0 + col.b * m1);
+        out.b = clamp_255(col.r * m1 + col.g * m2 + col.b * m0);
+        out.a = clamp_255(col.a);
+        return out;
+    }
+
     // Merrow's TranslateString: ASCII to the game's text encoding. Digits,
     // upper and lower case each live on a row selected by a prefix byte;
     // punctuation and the #/$/% controls come from two lookup tables.
@@ -194,6 +243,7 @@ namespace {
         std::vector<int> monster_stats = data::monsterstatvanilla;
         std::vector<int> boss_order = std::vector<int>(boss_count);
         int guilty_element = 4;
+        bool beigis_moved = false;
 
         Builder(const Options& opts, uint32_t seed) : options(opts), rng(seed) {}
 
@@ -738,7 +788,13 @@ namespace {
                     log(std::string("  ") + boss_names[boss_order[i]] + "'s arena: " + boss_names[i]);
                 }
                 // Merrow also patches code at 0x01D4D7 to skip Beigis's map
-                // check when he is moved; that needs a native hook here.
+                // check when he is moved. That is an instruction immediate, so
+                // it goes through quest64_randomizer_beigis_map_check instead
+                // of a ROM write; Beigis is boss 6.
+                if (boss_order[6] != 6) {
+                    beigis_moved = true;
+                    log("  Beigis's map check disabled (he is not in his own arena).");
+                }
             }
 
             if (options.boss_element) {
@@ -793,6 +849,40 @@ namespace {
                 log("Soul Search: on.");
             }
 
+            // Walking MP regen rate. Merrow's trackbar: 7 is off, 8-12 are the
+            // speed tiers with 10 matching vanilla. Only the tiers are a data
+            // byte; "off" is an instruction immediate and is handled by
+            // quest64_randomizer_walk_mp_regain.
+            if (options.mp_regain >= 8 && options.mp_regain <= 12 && options.mp_regain != 10) {
+                // Merrow's values, chosen to track seconds spent running
+                // rather than multiplying the rate.
+                static constexpr int speeds[5] = { 0x58, 0x51, 0x41, 0x31, 0x28 };
+                add_u8(0x071B39, speeds[options.mp_regain - 8]);
+                log("Walking MP regen rate: tier " + std::to_string(options.mp_regain - 10) + ".");
+            }
+            if (options.mp_regain == 7) {
+                log("Walking MP regen: off.");
+            }
+            if (options.staff_hit_mp != 1) {
+                log("Staff hit MP regain: " + std::to_string(options.staff_hit_mp) + ".");
+            }
+            if (options.element_uncap) {
+                log("Element level maximum raised to 99.");
+            }
+            if (options.drop_limit_disabled) {
+                log("Enemy drop limit disabled.");
+            }
+            if (options.wing_unlock_indoors) {
+                log("Wings enabled indoors.");
+            }
+            if (options.wing_unlock_skye) {
+                log("Wings enabled on the Isle of Skye.");
+            }
+            if (options.encounter_rate != 2) {
+                static const char* const names[5] = { "Halved", "Reduced", "Default", "Increased", "Doubled" };
+                log(std::string("Encounter rate: ") + names[std::clamp(options.encounter_rate, 0, 4)] + ".");
+            }
+
             if (options.fast_monastery) {
                 add_hex("4361A0", "00090002");
                 log("Fast Monastery: on.");
@@ -810,6 +900,60 @@ namespace {
             }
         }
 
+        // QuestPatchBuild.cs's cosmetic section. Merrow keeps these last so
+        // they can't affect anything else, and rolls them off the system RNG;
+        // here they come off the seeded RNG so a seed reproduces its colours.
+        void patch_cosmetics() {
+            if (options.text_palette != 0) {
+                // Merrow's fixed palettes, in its dropdown's order.
+                static const char* const fixed_palettes[7] = {
+                    nullptr,                // 0: off
+                    nullptr,                // 1: random, handled below
+                    "F83E9C1BBA0DD009",     // 2: red
+                    "F83E9C1B629D19AB",     // 3: blue
+                    "F83E318DBDEFF735",     // 4: white
+                    "F83E9C1B6AD5318D",     // 5: black (the game's default)
+                    nullptr,
+                };
+                static const char* const palette_names[6] = {
+                    "off", "random", "red", "blue", "white", "black"
+                };
+                int choice = std::clamp(options.text_palette, 0, 5);
+                if (choice == 1) {
+                    // A random hue rotation of either the light or the dark
+                    // base palette, as Merrow's "random" setting does.
+                    double hue = rng.next_double() * 360.0;
+                    bool light = rng.next(2) != 0;
+                    const std::vector<std::string>& base =
+                        light ? data::baseRedTextPalette : data::baseDarkTextPalette;
+                    std::string palette = "F83E";
+                    for (int i = 0; i < 3; i++) {
+                        palette += rgba_to_rgba5551(hue_shift(rgba5551_to_rgba(base[i]), hue));
+                    }
+                    add_hex("D3E240", palette);
+                    log("Text palette: random (" + std::to_string(static_cast<int>(std::lround(hue))) +
+                        (light ? " light)." : " dark)."));
+                }
+                else if (fixed_palettes[choice] != nullptr) {
+                    add_hex("D3E240", fixed_palettes[choice]);
+                    log(std::string("Text palette: ") + palette_names[choice] + ".");
+                }
+            }
+
+            if (options.staff_palette) {
+                // The staff texture is 768 RGBA5551 colours, all rotated by
+                // the same hue.
+                double hue = rng.next_double() * 360.0;
+                std::string palette;
+                palette.reserve(768 * 4);
+                for (int i = 0; i < 768; i++) {
+                    palette += rgba_to_rgba5551(hue_shift(rgba5551_to_rgba(data::stafftexture.substr(i * 4, 4)), hue));
+                }
+                add_hex("86EB70", palette);
+                log("Staff palette: random (" + std::to_string(static_cast<int>(std::lround(hue))) + ").");
+            }
+        }
+
         void build() {
             shuffle_spells();
             shuffle_spell_names();
@@ -820,11 +964,13 @@ namespace {
             patch_items();
             patch_monsters();
             patch_misc();
+            patch_cosmetics();
         }
     };
 
     Options active;
     bool active_loaded = false;
+    zelda64::randomizer::NativeState native;
 
     std::filesystem::path options_path() {
         return zelda64::get_app_folder_path() / "randomizer.json";
@@ -886,6 +1032,15 @@ void zelda64::randomizer::save_options(const Options& o) {
     j["start_defense"] = o.start_defense;
     j["fast_monastery"] = o.fast_monastery;
     j["fast_blue_cave"] = o.fast_blue_cave;
+    j["encounter_rate"] = o.encounter_rate;
+    j["mp_regain"] = o.mp_regain;
+    j["staff_hit_mp"] = o.staff_hit_mp;
+    j["element_uncap"] = o.element_uncap;
+    j["drop_limit_disabled"] = o.drop_limit_disabled;
+    j["wing_unlock_indoors"] = o.wing_unlock_indoors;
+    j["wing_unlock_skye"] = o.wing_unlock_skye;
+    j["text_palette"] = o.text_palette;
+    j["staff_palette"] = o.staff_palette;
 
     std::ofstream out(options_path());
     out << j.dump(4);
@@ -952,7 +1107,23 @@ zelda64::randomizer::Options zelda64::randomizer::load_options() {
     get("start_defense", o.start_defense);
     get("fast_monastery", o.fast_monastery);
     get("fast_blue_cave", o.fast_blue_cave);
+    get("encounter_rate", o.encounter_rate);
+    get("mp_regain", o.mp_regain);
+    get("staff_hit_mp", o.staff_hit_mp);
+    get("element_uncap", o.element_uncap);
+    get("drop_limit_disabled", o.drop_limit_disabled);
+    get("wing_unlock_indoors", o.wing_unlock_indoors);
+    get("wing_unlock_skye", o.wing_unlock_skye);
+    get("text_palette", o.text_palette);
+    get("staff_palette", o.staff_palette);
 
+    o.encounter_rate = std::clamp(o.encounter_rate, 0, 4);
+    o.text_palette = std::clamp(o.text_palette, 0, 5);
+    o.staff_hit_mp = std::clamp(o.staff_hit_mp, 0, 9);
+    // 7 is off, 8-12 are the speed tiers; treat anything else as vanilla.
+    if (o.mp_regain != 7 && (o.mp_regain < 8 || o.mp_regain > 12)) {
+        o.mp_regain = 10;
+    }
     o.variance = std::clamp(o.variance, 0, 5);
     o.scale_percent = std::clamp(o.scale_percent, 50, 150);
     o.exp_boost = std::clamp(o.exp_boost, 0, 12);
@@ -983,7 +1154,12 @@ zelda64::randomizer::Result zelda64::randomizer::generate(const Options& options
 
     result.writes = std::move(builder.writes);
     result.spoiler = std::move(builder.spoiler);
+    result.beigis_moved = builder.beigis_moved;
     return result;
+}
+
+const zelda64::randomizer::NativeState& zelda64::randomizer::native_state() {
+    return native;
 }
 
 void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
@@ -993,6 +1169,7 @@ void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
     }
 
     Result result = generate(options);
+    native.beigis_moved = result.beigis_moved;
 
     std::span<const uint8_t> rom = recomp::get_rom();
     std::vector<uint8_t> patched(rom.begin(), rom.end());
