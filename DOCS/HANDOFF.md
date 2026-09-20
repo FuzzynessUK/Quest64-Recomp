@@ -297,14 +297,44 @@ byte +0x19 (set on damage spells like Power Staff and Fire Pillar too, so not a
 duration) and byte +0x3C (only on Spirit Armor/Weakness/Weaken All, and behaves
 like magnitude, since Weakness Lv2 is *lower* than Lv1).
 
-#### Kill Brian
+**Second pass (2026-09-20), after sliding-window alignment.** Aligning only on a
+function's *first* 16 instructions misses any function whose opening changed.
+Sliding the 16-instruction window through each function finds an anchor in most
+of the battle range too, so nearly all of the game can be compared. Three
+candidate leads were chased and all eliminated:
 
-`kill_player()` now holds HP at zero for 30 frames rather than writing it once.
-Nothing outside of taking damage appears to check for death, and `gPlayerMainData`
-HP is only *read* by HUD code in the recompiled output (battle damage reaches it
-through a pointer, so it cannot be found by address). The hold gives the battle
-and field loops a window to notice; it is not a guaranteed kill, and finding the
-real death entry point is still open.
+- `func_80028624 +0x4A4/+0x4D4/+0x4E4` (1->12, 1->7, 3->7): calls into
+  `func_80029B58` with sprite ids and coordinates. UI layout, not durations.
+- `func_8002FD90 +0x0F4/+0x0FC` (6->10, 6->12): same shape, UI.
+- `func_800386D0`, byte field +0x98, decremented once per call: this is an
+  RLE repeat count in a script/bytecode interpreter (note the 0xFE escape byte
+  and the advancing pointer at +0x58), not a status turn counter.
+
+Merrow documents only two spell fields (+3 "spell rule", +11 "range"), nothing
+that covers this.
+
+**What would actually finish it.** Static analysis has run out of road; the next
+step is runtime observation, which is cheap with an emulator:
+
+1. In BizHawk (already installed with a Quest 64 US ROM), cast Silence or
+   Restriction in battle and RAM-search for a value that counts down once per
+   turn.
+2. That gives the counter's RDRAM address and the battle actor's struct offset.
+3. Search `RecompiledFuncs/` for the instruction that writes that offset; that
+   is the duration being set, and it becomes a native hook exactly like the
+   Stage 2 randomizer options.
+
+Until then the Enhancements tab deliberately has no toggle for it, rather than
+one that silently does nothing.
+
+#### Kill Brian: removed 2026-09-20
+
+The cheats tab briefly had a Kill button that set HP to zero. It never reliably
+killed: nothing outside of taking damage appears to check for death, and
+`gPlayerMainData` HP is only *read* by HUD code in the recompiled output (battle
+damage reaches it through a pointer, so the writer cannot be found by address).
+Removed at the user's request rather than left as a button that half worked.
+With One Hit KO on, any hit kills Brian anyway.
 
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
@@ -333,21 +363,10 @@ below is still fair game.
   draw call, and a hook keyed to the jal fires *before* the delay slot sets the
   register, so it gets stomped. Cosmetic only, so it was left alone rather than
   guessing at the hook placement. The four gameplay gates are done.
-- **Lost Keys mode** — the biggest remaining piece. Threaded through Shuffle.cs
-  rather than localised: it widens the drop array from 67 to 74 to include
-  bosses, changes the gift array size, adds its own boss item list, and
-  interacts with the progression-door unlocks (`rndUnlockDoorsToggle` behaves
-  differently for `rndLostKeysDropdown` index 1). Data-driven throughout, so it
-  needs no new hooks — but it does need the surrounding shuffle logic ported
-  carefully, not just a table write.
-- **Enemy composition shuffle** — needs `Merrow/Util/AreaEncounterData.cs`
-  (596 lines) ported: `MapData`, `RandomizeMonsterTables`,
-  `RandomizeAllMonsterPresets`, the `FixBaragoonMoor`/`FixBrannochCastle`/
-  `FixMammonsWorld` clamps (Brannoch and Mammon's World share pack definitions
-  across submaps) and `GetMapWriteOperations`. Mechanical but voluminous; also
-  data-only, so no hooks.
-- Cosmetics that Merrow has and this doesn't: cloak colour, text content
-  shuffle, seed digits on the title screen, the Merrow logo.
+- **Lost Keys mode** and **enemy composition shuffle** are DONE (stages 6 and
+  7, 2026-09-19). The entries that used to sit here are obsolete.
+- Cosmetics still missing: text content shuffle and vowels. Cloak colour is
+  done (stage 4); the logo and seed digits are deliberately not ported.
 
 ## Known gaps / ideas
 - Warp could accept an explicit X/Y/Z (`D_80085370 = -1` + pos in

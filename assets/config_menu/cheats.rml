@@ -78,19 +78,6 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>Kill Brian</div>
-                            </label>
-                            <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">
-                                    <div class="config-debug__select-label"><div>Sets HP to zero</div></div>
-                                </div>
-                                <div class="config-debug__option-trigger">
-                                    <button class="button" onclick="cheat_kill_player">Kill</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">The game starts at Melrode Monastery, submap 17.
                                 Submaps are described by where their exits lead and
                                 entrances by where the game enters through them, so

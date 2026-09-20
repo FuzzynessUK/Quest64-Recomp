@@ -72,8 +72,6 @@ namespace zelda64 {
     const std::vector<std::string>& item_names();
     // Queue `item_id` into the first free inventory slot on the next frame.
     void give_item(int item_id);
-    // Drop Brian to 0 HP on the next frame.
-    void kill_player();
 }
 
 #endif

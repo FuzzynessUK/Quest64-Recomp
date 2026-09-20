@@ -1009,11 +1009,6 @@ public:
                 zelda64::restart_application();
             });
 
-        recompui::register_event(listener, "cheat_kill_player",
-            [](const std::string& param, Rml::Event& event) {
-                zelda64::kill_player();
-            });
-
         recompui::register_event(listener, "rnd_new_seed",
             [](const std::string& param, Rml::Event& event) {
                 randomizer_context.edited.seed = std::to_string(std::random_device{}() % 100000000u);
