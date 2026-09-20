@@ -115,9 +115,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("saved_hud_ratio", o.saved_hud_ratio);
     get("speedrun_timer", o.speedrun_timer);
     get("timer_position", o.timer_position);
-    get("timer_format", o.timer_format);
     o.timer_position = std::clamp(o.timer_position, 0, 3);
-    o.timer_format = std::clamp(o.timer_format, 0, 2);
     get("jp_healing", o.jp_healing);
     get("exit_from_anywhere", o.exit_from_anywhere);
     get("longer_magic_barrier", o.longer_magic_barrier);
@@ -134,7 +132,6 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["saved_hud_ratio"] = o.saved_hud_ratio;
     j["speedrun_timer"] = o.speedrun_timer;
     j["timer_position"] = o.timer_position;
-    j["timer_format"] = o.timer_format;
     j["jp_healing"] = o.jp_healing;
     j["exit_from_anywhere"] = o.exit_from_anywhere;
     j["longer_magic_barrier"] = o.longer_magic_barrier;

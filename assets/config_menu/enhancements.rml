@@ -61,14 +61,6 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Timer format</div></div>
-                                        <select data-value="enh_timer_format" id="enh_timer_format_select">
-                                            <option value="0">Seconds</option>
-                                            <option value="1">Minutes</option>
-                                            <option value="2">Hours</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label"><div>Exit from anywhere</div></div>
                                         <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
                                             <option value="0">Off</option>

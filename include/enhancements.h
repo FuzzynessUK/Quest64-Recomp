@@ -25,11 +25,10 @@ namespace zelda64::enhancements {
         int saved_antialiasing = -1;
         int saved_hud_ratio = -1;
 
-        // Run timer. Position is 0 top-left, 1 top-right, 2 bottom-left,
-        // 3 bottom-right. Format is 0 seconds, 1 minutes, 2 hours.
+        // Run timer, shown as hh:mm:ss. Position is 0 top-left, 1 top-right,
+        // 2 bottom-left, 3 bottom-right.
         bool speedrun_timer = false;
         int timer_position = 1;
-        int timer_format = 1;
 
         // Quality of life.
         //

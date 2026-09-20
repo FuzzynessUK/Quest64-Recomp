@@ -4,7 +4,6 @@
 #include <string>
 
 #include "speedrun.h"
-#include "enhancements.h"
 #include "recomp.h"
 
 namespace {
@@ -82,23 +81,12 @@ bool zelda64::speedrun::finished() {
 
 std::string zelda64::speedrun::display() {
     long long total = elapsed_ms();
-    long long ms = total % 1000;
     long long seconds = (total / 1000) % 60;
     long long minutes = (total / 60000) % 60;
     long long hours = total / 3600000;
 
     char buffer[32];
-    switch (zelda64::enhancements::active_options().timer_format) {
-        case 0: // seconds only
-            snprintf(buffer, sizeof(buffer), "%lld.%03lld", total / 1000, ms);
-            break;
-        case 2: // hours
-            snprintf(buffer, sizeof(buffer), "%lld:%02lld:%02lld.%03lld", hours, minutes, seconds, ms);
-            break;
-        default: // minutes
-            snprintf(buffer, sizeof(buffer), "%lld:%02lld.%03lld", total / 60000, seconds, ms);
-            break;
-    }
+    snprintf(buffer, sizeof(buffer), "%02lld:%02lld:%02lld", hours, minutes, seconds);
     return buffer;
 }
 

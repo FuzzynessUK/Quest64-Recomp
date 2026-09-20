@@ -796,13 +796,6 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
-    constructor.BindFunc("enh_timer_format",
-        [](Rml::Variant& out) { out = enhancements_context.edited.timer_format; },
-        [](const Rml::Variant& in) {
-            enhancements_context.edited.timer_format = std::clamp(in.Get<int>(), 0, 2);
-            enhancements_option_changed();
-        }
-    );
 
     enhancements_context.model_handle = constructor.GetModelHandle();
 }
@@ -990,8 +983,14 @@ void recompui::update_speedrun_model() {
         return;
     }
 
-    bool visible = zelda64::enhancements::active_options().speedrun_timer
-        && (zelda64::speedrun::running() || zelda64::speedrun::finished());
+    // Put the overlay back if anything hid it, such as a menu closing.
+    if (zelda64::enhancements::active_options().speedrun_timer) {
+        recompui::show_speedrun_overlay();
+    }
+
+    // Shown whenever the option is on, reading 0 until the run starts, so
+    // it is obvious the overlay is working before a run is under way.
+    bool visible = zelda64::enhancements::active_options().speedrun_timer;
     if (visible != speedrun_context_state.shown_visible) {
         speedrun_context_state.shown_visible = visible;
         speedrun_context_state.model_handle.DirtyVariable("timer_visible");

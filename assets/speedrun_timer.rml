@@ -1,40 +1,42 @@
 <rml>
-<head>
-    <title>Speedrun Timer</title>
-    <style>
-        body {
-            position: absolute;
-            left: 0dp;
-            top: 0dp;
-            width: 100%;
-            height: 100%;
-            /* The overlay must never eat clicks meant for the game. */
-            pointer-events: none;
-            font-family: chiaro;
-            font-size: 28dp;
-            font-weight: bold;
-        }
-        .timer {
-            position: absolute;
-            padding: 6dp 12dp;
-            color: #ffffff;
-            /* Plain shadow so it stays readable over any scene. */
-            text-shadow: 2dp 2dp #000000d0;
-        }
-        .timer--top-left     { top: 12dp;    left: 16dp; }
-        .timer--top-right    { top: 12dp;    right: 16dp; }
-        .timer--bottom-left  { bottom: 12dp; left: 16dp; }
-        .timer--bottom-right { bottom: 12dp; right: 16dp; }
-        .timer--done { color: #7CFC7C; }
-    </style>
-</head>
-<body data-model="speedrun_model">
-    <div data-class-timer--top-left="timer_position == 0"
-         data-class-timer--top-right="timer_position == 1"
-         data-class-timer--bottom-left="timer_position == 2"
-         data-class-timer--bottom-right="timer_position == 3"
-         data-class-timer--done="timer_finished"
-         class="timer"
-         data-if="timer_visible">{{timer_text}}</div>
-</body>
+	<head>
+		<title>Speedrun Timer</title>
+		<link type="text/rcss" href="rml.rcss"/>
+		<link type="text/rcss" href="recomp.rcss"/>
+		<style>
+			body
+			{
+				width: 100%;
+				height: 100%;
+			}
+			.speedrun-timer
+			{
+				position: absolute;
+				display: block;
+				width: 260dp;
+				font-family: "latolatin";
+				font-size: 30dp;
+				font-weight: bold;
+				color: #ffffff;
+				background-color: #00000090;
+				padding: 6dp 10dp;
+			}
+			.speedrun-timer--top-left     { top: 16dp;    left: 16dp;  text-align: left; }
+			.speedrun-timer--top-right    { top: 16dp;    right: 16dp; text-align: right; }
+			.speedrun-timer--bottom-left  { bottom: 16dp; left: 16dp;  text-align: left; }
+			.speedrun-timer--bottom-right { bottom: 16dp; right: 16dp; text-align: right; }
+			.speedrun-timer--done         { color: #7cfc7c; }
+		</style>
+	</head>
+	<body>
+		<div data-model="speedrun_model">
+			<div data-if="timer_visible"
+			     class="speedrun-timer"
+			     data-class-speedrun-timer--top-left="timer_position == 0"
+			     data-class-speedrun-timer--top-right="timer_position == 1"
+			     data-class-speedrun-timer--bottom-left="timer_position == 2"
+			     data-class-speedrun-timer--bottom-right="timer_position == 3"
+			     data-class-speedrun-timer--done="timer_finished">{{timer_text}}</div>
+		</div>
+	</body>
 </rml>
