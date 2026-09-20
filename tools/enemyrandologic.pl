@@ -1,6 +1,6 @@
 #!/usr/bin/perl
-# Builds DOCS/enemyrandologic.xlsx: the design for a progression-aware enemy
-# randomizer, with the game's real area rosters and monster stats pulled out
+# Builds DOCS/enemyrandologic.xlsx: the design of the Enemy Randomizer option
+# (as implemented), with the game's real area rosters and monster stats pulled out
 # of the Merrow data (src/game/randomizer/merrow_data.cpp, merrow_mapdata.cpp)
 # so the numbers in the sheet are the ROM's. No spreadsheet library on this
 # machine, so the .xlsx (a zip of XML) is written directly; formulas are
@@ -223,30 +223,30 @@ sub F { { f => $_[0], s => ($_[1] // 7) } }
 
 # ---------------------------------------------------------------- Settings
 # Cell addresses of the inputs, so every formula below refers to one place.
+# The recomp does not read this file: the values here mirror the constants in
+# src/game/randomizer/enemy_progression.cpp, and the sheet exists to explain
+# and preview what that code does.
 my %S = (
-    down      => 'Settings!$B$4',   # tiers below an area a monster may come from
+    down      => 'Settings!$B$4',   # tiers below an area a set may come from
     up        => 'Settings!$B$5',   # tiers above
-    k         => 'Settings!$B$6',   # scaling strength
-    fliers    => 'Settings!$B$7',
-    dangerous => 'Settings!$B$8',
-    bulk      => 'Settings!$B$9',
-    threat    => 'Settings!$B$10',
-    thresholds=> 'Settings!$B$13:$B$19',   # T2..T8 lower bounds
-    hpcap     => 'Settings!$B$23',
-    statcap   => 'Settings!$B$24',
+    shape     => 'Settings!$B$6',   # shape exponent s
+    bulk      => 'Settings!$B$7',
+    threat    => 'Settings!$B$8',
+    thresholds=> 'Settings!$B$11:$B$17',   # T2..T8 lower bounds
+    hpcap     => 'Settings!$B$21',
+    statcap   => 'Settings!$B$22',
+    expcap    => 'Settings!$B$23',
 );
 my $TIERS = 8;
 
 my @settings = (
-    [ T('Settings (inputs)') ],
-    [ W('Yellow cells are the knobs the design refers to. Everything else on the other tabs is calculated from these and the game data.') ],
+    [ T('Settings (the constants the code uses)') ],
+    [ W('Yellow cells are the knobs the design refers to; the other tabs recalculate from them. The game itself uses the same values as constants in enemy_progression.cpp (spread_down, spread_up, shape_exponent, caps[]), so changing a cell here previews a change, it does not apply one.') ],
     [ H('Setting', 'Value', 'What it does') ],
-    [ 'Spread down (tiers below)', I(7), W('An area may take monsters from this many tiers BELOW its own (easier monsters, scaled up). 7 = any tier (the default: placement is unrestricted, the scaling does the balancing). 0 = none.') ],
-    [ 'Spread up (tiers above)', I(1), W('An area may take monsters from this many tiers ABOVE its own (harder monsters, scaled down). 0 = none. 7 = anything (Merrow\'s behaviour).') ],
-    [ 'Scaling strength k', I(1), W('0 = keep home stats, 0.5 = halfway to the destination area\'s average, 1 = full fit. EXP and the progression guard always use 1.') ],
-    [ 'Max fliers per area', I(99), W('Not enforced (any monster may appear anywhere); kept for reference. The ROM flags only Wyvern, Will-o\x27-Wisp and Pixie as flying.') ],
-    [ 'Dangerous: keep at native tier or above', I('N'), W('Off by default: Cockatrice / Flamed Mane may appear anywhere, rescaled like everything else. Y pins them at or above their native tier.') ],
-    [ 'Bulk: DEF weight', I(25), W('Bulk = HP * (1 + DEF / this). Larger = DEF matters less.') ],
+    [ 'Spread down (tiers below)', I(7), W('An area may take a monster set from this many tiers BELOW its own (easier monsters, scaled up). 7 = any tier. The shipped value is 7: placement is unrestricted and the scaling does the balancing.') ],
+    [ 'Spread up (tiers above)', I(7), W('An area may take a set from this many tiers ABOVE its own (harder monsters, scaled down). 7 = any tier (shipped). 0 would keep an area to sets no harder than its own tier.') ],
+    [ 'Shape exponent s', I(0.5), W('Rule 5: how much of a monster\'s deviation from its home average survives the move. 0.5 = square root (a monster at 3x its home average lands at 1.7x the destination\'s); 1 keeps the exact ratio; 0 makes every monster the destination average. Shipped: 0.5, chosen after Ork Jr (3x its home HP) hit the 999 cap in Mammon\'s World at s = 1.') ],
+    [ 'Bulk: DEF weight', I(25), W('Bulk = HP * (1 + DEF / this). Larger = DEF matters less. Feeds the Power score, which the guard (rule 6) is built on.') ],
     [ 'Threat: AGI weight', I(50), W('Threat = ATK * (1 + AGI / this). Larger = AGI matters less.') ],
     [],
     [ H('Power tier thresholds', 'Power at least', 'Tier') ],
@@ -257,39 +257,37 @@ my @settings = (
     [ 'T6 from', I(250), 6 ],
     [ 'T7 from', I(360), 7 ],
     [ 'T8 from', I(450), 8 ],
-    [ W('Power = SQRT(Bulk * Threat). Vanilla tier averages under the eight tiers: T1 15, T2 48, T3 119, T4 111, T5 187, T6 329, T7 397, T8 504 (T3 and T4 overlap: East Limelin is tougher by numbers than Windward/Blue Cave). Adjust and watch Monsters column P.') ],
+    [ W('Power = SQRT(Bulk * Threat). Vanilla tier averages under the eight tiers: T1 15, T2 48, T3 119, T4 111, T5 187, T6 329, T7 397, T8 504 (T3 and T4 overlap: East Limelin is tougher by numbers than Windward/Blue Cave). Informational: the code does not use power tiers, only the area averages and the guard.') ],
     [],
     [ H('Stat caps', 'Cap', '') ],
     [ 'HP cap', I(999), W('Vanilla monsters stay under 999; Hard Mode raises Brian\'s caps to 999 too.') ],
     [ 'ATK/DEF/AGI cap', I(255), W('Stored as bytes in the game\'s battle struct.') ],
-    [],
-    [ 'Shape exponent s', I(0.5), W('Rule 5: how much of a monster\'s deviation from its home average survives the move. 0.5 = square root (a monster at 3x its home average lands at 1.7x the destination\'s); 1 keeps the exact ratio; 0 makes every monster the destination average. This cell is B26.') ],
+    [ 'EXP / Stones cap', I(65535), W('EXP and Stones are words in the table; capped generously. Every scaled value is also floored at 1.') ],
 );
 
 # ---------------------------------------------------------------- Logic
 my @logic = (
-    [ T('Enemy randomizer: progression-aware placement (design)') ],
-    [ W('Quest 64 Recomp, 2026-09-20. Data on the Areas / Roster / Monsters tabs is the US ROM\'s, read out of the Merrow tables the randomizer already ships. Yellow cells are inputs; change them and the sheet recalculates.') ],
+    [ T('Enemy Randomizer: final logic (as implemented)') ],
+    [ W('Quest 64 Recomp, 2026-09-21. This is the shipped behaviour of the "Enemy Randomizer" switch on the Randomizer tab, one option that replaces Merrow\x27s "Shuffle Encounters" and the earlier "Enemy Progression". Data on the Areas / Roster / Monsters tabs is the US ROM\x27s, read out of the Merrow tables the randomizer ships. Yellow cells on Settings mirror the code\x27s constants; change them and the sheet previews the effect.') ],
     [],
-    [ S('The problem') ],
-    [ W('Merrow\'s two enemy options are blind to difficulty. "Enemy tables" swaps whole monster tables between areas at random, so the Holy Plains can draw the Dindom Dries table (Red Wyvern, 550 HP, against a 50 HP Brian) while Brannoch Castle gets Were Hares. "Enemy composition" only rerolls packs inside an area\'s own table, so nothing actually changes hands. Neither touches stats, so a moved monster keeps its home numbers.') ],
+    [ S('The problem it solves') ],
+    [ W('Merrow\'s enemy options are blind to difficulty. Swapping whole monster tables at random lets the Holy Plains draw the Dindom Dries set (Red Wyvern, 550 HP, against a 50 HP Brian) while Brannoch Castle gets Were Hares, and nothing touches stats, so a moved monster keeps its home numbers. The Enemy Randomizer keeps the "anything anywhere" variety but rewrites every placed monster\'s numbers for where it now lives, and guarantees the game gets progressively harder whatever the seed placed where.') ],
     [],
-    [ S('The idea, in one line') ],
-    [ W('Give every area a tier (1-8, story order) and every monster a native tier (the tier of the area it comes from). An area of tier T draws its roster only from monsters whose native tier is within a chosen spread of T, and every placed monster has its stats rescaled toward the destination area\'s budget, so the shape of the monster (glass cannon, tank, fast) survives but its numbers match where it now lives. The budget never goes down from one area to the next, so the game always gets progressively harder regardless of what the seed placed where. Exp and stones follow the destination budget, so levelling pace is unchanged.') ],
+    [ S('In one line') ],
+    [ W('Every area is given one of the game\'s six monster sets at random (any set in any area) and its encounter packs are rerolled; when the set is loaded for that area, each monster\'s HP / ATK / DEF / AGI / EXP / Stones are moved to the area\'s vanilla average, keeping the square root of the monster\'s own deviation from its home average, times a guard that never lets an area\'s numbers fall below the previous area\'s.') ],
     [],
     [ S('Rules') ],
-    [ W('1. Tiers (Areas tab, column C): T1 Holy Plains / Connor Forest, T2 Dondoran Flats / Glencoe Forest / West Carmaugh, T3 Cull Hazard / East Limelin, T4 Windward Forest / Blue Cave / Isle of Skye, T5 Baragoon Tunnel, T6 Dindom Dries / Boil Hole, T7 Baragoon Moor / Brannoch Castle, T8 Mammon\'s World. Editable.') ],
-    [ W('2. Monster native tier = tier of its home area (first area it appears in, by progression). The Monsters tab also computes a Power score from stats and a Power tier from thresholds (Settings), so you can see where a monster really sits versus where the game puts it (e.g. Cockatrice is T2 by area but T3 by numbers).') ],
-    [ W('3. Spread (Settings B4 down / B5 up). Default 7 / 7: any monster set can appear in any area, the scaling below is what balances it. Narrower spreads (e.g. 1 / 1) keep an area to sets whose monsters are within that many tiers of its own; 0 / 0 is a reshuffle within difficulty bands. Note the game\x27s monsters come in six fixed sets that are placed whole (see Implementation), so the window applies to sets, not single monsters.') ],
-    [ W('4. Roster size stays the same. Each area keeps its vanilla number of distinct monsters (Areas column E), because the pack definitions reference table slots 0..N-1 and the packs\' shapes (how many of each, min + extra) are kept as they are. The randomizer fills those slots from the allowed pool, no repeats within an area, and prefers monsters not already used by a neighbouring tier so the game does not become the same eight enemies everywhere.') ],
-    [ W('5. Stat scaling. For a monster placed in area A: new = AreaAvg(A, stat) * (own / AreaAvg(home, stat)) ^ s * guard(A). The monster is moved to the destination\x27s average and keeps its own deviation from its home average, compressed by the shape exponent s (Settings B26, 0.5): a monster three times its home average lands at 1.7 times the destination\x27s, so home-area bruisers like Ork Jr do not become super-bosses late. s = 1 would preserve the ratio exactly, 0 would make every monster the destination average. Applies to HP, ATK, DEF, AGI, EXP and Stones alike; spell damage follows ATK inside the game. HP capped at 999, ATK/DEF/AGI at 255. See ScalingExample.') ],
+    [ W('1. Tiers (Areas tab, column C): T1 Holy Plains / Connor Forest, T2 Dondoran Flats / Glencoe Forest / West Carmaugh, T3 Cull Hazard / East Limelin, T4 Windward Forest / Blue Cave / Isle of Skye, T5 Baragoon Tunnel, T6 Dindom Dries / Boil Hole, T7 Baragoon Moor / Brannoch Castle, T8 Mammon\'s World. Story order; the Areas rows are in this order and the guard (rule 6) walks it.') ],
+    [ W('2. Monster native tier = tier of its home area (first area it appears in, by progression). The Monsters tab also computes a Power score from stats and a Power tier from the Settings thresholds, so you can see where a monster really sits versus where the game puts it (e.g. Cockatrice is T2 by area but T3 by numbers). The code only uses the home area, for the averages.') ],
+    [ W('3. Placement is per monster set, not per monster. The game keeps its monsters in six files (Implementation tab), and every file loads to the same RAM address, so an area can only ever hold one whole set. For each of the 16 areas in progression order the seed picks one of the six sets; with spread 7 / 7 (Settings B4-B5) every set is a candidate for every area. When there is a choice, the set the previous area got is skipped, so consecutive areas look different. Submaps that share pack definitions (Baragoon Moor 1-2, Brannoch 1-6, Mammon 1-6) are one area and get one set.') ],
+    [ W('4. Packs are rerolled. Each area keeps its vanilla number of packs and each pack its shape (how many members, always-count + extra-count), but every member slot is refilled from the new set with no repeats inside a pack, and every region gets a full seven presets drawn from the area\'s packs (Merrow\'s composition logic). So the roster an area shows is the whole placed set, in new combinations.') ],
+    [ W('5. Stat scaling. For a monster of home area H placed in area A: new = AreaAvg(A, stat) * (own / AreaAvg(H, stat)) ^ s * guard(A), with s = Settings B6 (0.5). The monster is moved to the destination\'s average and keeps its own deviation from its home average, compressed: a monster three times its home average lands at 1.7 times the destination\'s, so home-area bruisers like Ork Jr do not become super-bosses late. Applies to HP, ATK, DEF, AGI, EXP and Stones alike, then rounds, floors at 1 and caps (HP 999, ATK/DEF/AGI 255, EXP 65535). See ScalingExample.') ],
     [ W('6. Progression guard (Areas columns M-N). Each area gets a budget = MAX(its own vanilla average power, the previous area\'s budget), so budgets never fall as you move through the game. guard(A) = budget / own average power, which is 1.0 wherever vanilla already climbs and > 1 where it dips (East Limelin -> Windward Forest is the one real dip). Applied to every placed monster, this is what makes the randomized game strictly progressively harder.') ],
-    [ W('7. Flying and dangerous flags (Monsters K-L) are informational only: nothing is excluded from any area. Cockatrice keeps its petrify wherever it lands, so it is the one monster whose danger the numbers do not capture; Settings B8 = Y pins it (and Flamed Mane) at their native tier or above if that proves too harsh early.') ],
-    [ W('8. Bosses are out of scope. The boss logic that already exists in the randomizer stays as it is; nothing here moves, rescales or reads the boss entries (monster ids 67+).') ],
-    [ W('9. Same seed, same result: the placement is a pure function of the seed and these settings, so a seed can be shared like any other randomizer seed, and the spoiler log lists each area\'s new roster with the scaled stats.') ],
-    [],
-    [ S('Why this is cheap to build') ],
-    [ W('Everything it changes is ROM data the randomizer already writes at boot: the area\'s table index (map header), the pack member ids, and each monster\'s six stat halfwords (Monsters column S has the ROM address). No native hooks and no recompiled code. The one engine question to verify is whether a table can mix monsters from different world chunks (the Implementation tab explains).') ],
+    [ W('7. Damage needs nothing extra. The game computes an enemy\'s spell / attack damage from the ATK in its table entry (the base passed to the damage routine already follows it), so scaling ATK scales damage. An earlier build also multiplied the damage itself and double-counted (a Were Hare hit for 592 in Mammon\'s World); that hook is gone. Brian\'s own damage is never touched.') ],
+    [ W('8. Flying and dangerous flags (Monsters K-L) are informational only: nothing is excluded from any area. Cockatrice keeps its petrify wherever it lands, so it is the one monster whose danger the numbers do not capture.') ],
+    [ W('9. Bosses are out of scope. The boss logic that already exists in the randomizer stays as it is; nothing here moves, rescales or reads the boss entries (monster ids 67+), and the boss files are separate from the six sets.') ],
+    [ W('10. Same seed, same result. Set choice and pack rerolls come from the seed\'s RNG, and the scaling is a pure function of the data on these tabs, so a seed can be shared like any other. The spoiler log (%LOCALAPPDATA%\\Quest64Recompiled\\randomizer_spoiler.txt) lists each area\'s set, guard and every monster\'s vanilla -> scaled HP/ATK/DEF/AGI/EXP.') ],
+    [ W('11. Stacking with other options. The "Stats" randomizer option (Merrow\'s monster stat shuffle) writes the ROM at boot, and the Enemy Randomizer scales whatever the file holds when it loads, so the two stack: Stats perturbs a monster\'s own numbers, the Enemy Randomizer then fits them to the area. Hard Mode overrides the whole randomizer, so with Hard Mode on none of this runs.') ],
 );
 
 # ---------------------------------------------------------------- Areas
@@ -298,7 +296,7 @@ my @logic = (
 # Q candidates, R packs, S notes.
 my @areas_rows = (
     [ T('Areas: progression order, tier, vanilla roster, averages and progression budget') ],
-    [ W('Tier (C) is an input. Averages (G-L) are over the area\'s vanilla roster (Roster tab). Budget (M) = MAX(own average power, previous budget), so it never falls; Guard (N) = budget / own average, the multiplier applied to everything placed here. Allowed tiers (O-P) follow the spread settings. Q counts how many monsters could be placed here under the current settings; E is how many the randomizer must place.') ],
+    [ W('Tier (C) is an input. Averages (G-L) are over the area\'s vanilla roster (Roster tab). Budget (M) = MAX(own average power, previous budget), so it never falls; Guard (N) = budget / own average, the multiplier applied to everything placed here. Allowed tiers (O-P) follow the spread settings. Q counts how many monsters could be placed here under the current settings (all 67 with 7 / 7); E is the vanilla roster size, which the placed set replaces whole.') ],
     [ H('Rank', 'Area', 'Tier', 'Monster table', 'Roster size', 'Vanilla roster', 'Avg HP', 'Avg ATK', 'Avg DEF', 'Avg AGI', 'Avg EXP', 'Avg Power', 'Progression budget', 'Guard x', 'Allowed tier min', 'Allowed tier max', 'Candidate monsters', 'Packs (vanilla: monster x always + extra)', 'Notes') ],
 );
 my $first_area_row = 4;
@@ -357,7 +355,7 @@ for my $name (@area_order) {
 # ---------------------------------------------------------------- Monsters
 my @monster_rows = (
     [ T('Monsters: vanilla stats, home area, computed power and placement window') ],
-    [ W('Stats are the ROM\'s (HP, ATK, DEF, AGI, EXP; Drop is the item drop slot). Native tier comes from the home area\'s tier on the Areas tab. Flying is the ROM\'s own flag (only Wyvern, Will-o\'-Wisp and Pixie carry it), not a visual judgement. Power/Power tier use the Settings weights and thresholds. Q-R are the area tiers this monster may be placed in under the current spread (Q uses spread-up: a monster may go to areas up to that many tiers below it; R uses spread-down); dangerous monsters are pinned at or above their native tier. S is where the six stat halfwords live in the ROM. Bosses (ids 67+) are not listed: they are not part of this.') ],
+    [ W('Stats are the ROM\'s (HP, ATK, DEF, AGI, EXP; Drop is the item drop slot). Native tier comes from the home area\'s tier on the Areas tab. Flying is the ROM\'s own flag (only Wyvern, Will-o\'-Wisp and Pixie carry it), not a visual judgement. Power/Power tier use the Settings weights and thresholds. Q-R are the area tiers this monster may be placed in under the current spread (Q uses spread-up: a monster may go to areas up to that many tiers below it; R uses spread-down); with the shipped 7 / 7 that is every tier. Dangerous (L) is informational. S is where the six stat halfwords live in the ROM. Bosses (ids 67+) are not listed: they are not part of this.') ],
     [ H('Id', 'Monster', 'Home area', 'Native tier', 'HP', 'ATK', 'DEF', 'AGI', 'EXP', 'Drop', 'Flying', 'Dangerous', 'Bulk', 'Threat', 'Power', 'Power tier', 'Placeable from tier', 'Placeable to tier', 'Stat ROM address') ],
 );
 my $mr = 3;
@@ -372,7 +370,7 @@ for my $m (@monsters) {
         F("F$mr*(1+H$mr/$S{threat})"),
         F("ROUND(SQRT(M$mr*N$mr),1)"),
         F("1+COUNTIF($S{thresholds},\"<=\"&O$mr)", 0),
-        F("IF(AND(L$mr=\"Y\",$S{dangerous}=\"Y\"),D$mr,MAX(1,D$mr-$S{up}))", 0),
+        F("MAX(1,D$mr-$S{up})", 0),
         F("MIN($TIERS,D$mr+$S{down})", 0),
         $m->{addr},
     ];
@@ -381,7 +379,7 @@ for my $m (@monsters) {
 # ---------------------------------------------------------------- Scaling example
 my @ex = (
     [ T('Scaling example: one monster dropped into one area') ],
-    [ W('Pick a monster and a destination area (yellow). The table shows its home stats, the two areas\' vanilla averages, the factor between them, the destination\'s progression guard, and the rescaled stats under Settings!B6. The grid below previews the same monster in every area.') ],
+    [ W('Pick a monster and a destination area (yellow). The table shows its home stats, the two areas\' vanilla averages, the factor between them, the destination\'s progression guard, and the rescaled stats under the shape exponent (Settings B6) with the guard applied. The grid below previews the same monster in every area.') ],
     [ 'Monster', I('RED WYVERN') ],
     [ 'Destination area', I('Holy Plains') ],
     [ 'Home area', F('INDEX(Monsters!$C:$C,MATCH($B$3,Monsters!$B:$B,0))', 0) ],
@@ -390,7 +388,7 @@ my @ex = (
     [ 'Destination guard x', F('INDEX(Areas!$N:$N,MATCH($B$4,Areas!$B:$B,0))') ],
     [ H('Stat', 'Own (home)', 'Home area avg', 'Destination avg', 'Own / home avg', 'Shape ^ s', 'Scaled (with guard)', 'Cap') ],
 );
-my @statcols = ( [ 'HP', 'E', 'G', $S{hpcap} ], [ 'ATK', 'F', 'H', $S{statcap} ], [ 'DEF', 'G', 'I', $S{statcap} ], [ 'AGI', 'H', 'J', $S{statcap} ], [ 'EXP', 'I', 'K', '99999' ] );
+my @statcols = ( [ 'HP', 'E', 'G', $S{hpcap} ], [ 'ATK', 'F', 'H', $S{statcap} ], [ 'DEF', 'G', 'I', $S{statcap} ], [ 'AGI', 'H', 'J', $S{statcap} ], [ 'EXP', 'I', 'K', $S{expcap} ] );
 my $er = 9;
 for my $sc (@statcols) {
     $er++;
@@ -401,7 +399,7 @@ for my $sc (@statcols) {
         F("INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0))"),
         F("INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$4,Areas!\$B:\$B,0))"),
         F("B$er/C$er"),
-        F("E$er^Settings!\$B\$26"),
+        F("E$er^$S{shape}"),
         F("MIN(H$er,ROUND(D$er*F$er*\$B\$8,0))", 0),
         F($cap, 0),
     ];
@@ -414,7 +412,7 @@ for my $name (@area_order) {
     my @cells = ( $name, F("INDEX(Areas!\$C:\$C,MATCH(\$A$pr,Areas!\$B:\$B,0))", 0) );
     for my $sc (@statcols) {
         my ($label, $mcol, $acol, $cap) = @$sc;
-        push @cells, F("MIN($cap,ROUND(INDEX(Areas!\$$acol:\$$acol,MATCH(\$A$pr,Areas!\$B:\$B,0))*(INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))/INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0)))^Settings!\$B\$26*INDEX(Areas!\$N:\$N,MATCH(\$A$pr,Areas!\$B:\$B,0)),0))", 0);
+        push @cells, F("MIN($cap,ROUND(INDEX(Areas!\$$acol:\$$acol,MATCH(\$A$pr,Areas!\$B:\$B,0))*(INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))/INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0)))^$S{shape}*INDEX(Areas!\$N:\$N,MATCH(\$A$pr,Areas!\$B:\$B,0)),0))", 0);
     }
     push @cells, F("IF(AND(B$pr>=INDEX(Monsters!\$Q:\$Q,MATCH(\$B\$3,Monsters!\$B:\$B,0)),B$pr<=INDEX(Monsters!\$R:\$R,MATCH(\$B\$3,Monsters!\$B:\$B,0))),\"yes\",\"no\")", 0);
     push @ex, \@cells;
@@ -422,19 +420,22 @@ for my $name (@area_order) {
 
 # ---------------------------------------------------------------- Implementation
 my @impl = (
-    [ T('Implementation notes (for the recomp\'s randomizer)') ],
+    [ T('Implementation notes (how the recomp does it)') ],
     [ S('What the game stores') ],
-    [ W('Six monster tables, one per world chunk: table 0 (ROM 0xADC090) Holy Plains + West Carmaugh, 1 (0xB63378) Connor / Dondoran Flats / Glencoe, 2 (0xBBDE98) Cull Hazard / Blue Cave / East Limelin, 3 (0xC317E8) Dindom / Boil Hole / Baragoon Moor / Brannoch, 4 (0xC9BE50) Windward / Isle of Skye / Baragoon Tunnel, 5 Mammon\'s World. Each area\'s 0x18-byte map header holds the table index it uses (merrow_mapdata.cpp AreaMap.table_index).') ],
-    [ W('Encounters are packs: up to four (table slot, always-count, extra-count) entries, written as packCount*3 words at the pack\'s ROM address. Regions pick from up to seven pack presets. Baragoon Moor 1-2, Brannoch 1-6 and Mammon 1-6 share pack definitions, so those submaps must be treated as one area (the sheet already merges them).') ],
-    [ W('Monster stats are six halfwords per monster at the addresses in Monsters!S (HP is stored twice in a row; Merrow\'s one-hit-KO writes both). The randomizer already writes them (options.monster_stats / monster_scale), so rescaled stats are the same Write records.') ],
-    [ S('Algorithm (boot time, pure function of seed + settings)') ],
-    [ W('1. Read tiers, spread, k from the options. 2. For each area in progression order: pool = monsters with Placeable-from <= tier <= Placeable-to, minus monsters already placed in this tier and its neighbours where possible, minus fliers over the cap. 3. Draw roster-size monsters from the pool (seeded RNG). 4. Build the area\'s table: either (a) point the area at the table that already holds those monsters when they all come from one chunk, or (b) write a new table into free ROM space listing the chosen monsters\' entries. 5. Keep the pack shapes, remap each pack member\'s slot to the new roster. 6. For each placed monster, write scaled stats. 7. Spoiler log: area -> roster with scaled stats.') ],
-    [ S('The one thing to verify first') ],
-    [ W('Whether a table can mix monsters from different chunks, i.e. whether a monster\'s model and animation data is reachable from any area or only from its own chunk\'s overlay. Merrow\'s table swap already makes an area use another chunk\'s whole table, which suggests monsters load from wherever their table entry points; a 10-minute test is to hand-write one table entry (e.g. put a Wyvern into table 0) and walk into the Holy Plains. If cross-chunk placement is not possible, the fallback is spread = 0 within each chunk plus stat scaling, which still fixes the difficulty problem but with smaller pools.') ],
-    [ S('Where it goes in the code') ],
-    [ W('src/game/randomizer/randomizer.cpp shuffle_enemies() already owns the table index / pack writes; add the tier pool selection there and the stat writes next to the existing monster_stats writes. Options: enemy_progression (bool), enemy_spread_down and enemy_spread_up (int), enemy_scale_strength (0/50/100 %), enemy_max_fliers. The per-area tiers and the progression budgets are constants derived from the Areas tab. UI: four controls under the existing "Enemy shuffling" group on the Randomizer tab. The tier table itself can be a constant array (one tier per area, from the Areas tab).') ],
-    [ S('Open questions') ],
-    [ W('Should exp scale with k or always fully (this sheet says always)? Do the story bosses\' areas (Connor, Windward, Blue Cave, Boil Hole, Moor, Brannoch) need the boss\'s own minions kept vanilla for the fight leading up to them?') ],
+    [ W('Six monster files, one per world chunk: file 0 (ROM 0xADC090) Holy Plains + West Carmaugh, 1 (0xB63378) Connor / Dondoran Flats / Glencoe, 2 (0xBBDE98) Cull Hazard / Blue Cave / East Limelin, 3 (0xC317E8) Dindom / Boil Hole / Baragoon Moor / Brannoch, 4 (0xC9BE50) Windward / Isle of Skye / Baragoon Tunnel, 5 Mammon\'s World. Each area\'s 0x18-byte map header holds the file index it uses (merrow_mapdata.cpp AreaMap.table_index). The file table at 0x80054160 has one 20-byte row per file: ROM start, ROM end, then three RAM pointers into the loaded file (table end at +8, table start at +0xC). Every file is DMA\'d to the same RAM base (0x8020E6F0), which is why placement is per set: two sets cannot be in memory at once.') ],
+    [ W('Encounters are packs: up to four (table slot, always-count, extra-count) entries, written as packCount*3 words at the pack\'s ROM address. Regions pick from up to seven pack presets. Baragoon Moor 1-2, Brannoch 1-6 and Mammon 1-6 share pack definitions, so those submaps are treated as one area (the sheet merges them the same way).') ],
+    [ W('The loaded monster table is 0x38 bytes per entry: +2 index, +4 and +6 HP (stored twice), +0xC AGI, +0xE DEF, +0x10 EXP (word), +0x14 Stones (word), +0x2A ATK. The battle set-up routine (func_80008FE0) copies an entry into the battle struct, and Soul Searcher reads the table directly, so the table is the one place that must hold the scaled numbers.') ],
+    [ S('Boot (randomizer.cpp shuffle_enemies / patch_enemies, seed-driven)') ],
+    [ W('1. For each of the 16 merged areas in progression order, candidate_tables() lists the files whose monsters fall inside the spread (all six with 7 / 7); the previous area\'s file is dropped when there is a choice; one is drawn with the seed\'s RNG. 2. The file index is written into every raw submap header of the area, and pack member ids are wrapped to the new file\'s size. 3. Packs are rerolled: every region gets seven presets drawn from the area\'s packs, and each pack\'s member slots are refilled from the file\'s entries with no repeats (Merrow\'s composition). 4. make_plan() turns the per-area file choice into a Plan: for each game map id, the (home area, destination area) pair of every entry of the file it uses, and writes the spoiler (vanilla -> scaled stats). The Plan is installed with set_active() and the ROM writes go through the randomizer\'s normal Write records.') ],
+    [ S('Play time (native_hooks.cpp quest64_randomizer_enemy_scale_table)') ],
+    [ W('One hook in func_80008EF4, the routine that DMAs a monster file, placed right after its dma call (before_vram 0x80008F5C). It reads the file-table row the game just loaded (row pointer at 0x8007D0BC), walks the table between the row\'s start and end pointers, and rewrites each entry in place with scaled_value(map, entry, stat, own) for HP (both halfwords), AGI, DEF, ATK, EXP and Stones. The map is gCurrentMap (0x80084EEC); if the plan has nothing for it (a load that happens during a transition) gNextMap (0x80084EE4) is used instead. Nothing runs unless the randomizer is the active mode, the Enemy Randomizer switch is on and Hard Mode is off.') ],
+    [ W('Scaling in RAM rather than in the ROM is forced by the shared RAM base: the same file serves several areas with different averages, so its stats cannot be fixed at boot. Scaling on load rather than at battle set-up is what makes Soul Searcher and the battle agree.') ],
+    [ S('Formula (enemy_progression.cpp rescale)') ],
+    [ W('new = round(AreaAvg(dest, stat) * (own / AreaAvg(home, stat)) ^ 0.5 * guard(dest)), then clamped to 1 .. cap (HP 999, ATK/DEF/AGI 255, EXP/Stones 65535). guard(dest) = budget / avg_power with budget = MAX(own avg power, previous area\'s budget), computed once from the Areas data (columns L-N). The area averages, home areas and file rosters are generated into enemy_progression_data.cpp by tools/enemyrandologic.pl from the same Merrow data this sheet is built from, so the sheet and the code cannot drift apart.') ],
+    [ S('What was tried and dropped') ],
+    [ W('Scaling per monster at battle set-up (func_80008FE0): battle numbers were right but Soul Searcher showed the unscaled table. Keying on gNextMap: wrong during the load that happens after a transition completes. A separate damage hook in func_80006BEC multiplying the damage base by the ATK ratio: the base already follows the scaled ATK, so it double-counted (x14.8 in Mammon\'s World). Shape exponent 1 (keep the exact ratio): Ork Jr, three times its home average, pinned at 999 HP in Mammon\'s World; 0.5 lands it around 780.') ],
+    [ S('Files') ],
+    [ W('src/game/randomizer/enemy_progression.h/.cpp (plan, rescale, scaled_value), enemy_progression_data.h/.cpp (GENERATED), native_hooks.cpp (the load hook), randomizer.cpp (placement, packs, spoiler, option), us.rev0.toml (the hook entry), include/randomizer.h (Options::enemy_randomizer), src/ui/ui_config.cpp + assets/config_menu/randomizer.rml (the switch), tools/enemyrandologic.pl (this sheet and the data). Setting stored as "enemy_randomizer" in randomizer.json.') ],
 );
 
 # ---------------------------------------------------------------- write

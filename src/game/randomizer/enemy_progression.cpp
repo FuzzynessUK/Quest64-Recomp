@@ -16,13 +16,13 @@ namespace {
 
     constexpr int tier_count = 8;
 
-    // Sheet: Settings B4-B5 and B26. Any set may serve any area; a monster's
+    // Sheet: Settings B4-B6. Any set may serve any area; a monster's
     // deviation from its home average is compressed by the shape exponent.
     constexpr int spread_down = 7;
     constexpr int spread_up = 7;
     constexpr double shape_exponent = 0.5;
 
-    // Sheet: Settings B23-B24. EXP is a word in the game; capped generously.
+    // Sheet: Settings B21-B23. EXP is a word in the game; capped generously.
     constexpr int caps[5] = { 999, 255, 255, 255, 65535 };
 
     int area_count() {
