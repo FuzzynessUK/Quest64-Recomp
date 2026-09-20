@@ -14,6 +14,7 @@ namespace {
     // inventory code at the bottom of this file.
     extern std::atomic<bool> cheats_on;
     extern std::atomic<int32_t> live_current_map;
+    extern std::atomic<int32_t> live_game_mode;
     // gCurrentMap, per Quest64Syms/data_dump.toml.
     constexpr int32_t gCurrentMap = 0x80084EEC;
     void apply_pending_item(uint8_t* rdram);
@@ -227,6 +228,7 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     sync_player_stats(rdram);
     apply_pending_item(rdram);
     live_current_map.store(static_cast<int32_t>(MEM_W(0, gCurrentMap)));
+    live_game_mode.store(static_cast<int32_t>(MEM_HU(0, gGameMode)));
     zelda64::enhancements::on_frame(rdram);
 }
 
@@ -303,6 +305,9 @@ namespace {
     // Cached each frame so the menu can read it without touching RDRAM off
     // the game thread.
     std::atomic<int32_t> live_current_map = -1;
+    // gGameMode, cached the same way. 1 means the field; anything else is
+    // a battle, a menu or a transition.
+    std::atomic<int32_t> live_game_mode = -1;
     std::atomic<int32_t> pending_item = no_pending_item;
 
     void apply_pending_item(uint8_t* rdram) {
@@ -341,4 +346,8 @@ void zelda64::give_item(int item_id) {
 
 int zelda64::current_map() {
     return live_current_map.load();
+}
+
+bool zelda64::in_field() {
+    return live_game_mode.load() == game_mode_field;
 }
