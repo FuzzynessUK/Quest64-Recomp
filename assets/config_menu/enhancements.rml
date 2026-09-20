@@ -13,60 +13,27 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>Fun</div>
+                                <div>Quality of Life</div>
                             </label>
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>One Hit KO</div></div>
-                                        <select data-value="enh_one_hit_ko" id="enh_one_hit_ko_select" style="nav-up: #tab_enhancements">
+                                        <div class="config-debug__select-label"><div>JP Healing Amounts</div></div>
+                                        <select data-value="enh_jp_healing" id="enh_jp_healing_select" style="nav-up: #tab_enhancements">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>N64 Mode</div></div>
-                                        <select data-value="enh_n64_mode" id="enh_n64_mode_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">N64 Mode renders the way the console did: native resolution, 4:3 and no antialiasing. It changes the graphics settings directly and takes effect straight away; switching it off restores whatever you had before. One Hit KO means everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
-                            </label>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div>Quality of Life</div>
-                            </label>
-                            <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label"><div>Speedrun Timer</div></div>
                                         <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
                                             <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Timer position</div></div>
-                                        <select data-value="enh_timer_position" id="enh_timer_position_select">
-                                            <option value="0">Top left</option>
-                                            <option value="4">Top middle</option>
-                                            <option value="1">Top right</option>
-                                            <option value="2">Bottom left</option>
-                                            <option value="5">Bottom middle</option>
-                                            <option value="3">Bottom right</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Exit from anywhere</div></div>
-                                        <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
+                                            <option value="1">Top left</option>
+                                            <option value="5">Top middle</option>
+                                            <option value="2">Top right</option>
+                                            <option value="3">Bottom left</option>
+                                            <option value="6">Bottom middle</option>
+                                            <option value="4">Bottom right</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
@@ -77,8 +44,8 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>JP Healing Amounts</div></div>
-                                        <select data-value="enh_jp_healing" id="enh_jp_healing_select">
+                                        <div class="config-debug__select-label"><div>Exit from anywhere</div></div>
+                                        <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
@@ -88,7 +55,7 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. Exit from anywhere lets the control you bind to "Exit Spell" under Controls warp you to the start of the area without owning the spell or paying the MP; with it off the binding does nothing.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. The Speedrun Timer starts when you leave the title screen and stops on the message that Mammon has been destroyed; pick where on the screen it sits. Exit from anywhere lets the control you bind to "Exit Spell" under Controls warp you to the start of the area without owning the spell or paying the MP; with it off the binding does nothing.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
@@ -110,6 +77,34 @@
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Hard Mode is Landmine36's Quest 64 Hard Mode hack: tougher monsters that get stronger again at night, stat caps raised to 999 and element levels to 99, reworked spells, new spirit locations, shops that take the Stones you earn, special items, boss rematches and more. Restart the game after changing it (Reset on the General tab). It uses its own save folder, so your normal saves are left alone, and it turns the Randomizer off while it is on.</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Fun</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>One Hit KO</div></div>
+                                        <select data-value="enh_one_hit_ko" id="enh_one_hit_ko_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>N64 Mode</div></div>
+                                        <select data-value="enh_n64_mode" id="enh_n64_mode_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">N64 Mode renders the way the console did: native resolution, 4:3 and no antialiasing. It changes the graphics settings directly and takes effect straight away; switching it off restores whatever you had before. One Hit KO means everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">

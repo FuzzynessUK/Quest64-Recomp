@@ -254,6 +254,13 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Enemy Randomizer</div></div>
+                                        <select data-value="rnd_enemy_randomizer" id="rnd_enemy_randomizer_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label"><div>Randomize stats</div></div>
                                         <select data-value="rnd_monster_stats" id="rnd_monster_stats_select">
                                             <option value="0">Off</option>
@@ -337,19 +344,12 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Enemy Randomizer</div></div>
-                                        <select data-value="rnd_enemy_randomizer" id="rnd_enemy_randomizer_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Enemy Randomizer: any of the game's six monster sets can appear in any area and the encounter packs are rerolled; then every monster's HP, ATK, DEF, AGI, EXP, Stones and spell damage are scaled from its home area to the area it is in, with a guard that keeps each area at least as hard as the one before, so the game always gets harder as you go. Replaces "Shuffle enemy tables" when on. The spoiler log lists each area's set and multipliers.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Enemy Randomizer: any of the game's six monster sets can appear in any area and the encounter packs are rerolled; then every monster's HP, ATK, DEF, AGI, EXP and Stones are rescaled from its home area to the area it is in (damage follows ATK), with a guard that keeps each area at least as hard as the one before, so the game always gets harder as you go. Replaces "Shuffle enemy tables" when on. The spoiler log lists each area's set and every monster's vanilla and scaled stats.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
@@ -543,7 +543,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Text improvements</div></div>
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;"><div>Text improvements</div></div>
                                         <select data-value="rnd_text_improvements" id="rnd_text_improvements_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>

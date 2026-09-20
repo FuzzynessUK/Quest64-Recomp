@@ -788,17 +788,19 @@ void make_enhancements_bindings(Rml::Context* context) {
         }
     );
 
+    // One control: 0 = off, 1..6 = on at timer_position 0..5. The two
+    // settings stay separate in enhancements.json.
     constructor.BindFunc("enh_speedrun_timer",
-        [](Rml::Variant& out) { out = enhancements_context.edited.speedrun_timer ? 1 : 0; },
+        [](Rml::Variant& out) {
+            const auto& e = enhancements_context.edited;
+            out = e.speedrun_timer ? e.timer_position + 1 : 0;
+        },
         [](const Rml::Variant& in) {
-            enhancements_context.edited.speedrun_timer = in.Get<int>() != 0;
-            enhancements_option_changed();
-        }
-    );
-    constructor.BindFunc("enh_timer_position",
-        [](Rml::Variant& out) { out = enhancements_context.edited.timer_position; },
-        [](const Rml::Variant& in) {
-            enhancements_context.edited.timer_position = std::clamp(in.Get<int>(), 0, 5);
+            int value = std::clamp(in.Get<int>(), 0, 6);
+            enhancements_context.edited.speedrun_timer = value != 0;
+            if (value != 0) {
+                enhancements_context.edited.timer_position = value - 1;
+            }
             enhancements_option_changed();
         }
     );
