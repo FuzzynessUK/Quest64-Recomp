@@ -25,6 +25,9 @@
 			.speedrun-timer--top-right    { top: 16dp;    right: 16dp; text-align: right; }
 			.speedrun-timer--bottom-left  { bottom: 16dp; left: 16dp;  text-align: left; }
 			.speedrun-timer--bottom-right { bottom: 16dp; right: 16dp; text-align: right; }
+			/* Centred by pulling back half the fixed width. */
+			.speedrun-timer--top-middle    { top: 16dp;    left: 50%; margin-left: -130dp; text-align: center; }
+			.speedrun-timer--bottom-middle { bottom: 16dp; left: 50%; margin-left: -130dp; text-align: center; }
 			.speedrun-timer--done         { color: #7cfc7c; }
 		</style>
 	</head>
@@ -36,6 +39,8 @@
 			     data-class-speedrun-timer--top-right="timer_position == 1"
 			     data-class-speedrun-timer--bottom-left="timer_position == 2"
 			     data-class-speedrun-timer--bottom-right="timer_position == 3"
+			     data-class-speedrun-timer--top-middle="timer_position == 4"
+			     data-class-speedrun-timer--bottom-middle="timer_position == 5"
 			     data-class-speedrun-timer--done="timer_finished">{{timer_text}}</div>
 		</div>
 	</body>

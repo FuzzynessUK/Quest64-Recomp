@@ -26,7 +26,7 @@ namespace zelda64::enhancements {
         int saved_hud_ratio = -1;
 
         // Run timer, shown as hh:mm:ss. Position is 0 top-left, 1 top-right,
-        // 2 bottom-left, 3 bottom-right.
+        // 2 bottom-left, 3 bottom-right, 4 top-middle, 5 bottom-middle.
         bool speedrun_timer = false;
         int timer_position = 1;
 

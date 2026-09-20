@@ -55,8 +55,10 @@
                                         <div class="config-debug__select-label"><div>Timer position</div></div>
                                         <select data-value="enh_timer_position" id="enh_timer_position_select">
                                             <option value="0">Top left</option>
+                                            <option value="4">Top middle</option>
                                             <option value="1">Top right</option>
                                             <option value="2">Bottom left</option>
+                                            <option value="5">Bottom middle</option>
                                             <option value="3">Bottom right</option>
                                         </select>
                                     </div>
