@@ -1,0 +1,55 @@
+<template name="config-menu__enhancements">
+    <head>
+    </head>
+    <body>
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">{{enh_status}}</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>For Fun</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>One Hit KO</div></div>
+                                        <select data-value="enh_one_hit_ko" id="enh_one_hit_ko_select" style="nav-up: #tab_enhancements">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Quality of Life</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">JP Buffs + Debuffs (the longer Magic Barrier, Silence, Restriction, Evade, Confusion and Slow Enemy durations from the Japanese release) is not wired up yet. The spell data table is byte-identical between the US and Japanese ROMs, so these durations live in game code rather than data and need a native hook; see DOCS/HANDOFF.md.</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Settings save as you change them and take effect the next time the game is launched.</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

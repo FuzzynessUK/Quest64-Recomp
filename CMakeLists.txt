@@ -164,6 +164,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_mapdata.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/native_hooks.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/enhancements.cpp
     ${CMAKE_SOURCE_DIR}/src/game/debug.cpp
     ${CMAKE_SOURCE_DIR}/src/game/quicksaving.cpp
     ${CMAKE_SOURCE_DIR}/src/game/recomp_api.cpp

@@ -6,13 +6,16 @@
 #include <optional>
 #include "zelda_debug.h"
 #include "randomizer/merrow_data.h"
+#include "enhancements.h"
 #include "librecomp/helpers.hpp"
 
 namespace {
     // Master switch for everything on the cheats tab; defined with the
     // inventory code at the bottom of this file.
     extern std::atomic<bool> cheats_on;
+    extern std::atomic<int32_t> kill_frames_remaining;
     void apply_pending_item(uint8_t* rdram);
+    void apply_pending_kill(uint8_t* rdram);
 }
 
 // #include "../patches/input.h"
@@ -219,6 +222,8 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     apply_map_warp(rdram);
     sync_player_stats(rdram);
     apply_pending_item(rdram);
+    apply_pending_kill(rdram);
+    zelda64::enhancements::on_frame(rdram);
 }
 
 // Movement speed.
@@ -292,6 +297,9 @@ namespace {
 
     std::atomic<bool> cheats_on = true;
     std::atomic<int32_t> pending_item = no_pending_item;
+    // How long kill_player() keeps forcing HP to zero.
+    constexpr int32_t kill_hold_frames = 30;
+    std::atomic<int32_t> kill_frames_remaining = 0;
 
     void apply_pending_item(uint8_t* rdram) {
         int32_t item = pending_item.exchange(no_pending_item);
@@ -327,7 +335,21 @@ void zelda64::give_item(int item_id) {
 }
 
 void zelda64::kill_player() {
-    // Reuses the stat queue, so the write lands on the next frame like any
-    // other stat edit and the game's own death handling takes it from there.
+    // A single write to HP was not enough: nothing outside of taking damage
+    // checks for death, so the value could be recomputed before anything
+    // noticed it. Hold it at zero for a short window instead, which gives
+    // the battle and field loops a chance to run their own check.
     set_player_stat(PlayerStat::HP, 0);
+    kill_frames_remaining.store(kill_hold_frames);
+}
+
+namespace {
+    void apply_pending_kill(uint8_t* rdram) {
+        int32_t remaining = kill_frames_remaining.load();
+        if (remaining <= 0 || !cheats_on.load()) {
+            return;
+        }
+        kill_frames_remaining.store(remaining - 1);
+        write_stat(rdram, stat_fields[static_cast<size_t>(zelda64::PlayerStat::HP)], 0);
+    }
 }

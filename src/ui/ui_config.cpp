@@ -9,6 +9,7 @@
 #include "zelda_debug.h"
 #include "zelda_game.h"
 #include "randomizer.h"
+#include "enhancements.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
 #include "promptfont.h"
@@ -666,6 +667,48 @@ void bind_randomizer_field(Rml::DataModelConstructor& constructor, const char* n
             randomizer_option_changed();
         }
     );
+}
+
+
+// Enhancements tab. Same shape as the randomizer tab: every control writes
+// straight back to its own settings file, which the game reads once at boot.
+struct EnhancementsContext {
+    Rml::DataModelHandle model_handle;
+    zelda64::enhancements::Options edited;
+};
+
+EnhancementsContext enhancements_context;
+
+std::string enhancements_status() {
+    const zelda64::enhancements::Options& active = zelda64::enhancements::active_options();
+    bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko;
+    return std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
+        (pending ? ". Changed settings apply when the game is next launched." : ".");
+}
+
+void enhancements_option_changed() {
+    zelda64::enhancements::save_options(enhancements_context.edited);
+    enhancements_context.model_handle.DirtyVariable("enh_status");
+}
+
+void make_enhancements_bindings(Rml::Context* context) {
+    Rml::DataModelConstructor constructor = context->CreateDataModel("enhancements_model");
+    if (!constructor) {
+        throw std::runtime_error("Failed to make RmlUi data model for the enhancements menu");
+    }
+
+    enhancements_context.edited = zelda64::enhancements::load_options();
+
+    constructor.BindFunc("enh_status", [](Rml::Variant& out) { out = enhancements_status(); });
+    constructor.BindFunc("enh_one_hit_ko",
+        [](Rml::Variant& out) { out = enhancements_context.edited.one_hit_ko ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.one_hit_ko = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+
+    enhancements_context.model_handle = constructor.GetModelHandle();
 }
 
 void make_randomizer_bindings(Rml::Context* context) {
@@ -1521,6 +1564,7 @@ public:
         make_sound_options_bindings(context);
         make_debug_bindings(context);
         make_cheats_bindings(context);
+        make_enhancements_bindings(context);
         make_randomizer_bindings(context);
     }
 };

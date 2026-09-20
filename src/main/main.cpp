@@ -34,6 +34,7 @@
 #include "zelda_render.h"
 #include "zelda_support.h"
 #include "zelda_game.h"
+#include "enhancements.h"
 #include "randomizer.h"
 #include "recomp_data.h"
 #include "ovl_patches.hpp"
@@ -352,6 +353,7 @@ gpr get_entrypoint_address();
 // mods; the randomizer patches the ROM in memory here.
 void quest64_on_init(uint8_t* rdram, recomp_context* ctx) {
     zelda64::randomizer::apply_at_boot(rdram);
+    zelda64::enhancements::apply_at_boot(rdram);
 }
 
 // array of supported GameEntry objects

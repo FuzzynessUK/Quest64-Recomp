@@ -234,6 +234,78 @@ play-testing; the General-tab toggle "Widescreen 2D Fixes" stays.
   collision on position + velocity.
 
 
+
+### Enhancements tab (2026-09-20)
+
+Separate from the randomizer: `include/enhancements.h`, `src/game/enhancements.cpp`,
+`assets/config_menu/enhancements.rml`, settings in `enhancements.json`. ROM-level
+changes are applied in `apply_at_boot`, called from `quest64_on_init` *after* the
+randomizer so the two stack; RAM-level ones run from `on_frame`, called by the
+cheats frame hook.
+
+- **For Fun / One Hit KO** — every monster and boss row's HP halfword (and its
+  duplicate two bytes later) is set to 1 in the ROM, and Brian's max HP is held
+  at 1 each frame so it also applies to a save already in progress. HP is only
+  ever lowered, never raised, so a death in progress is not undone.
+
+#### JP Buffs + Debuffs: what was found, and why it is not done
+
+The Japanese release (Eltale Monsters) gives Magic Barrier, Silence,
+Restriction, Evade, Confusion and Slow Enemy longer durations. Investigated
+2026-09-20 with both ROMs in hand:
+
+- The JP ROM is byte-swapped (.v64); swap it to big-endian before comparing.
+- The JP spell table is at ROM **0xD494A8** (US: 0xD4BA60), same 60 entries,
+  same 68-byte stride, same order.
+- **Diffing all 60 spell blocks gives exactly one differing byte in the whole
+  table**: Healing Lv2 at +0x0D (0x08 -> 0x10). The durations are therefore
+  *not* in the spell data.
+- Byte +0x3C is a small 1-4 value but only on Spirit Armor, Weakness and Weaken
+  All, i.e. the stat-modifier spells, and is zero on all six spells above. It is
+  not the status duration.
+- The two versions' code does not line up at all (97% of the boot segment's
+  words differ, and no US function's bytes appear anywhere in the JP ROM), so
+  there is no shortcut diff at instruction level.
+
+Conclusion: the durations are constants in the battle status code. Because the
+recomp bakes instruction immediates into `RecompiledFuncs/` as C literals, this
+needs a native hook like the Stage 2 randomizer options, after locating where a
+status effect's turn counter is initialised.
+
+**Update after a full US/JP code comparison (2026-09-20).** The ROMs *can* be
+compared, despite an earlier note to the contrary. Exact byte matching fails
+because data moved by 0x25B8 and every lui/addiu holding an address differs, but
+masking out I-type immediates (keep opcode+registers, drop the low 16 bits)
+aligns functions fine. `tools/` has no script for this; the throwaway one lived
+in the scratchpad, but the method is:
+
+- mask each word: R-type/COP keep whole, J/JAL keep opcode, I-type keep top 16 bits
+- index every 16-instruction window of the JP ROM by masked signature
+- look each US function up by the signature of its first 16 instructions
+
+Results: **440 of 669 US functions align**, and across all of them only ~50
+immediates in value-carrying opcodes (addi/addiu/slti/andi/ori) differ, none of
+them duration-shaped. Meanwhile most functions in the **0x8003xxxx-0x8004xxxx
+battle range did not align at all**, i.e. they were substantially rewritten
+between versions.
+
+So the JP buff/debuff behaviour is **not a constant that can be patched**: it is
+different battle logic. Reproducing it means reimplementing the behaviour with
+native hooks after working out the US status system, which is a much larger job
+than a data or immediate patch. Ruled out by data: the spell table (identical),
+byte +0x19 (set on damage spells like Power Staff and Fire Pillar too, so not a
+duration) and byte +0x3C (only on Spirit Armor/Weakness/Weaken All, and behaves
+like magnitude, since Weakness Lv2 is *lower* than Lv1).
+
+#### Kill Brian
+
+`kill_player()` now holds HP at zero for 30 frames rather than writing it once.
+Nothing outside of taking damage appears to check for death, and `gPlayerMainData`
+HP is only *read* by HUD code in the recompiled output (battle damage reaches it
+through a pointer, so it cannot be found by address). The hold gives the battle
+and field loops a window to notice; it is not a guaranteed kill, and finding the
+real death entry point is still open.
+
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
 Merrow replaces the title-screen logo and can stamp the seed digits over the
