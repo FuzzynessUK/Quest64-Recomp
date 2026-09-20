@@ -147,3 +147,10 @@ before_vram = 0x8001C8DC
 func = "func_80007A50"
 text = "quest64_speedrun_stop(ctx);"
 before_vram = 0x80007B44
+
+# Runs every frame the title screen is up. The run starts on the first frame
+# after it stops running, which is when New (or Continue) has been chosen.
+[[patches.hook]]
+func = "func_801000A8_ovl_title"
+text = "quest64_speedrun_title_frame();"
+before_vram = 0x801000A8

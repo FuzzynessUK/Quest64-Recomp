@@ -8,6 +8,7 @@
 #include "zelda_debug.h"
 #include "randomizer/merrow_data.h"
 #include "enhancements.h"
+#include "speedrun.h"
 #include "librecomp/helpers.hpp"
 
 namespace {
@@ -260,6 +261,7 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     apply_pending_item(rdram);
     live_current_map.store(static_cast<int32_t>(MEM_W(0, gCurrentMap)));
     zelda64::enhancements::on_frame(rdram);
+    zelda64::speedrun::update(false);
 }
 
 // Movement speed.

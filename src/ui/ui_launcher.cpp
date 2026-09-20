@@ -84,7 +84,7 @@ public:
                 recompui::hide_all_contexts();
                 // The run starts here, and the overlay has to be put back
                 // because hide_all_contexts() just took it down with the menus.
-                zelda64::speedrun::start();
+                zelda64::speedrun::arm();
                 recompui::show_speedrun_overlay();
             }
         );
