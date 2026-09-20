@@ -116,8 +116,9 @@ Plan zelda64::randomizer::progression::make_plan(const std::vector<int>& table_p
                 f.def = ratio(2, k);
                 f.agi = ratio(3, k);
                 f.exp = ratio(4, 1.0);
-                std::snprintf(line, sizeof(line), "    %-18s HP x%.2f ATK x%.2f DEF x%.2f AGI x%.2f EXP x%.2f\n",
-                    data::monsters[static_cast<size_t>(id)].name, f.hp, f.atk, f.def, f.agi, f.exp);
+                f.dmg = std::sqrt(f.hp * f.atk);
+                std::snprintf(line, sizeof(line), "    %-18s HP x%.2f ATK x%.2f DEF x%.2f AGI x%.2f EXP x%.2f DMG x%.2f\n",
+                    data::monsters[static_cast<size_t>(id)].name, f.hp, f.atk, f.def, f.agi, f.exp, f.dmg);
                 spoiler += line;
             }
             factors.push_back(f);
@@ -149,6 +150,7 @@ double zelda64::randomizer::progression::factor(int map_id, int entry, Stat stat
         case Stat::DEF: return f.def;
         case Stat::AGI: return f.agi;
         case Stat::EXP: return f.exp;
+        case Stat::DMG: return f.dmg;
     }
     return 1.0;
 }

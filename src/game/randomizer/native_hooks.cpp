@@ -252,13 +252,30 @@ void quest64_randomizer_beigis_map_check(recomp_context* ctx) {
 // the two never run together (Hard Mode stands the randomizer down).
 
 namespace {
-    constexpr int32_t gCurrentMap = 0x80084EE4;
+    // The loaded map (data_dump.toml: gCurrentMap), and the load-request slot
+    // that doubles as "map currently loaded" (gNextMap), tried second.
+    constexpr int32_t gCurrentMap = 0x80084EEC;
+    constexpr int32_t gNextMap = 0x80084EE4;
 
     // Round like the FPU's cvt.w.s (nearest) and keep the halfword sane.
     gpr scaled_stat(uint8_t* rdram, recomp_context* ctx, gpr entry, gpr value, progression::Stat stat, int cap) {
         int map = MEM_W(0, gCurrentMap);
         int index = MEM_HU(2, entry);
         double f = progression::factor(map, index, stat);
+        if (f == 1.0) {
+            map = MEM_W(0, gNextMap);
+            f = progression::factor(map, index, stat);
+        }
+        // Diagnostic, first few battles only: which map/entry the hook saw
+        // and what it did, in randomizer_hooks.txt next to the spoiler log.
+        static int noted = 0;
+        if (noted < 40) {
+            noted++;
+            std::ofstream out(zelda64::get_app_folder_path() / "randomizer_hooks.txt", std::ios::app);
+            out << "enemy_scale: map " << MEM_W(0, gCurrentMap) << "/" << MEM_W(0, gNextMap)
+                << " entry " << index << " stat " << static_cast<int>(stat)
+                << " value " << static_cast<int32_t>(value) << " x" << f << "\n";
+        }
         if (f == 1.0) {
             return value;
         }
@@ -276,6 +293,26 @@ namespace {
     constexpr int hp_cap = 999;
     constexpr int stat_cap = 255;
     constexpr int reward_cap = 65535;
+
+    // Table entries the battle set-up hook has seen: how the damage hook tells
+    // a monster (record+0x64 / battle struct+0x20 hold its entry) from Brian.
+    constexpr size_t seen_entries_count = 32;
+    uint32_t seen_entries[seen_entries_count] = {};
+    size_t seen_next = 0;
+
+    void remember_entry(gpr entry) {
+        uint32_t e = static_cast<uint32_t>(entry);
+        if (e == 0) return;
+        for (uint32_t s : seen_entries) if (s == e) return;
+        seen_entries[seen_next] = e;
+        seen_next = (seen_next + 1) % seen_entries_count;
+    }
+    bool is_seen_entry(gpr entry) {
+        uint32_t e = static_cast<uint32_t>(entry);
+        if (e == 0) return false;
+        for (uint32_t s : seen_entries) if (s == e) return true;
+        return false;
+    }
 }
 
 extern "C" {
@@ -284,6 +321,7 @@ extern "C" {
 // 0x8000908C; v1 is the table entry.
 void quest64_randomizer_enemy_scale_hp(uint8_t* rdram, recomp_context* ctx) {
     if (!progressing()) return;
+    remember_entry(ctx->r3);
     ctx->r12 = scaled_stat(rdram, ctx, ctx->r3, ctx->r12, progression::Stat::HP, hp_cap);
 }
 // 0x80009090 `lhu $t5, 0x6($v1)` (max HP), before the `sh` at 0x8000909C.
@@ -317,6 +355,38 @@ void quest64_randomizer_enemy_scale_exp(uint8_t* rdram, recomp_context* ctx) {
 void quest64_randomizer_enemy_scale_stones(uint8_t* rdram, recomp_context* ctx) {
     if (!progressing()) return;
     ctx->r9 = scaled_stat(rdram, ctx, ctx->r8, ctx->r9, progression::Stat::EXP, reward_cap);
+}
+
+}
+
+extern "C" {
+
+// func_8000ACC0, the damage formula: base * ATK / (ATK + target DEF). The
+// base is the spell's own power, which is what actually carries an enemy's
+// damage across the game, so it is scaled here as well. Hooked before the
+// `mtc1 $s0` at 0x8000ADA8, after the element modifiers; s0 is the base, t2
+// the attacker's record (the 5th argument), whose +0x64 is a table entry
+// only for monsters set up by func_80008FE0.
+void quest64_randomizer_enemy_scale_damage(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    gpr record = ctx->r10;
+    gpr target = ctx->r3;
+    // Two independent tests, both required: the attacker must be a monster
+    // (its record+0x64 is a table entry seen at set-up) and the target must
+    // not be one (a monster's battle struct keeps its entry at +0x20). Brian's
+    // own staff and spells, which always target a monster, are never scaled.
+    gpr entry = record ? static_cast<gpr>(static_cast<int32_t>(MEM_W(0x64, record))) : 0;
+    bool attacker_is_monster = is_seen_entry(entry);
+    bool target_is_monster = is_seen_entry(static_cast<gpr>(static_cast<int32_t>(MEM_W(0x20, target))));
+    static int noted = 0;
+    if (noted < 20) {
+        noted++;
+        std::ofstream out(zelda64::get_app_folder_path() / "randomizer_hooks.txt", std::ios::app);
+        out << "damage: base " << static_cast<int32_t>(ctx->r16) << " attacker_is_monster " << attacker_is_monster
+            << " target_is_monster " << target_is_monster << "\n";
+    }
+    if (!attacker_is_monster || target_is_monster) return;
+    ctx->r16 = scaled_stat(rdram, ctx, entry, ctx->r16, progression::Stat::DMG, reward_cap);
 }
 
 }

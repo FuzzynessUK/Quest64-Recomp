@@ -32,6 +32,9 @@ namespace zelda64::randomizer::progression {
         double def = 1.0;
         double agi = 1.0;
         double exp = 1.0;
+        // Spell base damage: between the HP and ATK factors (base power grows
+        // faster than ATK through the game), sqrt(hp * atk).
+        double dmg = 1.0;
     };
 
     struct Plan {
@@ -55,7 +58,7 @@ namespace zelda64::randomizer::progression {
     bool active();
     // Multiplier for one stat of the monster in table entry `entry` of the
     // file the current map uses. 1.0 when nothing applies.
-    enum class Stat { HP, ATK, DEF, AGI, EXP };
+    enum class Stat { HP, ATK, DEF, AGI, EXP, DMG };
     double factor(int map_id, int entry, Stat stat);
 }
 
