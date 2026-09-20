@@ -726,6 +726,14 @@ void make_enhancements_bindings(Rml::Context* context) {
         }
     );
 
+    constructor.BindFunc("enh_longer_magic_barrier",
+        [](Rml::Variant& out) { out = enhancements_context.edited.longer_magic_barrier ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.longer_magic_barrier = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+
     enhancements_context.model_handle = constructor.GetModelHandle();
 }
 

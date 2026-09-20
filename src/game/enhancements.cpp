@@ -29,6 +29,11 @@ namespace {
     constexpr int32_t player_hp = gPlayerMainData + 0x04;
     constexpr int32_t player_max_hp = gPlayerMainData + 0x06;
 
+    // Magic Barrier turns remaining, as found in RAM. A byte, per the
+    // GameShark-style address it came from.
+    constexpr int32_t magic_barrier_timer = 0x8007BB42;
+    constexpr int magic_barrier_bonus = 2;
+
     // Every monster's stat row, as used by the randomizer: six halfwords per
     // monster with HP first, and HP is stored twice in a row.
     constexpr int monster_count = 75;
@@ -102,6 +107,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("one_hit_ko", o.one_hit_ko);
     get("jp_healing", o.jp_healing);
     get("exit_from_anywhere", o.exit_from_anywhere);
+    get("longer_magic_barrier", o.longer_magic_barrier);
     return o;
 }
 
@@ -110,6 +116,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["one_hit_ko"] = o.one_hit_ko;
     j["jp_healing"] = o.jp_healing;
     j["exit_from_anywhere"] = o.exit_from_anywhere;
+    j["longer_magic_barrier"] = o.longer_magic_barrier;
     std::ofstream out(options_path());
     out << j.dump(4);
 }
@@ -153,6 +160,21 @@ void zelda64::enhancements::apply_at_boot(uint8_t* rdram) {
 
 void zelda64::enhancements::on_frame(uint8_t* rdram) {
     const Options& options = active_options();
+
+    if (options.longer_magic_barrier) {
+        // The counter only ever rises when the spell is cast, and falls a
+        // turn at a time after that, so topping up on a rise adds the bonus
+        // once per cast rather than every frame.
+        static int previous = 0;
+        int current = MEM_BU(0, magic_barrier_timer);
+        if (current > previous && current > 0) {
+            int extended = std::min(current + magic_barrier_bonus, 0xFF);
+            MEM_B(0, magic_barrier_timer) = static_cast<int8_t>(extended);
+            current = extended;
+        }
+        previous = current;
+    }
+
     if (!options.one_hit_ko) {
         return;
     }

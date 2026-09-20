@@ -28,6 +28,13 @@ namespace zelda64::enhancements {
         // owning the spell or paying the MP. There is no menu button: the
         // binding under Controls is how it is used.
         bool exit_from_anywhere = false;
+
+        // Magic Barrier holds two turns longer. The duration is a live value
+        // at 0x8007BB42, reached through a pointer rather than written by any
+        // instruction we can patch, so it is topped up each frame instead: a
+        // fresh cast is the only time the counter goes up, and that is when
+        // the two extra turns are added.
+        bool longer_magic_barrier = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.

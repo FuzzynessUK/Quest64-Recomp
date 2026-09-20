@@ -402,6 +402,31 @@ It targets submap 0, entrance 0 of the current map. That is an assumption
 about where an area starts, not something read from the game's own Exit
 handler, which was not located.
 
+
+#### Magic Barrier +2 turns (working, 2026-09-20)
+
+The duration is a **live value at RAM 0x8007BB42** (a byte; the address came
+from the user as a GameShark-style code). It is reached through a pointer:
+nothing in the recompiled output reads or writes it by absolute address, and
+the only struct-relative access at the matching offset (+0xC2) is a read in
+func_80002F60. So there is no instruction to hook and no ROM byte to patch,
+which is why every earlier attempt through the spell table failed.
+
+Handled in `on_frame` instead. The counter only rises when the spell is
+cast and falls a turn at a time afterwards, so the bonus is applied on a
+rise, which adds it once per cast rather than every frame.
+
+#### Exit: still a warp, not the real spell
+
+The request is for the genuine Exit spell to fire without owning it or
+paying MP. Not done. The spell effect handlers do live in a jump table at
+ROM 0x04D8D0 (41 entries of ascending 0x8001xxxx addresses), but the index
+is not the spell entry's +0x01 byte: that field is a per-element ordering
+value and collides (Compression and Exit are both 0x13). Even with the right
+index, the handlers take a spell-cast context in $a0 and a target in $a1,
+so they cannot be called cold from the frame hook without building that
+context. What exists today warps to submap 0, entrance 0 of the current map.
+
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
 Merrow replaces the title-screen logo and can stamp the seed digits over the
