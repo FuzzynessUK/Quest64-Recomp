@@ -392,6 +392,6 @@ func = "func_80008FE0"
 text = "quest64_randomizer_enemy_scale_atk(rdram, ctx);"
 before_vram = 0x80009228
 [[patches.hook]]
-func = "func_8000ACC0"
+func = "func_80006BEC"
 text = "quest64_randomizer_enemy_scale_damage(rdram, ctx);"
-before_vram = 0x8000ADA8
+before_vram = 0x80006BF8

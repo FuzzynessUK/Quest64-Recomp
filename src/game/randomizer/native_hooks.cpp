@@ -361,31 +361,26 @@ void quest64_randomizer_enemy_scale_stones(uint8_t* rdram, recomp_context* ctx) 
 
 extern "C" {
 
-// func_8000ACC0, the damage formula: base * ATK / (ATK + target DEF). The
-// base is the spell's own power, which is what actually carries an enemy's
-// damage across the game, so it is scaled here as well. Hooked before the
-// `mtc1 $s0` at 0x8000ADA8, after the element modifiers; s0 is the base, t2
-// the attacker's record (the 5th argument), whose +0x64 is a table entry
-// only for monsters set up by func_80008FE0.
+// func_80006BEC(base, ?, attacker record) is the damage Brian takes: base *
+// attacker ATK / (ATK + Brian's DEF), then a random spread. The base is the
+// spell's own power, which is what actually carries an enemy's damage across
+// the game, so it is scaled here on entry (before 0x80006BF8, with s0 = base
+// and a2 = the attacker's record, whose +0x64 is a table entry only for
+// monsters set up by func_80008FE0). Brian's own attacks go through the
+// monster-side formula (func_8000ACC0) and never reach this function, so
+// his damage is untouched by construction.
 void quest64_randomizer_enemy_scale_damage(uint8_t* rdram, recomp_context* ctx) {
     if (!progressing()) return;
-    gpr record = ctx->r10;
-    gpr target = ctx->r3;
-    // Two independent tests, both required: the attacker must be a monster
-    // (its record+0x64 is a table entry seen at set-up) and the target must
-    // not be one (a monster's battle struct keeps its entry at +0x20). Brian's
-    // own staff and spells, which always target a monster, are never scaled.
+    gpr record = ctx->r6;
     gpr entry = record ? static_cast<gpr>(static_cast<int32_t>(MEM_W(0x64, record))) : 0;
     bool attacker_is_monster = is_seen_entry(entry);
-    bool target_is_monster = is_seen_entry(static_cast<gpr>(static_cast<int32_t>(MEM_W(0x20, target))));
     static int noted = 0;
     if (noted < 20) {
         noted++;
         std::ofstream out(zelda64::get_app_folder_path() / "randomizer_hooks.txt", std::ios::app);
-        out << "damage: base " << static_cast<int32_t>(ctx->r16) << " attacker_is_monster " << attacker_is_monster
-            << " target_is_monster " << target_is_monster << "\n";
+        out << "player_damage: base " << static_cast<int32_t>(ctx->r16) << " attacker_is_monster " << attacker_is_monster << "\n";
     }
-    if (!attacker_is_monster || target_is_monster) return;
+    if (!attacker_is_monster) return;
     ctx->r16 = scaled_stat(rdram, ctx, entry, ctx->r16, progression::Stat::DMG, reward_cap);
 }
 
