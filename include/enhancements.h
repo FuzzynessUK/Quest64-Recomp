@@ -15,6 +15,16 @@ namespace zelda64::enhancements {
         // it applies to a save that is already in progress.
         bool one_hit_ko = false;
 
+        // Renders the way the console did: native resolution, 4:3, no
+        // antialiasing and the original HUD ratio. The graphics settings in
+        // effect when it was switched on are kept so turning it off puts
+        // them back rather than guessing at defaults.
+        bool n64_mode = false;
+        int saved_resolution = -1;
+        int saved_aspect = -1;
+        int saved_antialiasing = -1;
+        int saved_hud_ratio = -1;
+
         // Quality of life.
         //
 

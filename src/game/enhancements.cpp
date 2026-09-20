@@ -108,6 +108,11 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
         }
     };
     get("one_hit_ko", o.one_hit_ko);
+    get("n64_mode", o.n64_mode);
+    get("saved_resolution", o.saved_resolution);
+    get("saved_aspect", o.saved_aspect);
+    get("saved_antialiasing", o.saved_antialiasing);
+    get("saved_hud_ratio", o.saved_hud_ratio);
     get("jp_healing", o.jp_healing);
     get("exit_from_anywhere", o.exit_from_anywhere);
     get("longer_magic_barrier", o.longer_magic_barrier);
@@ -117,6 +122,11 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
 void zelda64::enhancements::save_options(const Options& o) {
     nlohmann::json j;
     j["one_hit_ko"] = o.one_hit_ko;
+    j["n64_mode"] = o.n64_mode;
+    j["saved_resolution"] = o.saved_resolution;
+    j["saved_aspect"] = o.saved_aspect;
+    j["saved_antialiasing"] = o.saved_antialiasing;
+    j["saved_hud_ratio"] = o.saved_hud_ratio;
     j["jp_healing"] = o.jp_healing;
     j["exit_from_anywhere"] = o.exit_from_anywhere;
     j["longer_magic_barrier"] = o.longer_magic_barrier;

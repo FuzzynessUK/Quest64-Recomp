@@ -693,6 +693,41 @@ void enhancements_option_changed() {
     enhancements_context.model_handle.DirtyVariable("enh_status");
 }
 
+
+// N64 mode, in the spirit of Ship of Harkinian's: render the way the console
+// did. Applied straight to the graphics config rather than the ROM, and the
+// previous settings are kept in the enhancements file so switching it off puts
+// them back instead of falling to defaults.
+void apply_n64_mode(bool on) {
+    using namespace ultramodern::renderer;
+    zelda64::enhancements::Options& o = enhancements_context.edited;
+
+    if (on) {
+        o.saved_resolution = static_cast<int>(new_options.res_option);
+        o.saved_aspect = static_cast<int>(new_options.ar_option);
+        o.saved_antialiasing = static_cast<int>(new_options.msaa_option);
+        o.saved_hud_ratio = static_cast<int>(new_options.hr_option);
+
+        new_options.res_option = Resolution::Original;
+        new_options.ar_option = AspectRatio::Original;
+        new_options.msaa_option = Antialiasing::None;
+        new_options.hr_option = HUDRatioMode::Original;
+    }
+    else {
+        auto restore = [](int saved, auto& field, auto fallback) {
+            using T = std::decay_t<decltype(field)>;
+            field = (saved >= 0 && saved < static_cast<int>(T::OptionCount))
+                ? static_cast<T>(saved) : fallback;
+        };
+        restore(o.saved_resolution, new_options.res_option, Resolution::Auto);
+        restore(o.saved_aspect, new_options.ar_option, AspectRatio::Expand);
+        restore(o.saved_antialiasing, new_options.msaa_option, Antialiasing::None);
+        restore(o.saved_hud_ratio, new_options.hr_option, HUDRatioMode::Clamp16x9);
+    }
+
+    apply_graphics_config();
+}
+
 void make_enhancements_bindings(Rml::Context* context) {
     Rml::DataModelConstructor constructor = context->CreateDataModel("enhancements_model");
     if (!constructor) {
@@ -731,6 +766,18 @@ void make_enhancements_bindings(Rml::Context* context) {
         [](const Rml::Variant& in) {
             enhancements_context.edited.longer_magic_barrier = in.Get<int>() != 0;
             enhancements_option_changed();
+        }
+    );
+
+    constructor.BindFunc("enh_n64_mode",
+        [](Rml::Variant& out) { out = enhancements_context.edited.n64_mode ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            bool on = in.Get<int>() != 0;
+            if (on != enhancements_context.edited.n64_mode) {
+                apply_n64_mode(on);
+                enhancements_context.edited.n64_mode = on;
+                enhancements_option_changed();
+            }
         }
     );
 

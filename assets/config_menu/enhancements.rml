@@ -13,7 +13,7 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>For Fun</div>
+                                <div>Fun</div>
                             </label>
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
@@ -24,12 +24,19 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>N64 Mode</div></div>
+                                        <select data-value="enh_n64_mode" id="enh_n64_mode_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">N64 Mode renders the way the console did: native resolution, 4:3 and no antialiasing. It changes the graphics settings directly and takes effect straight away; switching it off restores whatever you had before. One Hit KO means everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
