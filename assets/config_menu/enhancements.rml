@@ -45,7 +45,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Magic Barrier +2 turns</div></div>
+                                        <div class="config-debug__select-label"><div>JP Magic barrier (+2 Turns)</div></div>
                                         <select data-value="enh_longer_magic_barrier" id="enh_longer_magic_barrier_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
