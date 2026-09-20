@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <optional>
 #include "zelda_debug.h"
@@ -83,6 +84,10 @@ namespace {
         // field to settle. Pressing the Exit button in a battle should do
         // nothing, not fire the moment the battle ends.
         bool drop_if_busy;
+        // When the request was made. A drop_if_busy warp that has not become
+        // applicable within a few frames is discarded, so pressing Exit in a
+        // battle does nothing at all rather than firing once it ends.
+        std::chrono::steady_clock::time_point requested_at;
     };
 
     std::mutex pending_map_warp_mutex;
@@ -99,7 +104,8 @@ void zelda64::do_map_warp(int map, int submap, int entrance, bool from_cheats, b
     entrance = std::clamp(entrance, 0, entrance_count(map, submap) - 1);
 
     std::lock_guard lock{pending_map_warp_mutex};
-    pending_map_warp = MapWarp{map, submap, entrance, from_cheats, drop_if_busy};
+    pending_map_warp = MapWarp{map, submap, entrance, from_cheats, drop_if_busy,
+        std::chrono::steady_clock::now()};
     map_warp_queued.store(true);
 }
 
@@ -119,11 +125,21 @@ static void apply_map_warp(uint8_t* rdram) {
         if (!pending_map_warp) {
             return;
         }
-        if (!ready) {
-            if (pending_map_warp->drop_if_busy) {
+        // An immediate warp is dropped as soon as it is not applicable, and
+        // also if it has simply gone stale: the per-frame hook does not
+        // necessarily run in every game mode, so a request made during a
+        // battle could otherwise sit untouched and fire when the field came
+        // back. Wall-clock time covers both cases.
+        if (pending_map_warp->drop_if_busy) {
+            bool stale = std::chrono::steady_clock::now() - pending_map_warp->requested_at
+                > std::chrono::milliseconds(250);
+            if (!ready || stale) {
                 pending_map_warp.reset();
                 map_warp_queued.store(false);
+                return;
             }
+        }
+        if (!ready) {
             return;
         }
         warp = *pending_map_warp;
