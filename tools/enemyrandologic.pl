@@ -70,16 +70,16 @@ my @progression = (
     [ 'Glencoe Forest',   2, '' ],
     [ 'West Carmaugh',    2, 'after Larapool' ],
     [ 'Cull Hazard',      3, '' ],
-    [ 'East Limelin',     3, 'Normoon side' ],
-    [ 'Windward Forest',  3, 'Zelse' ],
+    [ 'East Limelin',     3, 'Normoon side; by vanilla numbers it is tougher than the T4 areas, the progression guard covers this' ],
+    [ 'Windward Forest',  4, 'Zelse' ],
     [ 'Blue Cave',        4, 'Nepty' ],
     [ 'Isle of Skye',     4, '' ],
-    [ 'Baragoon Tunnel',  4, '' ],
-    [ 'Dindom Dries',     5, 'Shamwood side' ],
-    [ 'Boil Hole',        5, 'Fargo' ],
-    [ 'Baragoon Moor',    5, 'Shilf; submaps 1-2 share one roster' ],
-    [ 'Brannoch Castle',  6, 'Guilty, Beigis; submaps 1-6 share one roster' ],
-    [ "Mammon's World",   7, 'submaps 1-6 share one roster' ],
+    [ 'Baragoon Tunnel',  5, '' ],
+    [ 'Dindom Dries',     6, 'Shamwood side' ],
+    [ 'Boil Hole',        6, 'Fargo' ],
+    [ 'Baragoon Moor',    7, 'Shilf; submaps 1-2 share one roster' ],
+    [ 'Brannoch Castle',  7, 'Guilty, Beigis; submaps 1-6 share one roster' ],
+    [ "Mammon's World",   8, 'submaps 1-6 share one roster' ],
 );
 
 my %merge = map { ("$_ 1" => $_, "$_ 2" => $_, "$_ 3" => $_, "$_ 4" => $_, "$_ 5" => $_, "$_ 6" => $_) }
@@ -221,6 +221,49 @@ sub T { { v => $_[0], s => 4 } }
 sub S { { v => $_[0], s => 6 } }
 sub F { { f => $_[0], s => ($_[1] // 7) } }
 
+# ---------------------------------------------------------------- Settings
+# Cell addresses of the inputs, so every formula below refers to one place.
+my %S = (
+    down      => 'Settings!$B$4',   # tiers below an area a monster may come from
+    up        => 'Settings!$B$5',   # tiers above
+    k         => 'Settings!$B$6',   # scaling strength
+    fliers    => 'Settings!$B$7',
+    dangerous => 'Settings!$B$8',
+    bulk      => 'Settings!$B$9',
+    threat    => 'Settings!$B$10',
+    thresholds=> 'Settings!$B$13:$B$19',   # T2..T8 lower bounds
+    hpcap     => 'Settings!$B$23',
+    statcap   => 'Settings!$B$24',
+);
+my $TIERS = 8;
+
+my @settings = (
+    [ T('Settings (inputs)') ],
+    [ W('Yellow cells are the knobs the design refers to. Everything else on the other tabs is calculated from these and the game data.') ],
+    [ H('Setting', 'Value', 'What it does') ],
+    [ 'Spread down (tiers below)', I(1), W('An area may take monsters from this many tiers BELOW its own (easier monsters, scaled up). 0 = none.') ],
+    [ 'Spread up (tiers above)', I(1), W('An area may take monsters from this many tiers ABOVE its own (harder monsters, scaled down). 0 = none. 7 = anything (Merrow\'s behaviour).') ],
+    [ 'Scaling strength k', I(1), W('0 = keep home stats, 0.5 = halfway to the destination area\'s average, 1 = full fit. EXP and the progression guard always use 1.') ],
+    [ 'Max fliers per area', I(2), W('Upper bound on flying monsters in one roster; tier 1 gets none.') ],
+    [ 'Dangerous: keep at native tier or above', I('Y'), W('Cockatrice / Flamed Mane never appear earlier than vanilla.') ],
+    [ 'Bulk: DEF weight', I(25), W('Bulk = HP * (1 + DEF / this). Larger = DEF matters less.') ],
+    [ 'Threat: AGI weight', I(50), W('Threat = ATK * (1 + AGI / this). Larger = AGI matters less.') ],
+    [],
+    [ H('Power tier thresholds', 'Power at least', 'Tier') ],
+    [ 'T2 from', I(30), 2 ],
+    [ 'T3 from', I(80), 3 ],
+    [ 'T4 from', I(100), 4 ],
+    [ 'T5 from', I(160), 5 ],
+    [ 'T6 from', I(250), 6 ],
+    [ 'T7 from', I(360), 7 ],
+    [ 'T8 from', I(450), 8 ],
+    [ W('Power = SQRT(Bulk * Threat). Vanilla tier averages under the eight tiers: T1 15, T2 48, T3 119, T4 111, T5 187, T6 329, T7 397, T8 504 (T3 and T4 overlap: East Limelin is tougher by numbers than Windward/Blue Cave). Adjust and watch Monsters column P.') ],
+    [],
+    [ H('Stat caps', 'Cap', '') ],
+    [ 'HP cap', I(999), W('Vanilla monsters stay under 999; Hard Mode raises Brian\'s caps to 999 too.') ],
+    [ 'ATK/DEF/AGI cap', I(255), W('Stored as bytes in the game\'s battle struct.') ],
+);
+
 # ---------------------------------------------------------------- Logic
 my @logic = (
     [ T('Enemy randomizer: progression-aware placement (design)') ],
@@ -230,53 +273,31 @@ my @logic = (
     [ W('Merrow\'s two enemy options are blind to difficulty. "Enemy tables" swaps whole monster tables between areas at random, so the Holy Plains can draw the Dindom Dries table (Red Wyvern, 550 HP, against a 50 HP Brian) while Brannoch Castle gets Were Hares. "Enemy composition" only rerolls packs inside an area\'s own table, so nothing actually changes hands. Neither touches stats, so a moved monster keeps its home numbers.') ],
     [],
     [ S('The idea, in one line') ],
-    [ W('Give every area a tier (1-7, story order) and every monster a native tier (the tier of the area it comes from). An area of tier T draws its roster only from monsters whose native tier is within a chosen spread of T, and any monster placed outside its native tier has its stats rescaled toward the destination area\'s vanilla averages, so the shape of the monster (glass cannon, tank, fast) survives but its budget matches where it now lives. Exp and stones always scale with the destination, so levelling pace is unchanged.') ],
+    [ W('Give every area a tier (1-8, story order) and every monster a native tier (the tier of the area it comes from). An area of tier T draws its roster only from monsters whose native tier is within a chosen spread of T, and every placed monster has its stats rescaled toward the destination area\'s budget, so the shape of the monster (glass cannon, tank, fast) survives but its numbers match where it now lives. The budget never goes down from one area to the next, so the game always gets progressively harder regardless of what the seed placed where. Exp and stones follow the destination budget, so levelling pace is unchanged.') ],
     [],
     [ S('Rules') ],
-    [ W('1. Tiers. Areas tab, column C. Suggested: T1 Holy Plains/Connor, T2 Dondoran Flats/Glencoe/West Carmaugh, T3 Cull Hazard/East Limelin/Windward, T4 Blue Cave/Isle of Skye/Baragoon Tunnel, T5 Dindom Dries/Boil Hole/Baragoon Moor, T6 Brannoch, T7 Mammon\'s World. Editable.') ],
+    [ W('1. Tiers (Areas tab, column C): T1 Holy Plains / Connor Forest, T2 Dondoran Flats / Glencoe Forest / West Carmaugh, T3 Cull Hazard / East Limelin, T4 Windward Forest / Blue Cave / Isle of Skye, T5 Baragoon Tunnel, T6 Dindom Dries / Boil Hole, T7 Baragoon Moor / Brannoch Castle, T8 Mammon\'s World. Editable.') ],
     [ W('2. Monster native tier = tier of its home area (first area it appears in, by progression). The Monsters tab also computes a Power score from stats and a Power tier from thresholds (Settings), so you can see where a monster really sits versus where the game puts it (e.g. Cockatrice is T2 by area but T3 by numbers).') ],
-    [ W('3. Tier spread (Settings B4). A tier-T area may take monsters of native tier T-spread .. T+spread. 0 = same tier only (a reshuffle within difficulty bands), 1 = the recommended default, 2 = wild, 6 = anything goes (Merrow\'s behaviour). Dangerous monsters (Monsters column L: Cockatrice petrifies, Flamed Mane) never go below their native tier whatever the spread.') ],
+    [ W('3. Spread (Settings B4 down / B5 up). A tier-T area may take monsters of native tier T-down .. T+up. 0/0 = a reshuffle within difficulty bands, 1/1 = the recommended default, 0/2 = only ever harder monsters (scaled down to fit), 7/7 = anything goes (Merrow\'s behaviour). Dangerous monsters (Monsters column L: Cockatrice petrifies, Flamed Mane) never go below their native tier whatever the spread.') ],
     [ W('4. Roster size stays the same. Each area keeps its vanilla number of distinct monsters (Areas column E), because the pack definitions reference table slots 0..N-1 and the packs\' shapes (how many of each, min + extra) are kept as they are. The randomizer fills those slots from the allowed pool, no repeats within an area, and prefers monsters not already used by a neighbouring tier so the game does not become the same eight enemies everywhere.') ],
-    [ W('5. Stat scaling (Settings B5). For a monster placed in area A: factor = AreaAvg(A, stat) / AreaAvg(home, stat); new = round(own * factor ^ k). k = 1.0 fits the monster fully to the new area, 0.5 meets halfway, 0 leaves stats alone (not recommended). EXP always uses k = 1. HP capped at 999, ATK/DEF/AGI at 255. See ScalingExample for a live worked example.') ],
-    [ W('6. Flying (Monsters column K). The vanilla game limits fliers because some spells cannot reach them; keep at most Settings B6 fliers per area and none in tier 1.') ],
-    [ W('7. Bosses are never moved or rescaled here; Merrow\'s boss options already cover them.') ],
-    [ W('8. Same seed, same result: the placement is a pure function of the seed and these settings, so a seed can be shared like any other randomizer seed, and the spoiler log lists each area\'s new roster with the scaled stats.') ],
+    [ W('5. Stat scaling (Settings B6). For a monster placed in area A: factor = AreaAvg(A, stat) / AreaAvg(home, stat); new = round(own * factor ^ k * guard(A)). k = 1.0 fits the monster fully to the new area, 0.5 meets halfway, 0 leaves stats alone (not recommended). EXP always uses k = 1. HP capped at 999, ATK/DEF/AGI at 255. See ScalingExample for a live worked example.') ],
+    [ W('6. Progression guard (Areas columns M-N). Each area gets a budget = MAX(its own vanilla average power, the previous area\'s budget), so budgets never fall as you move through the game. guard(A) = budget / own average power, which is 1.0 wherever vanilla already climbs and > 1 where it dips (East Limelin -> Windward Forest is the one real dip). Applied to every placed monster, this is what makes the randomized game strictly progressively harder.') ],
+    [ W('7. Flying (Monsters column K, the ROM\'s flag). The vanilla game limits fliers because some spells cannot reach them; keep at most Settings B7 fliers per area and none in tier 1.') ],
+    [ W('8. Bosses are out of scope. The boss logic that already exists in the randomizer stays as it is; nothing here moves, rescales or reads the boss entries (monster ids 67+).') ],
+    [ W('9. Same seed, same result: the placement is a pure function of the seed and these settings, so a seed can be shared like any other randomizer seed, and the spoiler log lists each area\'s new roster with the scaled stats.') ],
     [],
     [ S('Why this is cheap to build') ],
     [ W('Everything it changes is ROM data the randomizer already writes at boot: the area\'s table index (map header), the pack member ids, and each monster\'s six stat halfwords (Monsters column S has the ROM address). No native hooks and no recompiled code. The one engine question to verify is whether a table can mix monsters from different world chunks (the Implementation tab explains).') ],
 );
 
-# ---------------------------------------------------------------- Settings
-my @settings = (
-    [ T('Settings (inputs)') ],
-    [ W('Yellow cells are the knobs the design refers to. Everything else on the other tabs is calculated from these and the game data.') ],
-    [ H('Setting', 'Value', 'What it does') ],
-    [ 'Tier spread', I(1), W('How many tiers away from an area\'s tier a monster may come from. 0 strict, 1 recommended, 2 wild, 6 = anything (Merrow).') ],
-    [ 'Scaling strength k', I(1), W('0 = keep home stats, 0.5 = halfway to the destination area\'s average, 1 = full fit. EXP always uses 1.') ],
-    [ 'Max fliers per area', I(2), W('Upper bound on flying monsters in one roster; tier 1 gets none.') ],
-    [ 'Dangerous: keep at native tier or above', I('Y'), W('Cockatrice / Flamed Mane never appear earlier than vanilla.') ],
-    [ 'Bulk: DEF weight', I(25), W('Bulk = HP * (1 + DEF / this). Larger = DEF matters less.') ],
-    [ 'Threat: AGI weight', I(50), W('Threat = ATK * (1 + AGI / this). Larger = AGI matters less.') ],
-    [],
-    [ H('Power tier thresholds', 'Power at least', 'Tier') ],
-    [ 'T2 from', I(30), 2 ],
-    [ 'T3 from', I(90), 3 ],
-    [ 'T4 from', I(180), 4 ],
-    [ 'T5 from', I(260), 5 ],
-    [ 'T6 from', I(330), 6 ],
-    [ 'T7 from', I(400), 7 ],
-    [ W('Power = SQRT(Bulk * Threat). Thresholds were chosen so the vanilla areas land on their story tiers; adjust and watch Monsters column P.') ],
-    [],
-    [ H('Stat caps', 'Cap', '') ],
-    [ 'HP cap', I(999), W('Vanilla monsters stay under 999; Hard Mode raises Brian\'s caps to 999 too.') ],
-    [ 'ATK/DEF/AGI cap', I(255), W('Stored as bytes in the game\'s battle struct.') ],
-);
-
 # ---------------------------------------------------------------- Areas
+# Columns: A Rank, B Area, C Tier, D Table, E Roster size, F Roster, G-K avg
+# stats, L avg power, M progression budget, N guard, O-P allowed tiers,
+# Q candidates, R packs, S notes.
 my @areas_rows = (
-    [ T('Areas: progression order, tier, vanilla roster and averages') ],
-    [ W('Tier (C) is an input. Averages (G-K) are over the area\'s vanilla roster (Roster tab). Allowed tiers (M-N) follow Settings!B4. O counts how many monsters could be placed here under the current settings; P is the vanilla roster size the randomizer must fill.') ],
-    [ H('Rank', 'Area', 'Tier', 'Monster table', 'Roster size', 'Vanilla roster', 'Avg HP', 'Avg ATK', 'Avg DEF', 'Avg AGI', 'Avg EXP', 'Avg Power', 'Allowed tier min', 'Allowed tier max', 'Candidate monsters', 'Packs (vanilla: monster x always + extra)', 'Notes') ],
+    [ T('Areas: progression order, tier, vanilla roster, averages and progression budget') ],
+    [ W('Tier (C) is an input. Averages (G-L) are over the area\'s vanilla roster (Roster tab). Budget (M) = MAX(own average power, previous budget), so it never falls; Guard (N) = budget / own average, the multiplier applied to everything placed here. Allowed tiers (O-P) follow the spread settings. Q counts how many monsters could be placed here under the current settings; E is how many the randomizer must place.') ],
+    [ H('Rank', 'Area', 'Tier', 'Monster table', 'Roster size', 'Vanilla roster', 'Avg HP', 'Avg ATK', 'Avg DEF', 'Avg AGI', 'Avg EXP', 'Avg Power', 'Progression budget', 'Guard x', 'Allowed tier min', 'Allowed tier max', 'Candidate monsters', 'Packs (vanilla: monster x always + extra)', 'Notes') ],
 );
 my $first_area_row = 4;
 my $rank = 0;
@@ -286,6 +307,7 @@ for my $p (@progression) {
     my ($name, $tier, $note) = @$p;
     my $e = $area{$name};
     my $r = $first_area_row + $rank - 1;
+    my $prev = $r - 1;
     my @roster = map { $tables[ $e->{table} ][$_] } sort { $a <=> $b } keys %{ $e->{slots} };
     push @area_order, $name;
     push @areas_rows, [
@@ -296,8 +318,10 @@ for my $p (@progression) {
         F("AVERAGEIFS(Roster!\$G:\$G,Roster!\$A:\$A,\$B$r)"),
         F("AVERAGEIFS(Roster!\$H:\$H,Roster!\$A:\$A,\$B$r)"),
         F("AVERAGEIFS(Roster!\$I:\$I,Roster!\$A:\$A,\$B$r)"),
-        F("MAX(1,C$r-Settings!\$B\$4)", 0),
-        F("MIN(7,C$r+Settings!\$B\$4)", 0),
+        ($rank == 1 ? F("L$r") : F("MAX(L$r,M$prev)")),
+        F("M$r/L$r", 7),
+        F("MAX(1,C$r-$S{down})", 0),
+        F("MIN($TIERS,C$r+$S{up})", 0),
         F("COUNTIFS(Monsters!\$Q:\$Q,\"<=\"&C$r,Monsters!\$R:\$R,\">=\"&C$r)", 0),
         W(join(' ', @{ $e->{packs} })),
         W($note),
@@ -331,7 +355,7 @@ for my $name (@area_order) {
 # ---------------------------------------------------------------- Monsters
 my @monster_rows = (
     [ T('Monsters: vanilla stats, home area, computed power and placement window') ],
-    [ W('Stats are the ROM\'s (HP, ATK, DEF, AGI, EXP; Drop is the item drop slot). Native tier comes from the home area\'s tier on the Areas tab. Flying is the ROM\'s own flag (only Wyvern, Will-o\'-Wisp and Pixie carry it), not a visual judgement. Power/Power tier use the Settings weights and thresholds. Q-R are the area tiers this monster may be placed in under the current spread; dangerous monsters are pinned at or above their native tier. S is where the six stat halfwords live in the ROM.') ],
+    [ W('Stats are the ROM\'s (HP, ATK, DEF, AGI, EXP; Drop is the item drop slot). Native tier comes from the home area\'s tier on the Areas tab. Flying is the ROM\'s own flag (only Wyvern, Will-o\'-Wisp and Pixie carry it), not a visual judgement. Power/Power tier use the Settings weights and thresholds. Q-R are the area tiers this monster may be placed in under the current spread (Q uses spread-up: a monster may go to areas up to that many tiers below it; R uses spread-down); dangerous monsters are pinned at or above their native tier. S is where the six stat halfwords live in the ROM. Bosses (ids 67+) are not listed: they are not part of this.') ],
     [ H('Id', 'Monster', 'Home area', 'Native tier', 'HP', 'ATK', 'DEF', 'AGI', 'EXP', 'Drop', 'Flying', 'Dangerous', 'Bulk', 'Threat', 'Power', 'Power tier', 'Placeable from tier', 'Placeable to tier', 'Stat ROM address') ],
 );
 my $mr = 3;
@@ -342,12 +366,12 @@ for my $m (@monsters) {
         F("IFERROR(INDEX(Areas!\$C:\$C,MATCH(\$C$mr,Areas!\$B:\$B,0)),\"\")", 0),
         $m->{hp}, $m->{atk}, $m->{def}, $m->{agi}, $m->{exp}, $m->{drop},
         $m->{flying}, I($m->{dangerous}),
-        F("E$mr*(1+G$mr/Settings!\$B\$8)"),
-        F("F$mr*(1+H$mr/Settings!\$B\$9)"),
+        F("E$mr*(1+G$mr/$S{bulk})"),
+        F("F$mr*(1+H$mr/$S{threat})"),
         F("ROUND(SQRT(M$mr*N$mr),1)"),
-        F("1+COUNTIF(Settings!\$B\$12:\$B\$17,\"<=\"&O$mr)", 0),
-        F("IF(AND(L$mr=\"Y\",Settings!\$B\$7=\"Y\"),D$mr,MAX(1,D$mr-Settings!\$B\$4))", 0),
-        F("MIN(7,D$mr+Settings!\$B\$4)", 0),
+        F("1+COUNTIF($S{thresholds},\"<=\"&O$mr)", 0),
+        F("IF(AND(L$mr=\"Y\",$S{dangerous}=\"Y\"),D$mr,MAX(1,D$mr-$S{up}))", 0),
+        F("MIN($TIERS,D$mr+$S{down})", 0),
         $m->{addr},
     ];
 }
@@ -355,21 +379,21 @@ for my $m (@monsters) {
 # ---------------------------------------------------------------- Scaling example
 my @ex = (
     [ T('Scaling example: one monster dropped into one area') ],
-    [ W('Pick a monster and a destination area (yellow). The table shows its home stats, the two areas\' vanilla averages, the factor between them, and the rescaled stats under Settings!B5. The grid below previews the same monster in every area.') ],
+    [ W('Pick a monster and a destination area (yellow). The table shows its home stats, the two areas\' vanilla averages, the factor between them, the destination\'s progression guard, and the rescaled stats under Settings!B6. The grid below previews the same monster in every area.') ],
     [ 'Monster', I('RED WYVERN') ],
     [ 'Destination area', I('Holy Plains') ],
     [ 'Home area', F('INDEX(Monsters!$C:$C,MATCH($B$3,Monsters!$B:$B,0))', 0) ],
     [ 'Home tier', F('INDEX(Monsters!$D:$D,MATCH($B$3,Monsters!$B:$B,0))', 0), 'Destination tier', F('INDEX(Areas!$C:$C,MATCH($B$4,Areas!$B:$B,0))', 0) ],
     [ 'Within allowed spread?', F('IF(AND(D6>=INDEX(Monsters!$Q:$Q,MATCH($B$3,Monsters!$B:$B,0)),D6<=INDEX(Monsters!$R:$R,MATCH($B$3,Monsters!$B:$B,0))),"yes","no (outside spread)")', 0) ],
-    [],
-    [ H('Stat', 'Own (home)', 'Home area avg', 'Destination avg', 'Factor', 'k used', 'Scaled', 'Cap') ],
+    [ 'Destination guard x', F('INDEX(Areas!$N:$N,MATCH($B$4,Areas!$B:$B,0))') ],
+    [ H('Stat', 'Own (home)', 'Home area avg', 'Destination avg', 'Factor', 'k used', 'Scaled (with guard)', 'Cap') ],
 );
-my @statcols = ( [ 'HP', 'E', 'G', 'Settings!$B$21' ], [ 'ATK', 'F', 'H', 'Settings!$B$22' ], [ 'DEF', 'G', 'I', 'Settings!$B$22' ], [ 'AGI', 'H', 'J', 'Settings!$B$22' ], [ 'EXP', 'I', 'K', '99999' ] );
+my @statcols = ( [ 'HP', 'E', 'G', $S{hpcap} ], [ 'ATK', 'F', 'H', $S{statcap} ], [ 'DEF', 'G', 'I', $S{statcap} ], [ 'AGI', 'H', 'J', $S{statcap} ], [ 'EXP', 'I', 'K', '99999' ] );
 my $er = 9;
 for my $sc (@statcols) {
     $er++;
     my ($label, $mcol, $acol, $cap) = @$sc;
-    my $k = $label eq 'EXP' ? '1' : 'Settings!$B$5';
+    my $k = $label eq 'EXP' ? '1' : $S{k};
     push @ex, [
         $label,
         F("INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))", 0),
@@ -377,21 +401,20 @@ for my $sc (@statcols) {
         F("INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$4,Areas!\$B:\$B,0))"),
         F("D$er/C$er"),
         F($k),
-        F("MIN(H$er,ROUND(B$er*E$er^F$er,0))", 0),
+        F("MIN(H$er,ROUND(B$er*E$er^F$er*\$B\$8,0))", 0),
         F($cap, 0),
     ];
 }
-push @ex, [], [ S('Preview: the chosen monster in every area') ],
+push @ex, [], [ S('Preview: the chosen monster in every area (guard included)') ],
     [ H('Area', 'Tier', 'HP', 'ATK', 'DEF', 'AGI', 'EXP', 'Allowed?') ];
 my $pr = $er + 3;
 for my $name (@area_order) {
     $pr++;
     my @cells = ( $name, F("INDEX(Areas!\$C:\$C,MATCH(\$A$pr,Areas!\$B:\$B,0))", 0) );
-    my $ci = 2;
     for my $sc (@statcols) {
         my ($label, $mcol, $acol, $cap) = @$sc;
-        my $k = $label eq 'EXP' ? '1' : 'Settings!$B$5';
-        push @cells, F("MIN($cap,ROUND(INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))*(INDEX(Areas!\$$acol:\$$acol,MATCH(\$A$pr,Areas!\$B:\$B,0))/INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0)))^$k,0))", 0);
+        my $k = $label eq 'EXP' ? '1' : $S{k};
+        push @cells, F("MIN($cap,ROUND(INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))*(INDEX(Areas!\$$acol:\$$acol,MATCH(\$A$pr,Areas!\$B:\$B,0))/INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0)))^$k*INDEX(Areas!\$N:\$N,MATCH(\$A$pr,Areas!\$B:\$B,0)),0))", 0);
     }
     push @cells, F("IF(AND(B$pr>=INDEX(Monsters!\$Q:\$Q,MATCH(\$B\$3,Monsters!\$B:\$B,0)),B$pr<=INDEX(Monsters!\$R:\$R,MATCH(\$B\$3,Monsters!\$B:\$B,0))),\"yes\",\"no\")", 0);
     push @ex, \@cells;
@@ -409,9 +432,9 @@ my @impl = (
     [ S('The one thing to verify first') ],
     [ W('Whether a table can mix monsters from different chunks, i.e. whether a monster\'s model and animation data is reachable from any area or only from its own chunk\'s overlay. Merrow\'s table swap already makes an area use another chunk\'s whole table, which suggests monsters load from wherever their table entry points; a 10-minute test is to hand-write one table entry (e.g. put a Wyvern into table 0) and walk into the Holy Plains. If cross-chunk placement is not possible, the fallback is spread = 0 within each chunk plus stat scaling, which still fixes the difficulty problem but with smaller pools.') ],
     [ S('Where it goes in the code') ],
-    [ W('src/game/randomizer/randomizer.cpp shuffle_enemies() already owns the table index / pack writes; add the tier pool selection there and the stat writes next to the existing monster_stats writes. Options: enemy_progression (bool), enemy_tier_spread (int), enemy_scale_strength (0/50/100 %), enemy_max_fliers. UI: three controls under the existing "Enemy shuffling" group on the Randomizer tab. The tier table itself can be a constant array (one tier per area, from the Areas tab).') ],
+    [ W('src/game/randomizer/randomizer.cpp shuffle_enemies() already owns the table index / pack writes; add the tier pool selection there and the stat writes next to the existing monster_stats writes. Options: enemy_progression (bool), enemy_spread_down and enemy_spread_up (int), enemy_scale_strength (0/50/100 %), enemy_max_fliers. The per-area tiers and the progression budgets are constants derived from the Areas tab. UI: four controls under the existing "Enemy shuffling" group on the Randomizer tab. The tier table itself can be a constant array (one tier per area, from the Areas tab).') ],
     [ S('Open questions') ],
-    [ W('Should the spread be asymmetric (allow one tier down, two up) so the game gets harder rather than easier? Should exp scale with k or always fully (this sheet says always)? Do the story bosses\' areas (Connor, Windward, Blue Cave, Boil Hole, Moor, Brannoch) need the boss\'s own minions kept vanilla for the fight leading up to them?') ],
+    [ W('Should exp scale with k or always fully (this sheet says always)? Do the story bosses\' areas (Connor, Windward, Blue Cave, Boil Hole, Moor, Brannoch) need the boss\'s own minions kept vanilla for the fight leading up to them?') ],
 );
 
 # ---------------------------------------------------------------- write
