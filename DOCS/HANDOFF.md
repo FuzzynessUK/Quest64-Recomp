@@ -336,6 +336,36 @@ damage reaches it through a pointer, so the writer cannot be found by address).
 Removed at the user's request rather than left as a button that half worked.
 With One Hit KO on, any hit kills Brian anyway.
 
+
+#### The spell effect parameter block (found 2026-09-20)
+
+Bytes **+0x34..+0x3F** of a 68-byte spell entry are a per-effect parameter
+array: each status effect owns one slot, and a spell writes only its own.
+Mapped from the 60 US entries:
+
+| offset | effect | values |
+| --- | --- | --- |
+| +0x34 | Power Staff | 1, 2 |
+| +0x35 | Restriction / Ice | 1, 2 |
+| +0x36 | Slow Enemy, Wind Walk | 1, 2 |
+| +0x37 | Evade | 1, 2 |
+| +0x38 | Silence | 1 |
+| +0x39 | Soul Searcher | 1 |
+| +0x3A | **Magic Barrier** | 1 |
+| +0x3B | Confusion | 1 |
+| +0x3C | Spirit Armor / Weakness / Weaken All | 1-4 |
+| +0x3E, +0x3F | Magnet Rock, Ice Wall, Cyclone, Wind Bomb | 1-3 |
+
+The values track spell level where a spell has two (Evade 1/2, Spirit Armor
+3/4), which is what makes this look like the effect's turn parameter.
+
+**Up to 5 turn Magic Barrier** writes 5 over Magic Barrier's slot at ROM
+**0xD4C1C6** (entry 0xD4C18C + 0x3A), which ships as 1. The address is looked
+up by spell name at runtime rather than hardcoded. Caveat: the JP ROM carries
+the *same* byte (verified), so JP's longer barrier comes from its battle code;
+this reproduces the effect, not the mechanism, and is untested in game. If it
+turns out +0x3A is strength rather than turns, only this one byte is involved.
+
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
 Merrow replaces the title-screen logo and can stamp the seed digits over the

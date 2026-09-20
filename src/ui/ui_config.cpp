@@ -681,7 +681,8 @@ EnhancementsContext enhancements_context;
 
 std::string enhancements_status() {
     const zelda64::enhancements::Options& active = zelda64::enhancements::active_options();
-    bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko;
+    bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko ||
+        active.long_magic_barrier != enhancements_context.edited.long_magic_barrier;
     return std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
         (pending ? ". Changed settings apply when the game is next launched." : ".");
 }
@@ -704,6 +705,14 @@ void make_enhancements_bindings(Rml::Context* context) {
         [](Rml::Variant& out) { out = enhancements_context.edited.one_hit_ko ? 1 : 0; },
         [](const Rml::Variant& in) {
             enhancements_context.edited.one_hit_ko = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+
+    constructor.BindFunc("enh_long_magic_barrier",
+        [](Rml::Variant& out) { out = enhancements_context.edited.long_magic_barrier ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.long_magic_barrier = in.Get<int>() != 0;
             enhancements_option_changed();
         }
     );

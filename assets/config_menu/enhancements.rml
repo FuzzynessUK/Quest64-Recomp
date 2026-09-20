@@ -36,10 +36,20 @@
                             <label class="config-debug-option__label">
                                 <div>Quality of Life</div>
                             </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Up to 5 turn Magic Barrier</div></div>
+                                        <select data-value="enh_long_magic_barrier" id="enh_long_magic_barrier_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">JP Buffs + Debuffs (the longer Magic Barrier, Silence, Restriction, Evade, Confusion and Slow Enemy durations from the Japanese release) is not wired up yet. The spell data table is byte-identical between the US and Japanese ROMs, so these durations live in game code rather than data and need a native hook; see DOCS/HANDOFF.md.</div>
+                            <label class="config-debug-option__label">                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Magic Barrier holds for up to 5 turns instead of 1, as in the Japanese release. Each status spell owns one byte of the effect parameter block in its spell entry, and Magic Barrier owns +0x3A. The Japanese ROM carries the same byte, so this reproduces the effect rather than the exact mechanism, and it is untested in game.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">

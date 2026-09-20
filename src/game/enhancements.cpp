@@ -32,9 +32,26 @@ namespace {
     // monster with HP first, and HP is stored twice in a row.
     constexpr int monster_count = 75;
 
+    // Magic Barrier is spell 27; its effect parameter sits at +0x3A of the
+    // 68-byte entry. Looked up by name so a change to the table cannot
+    // silently point this at a different spell.
+    constexpr int spell_entry_size = 68;
+    constexpr int magic_barrier_param = 0x3A;
+
+    uint32_t magic_barrier_param_address() {
+        for (size_t i = 0; i + 3 < data::spells.size(); i += 4) {
+            if (data::spells[i] == "Magic Barrier") {
+                return static_cast<uint32_t>(std::stoul(data::spells[i + 1], nullptr, 16)) + magic_barrier_param;
+            }
+        }
+        return 0;
+    }
+
     struct Write {
         uint32_t rom_offset;
         uint16_t value;
+        // Monster HP is a halfword; the spell effect parameter is one byte.
+        bool single_byte = false;
     };
 
     std::vector<Write> build_writes(const Options& options) {
@@ -44,8 +61,16 @@ namespace {
             for (int monster = 0; monster < monster_count; monster++) {
                 uint32_t address = static_cast<uint32_t>(
                     std::stoul(data::monsterstatlocations[monster][0], nullptr, 16));
-                writes.push_back({ address, 1 });
-                writes.push_back({ address + 2, 1 });
+                writes.push_back({ address, 1, false });
+                writes.push_back({ address + 2, 1, false });
+            }
+        }
+        if (options.long_magic_barrier) {
+            uint32_t address = magic_barrier_param_address();
+            if (address != 0) {
+                // One byte, so only the low half of the halfword write is used;
+                // write it as a byte value in the high position of its own pair.
+                writes.push_back({ address, static_cast<uint16_t>(std::clamp(options.magic_barrier_turns, 1, 255)), true });
             }
         }
         return writes;
@@ -75,12 +100,17 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
         }
     };
     get("one_hit_ko", o.one_hit_ko);
+    get("long_magic_barrier", o.long_magic_barrier);
+    get("magic_barrier_turns", o.magic_barrier_turns);
+    o.magic_barrier_turns = std::clamp(o.magic_barrier_turns, 1, 255);
     return o;
 }
 
 void zelda64::enhancements::save_options(const Options& o) {
     nlohmann::json j;
     j["one_hit_ko"] = o.one_hit_ko;
+    j["long_magic_barrier"] = o.long_magic_barrier;
+    j["magic_barrier_turns"] = o.magic_barrier_turns;
     std::ofstream out(options_path());
     out << j.dump(4);
 }
@@ -106,6 +136,12 @@ void zelda64::enhancements::apply_at_boot(uint8_t* rdram) {
     std::vector<uint8_t> patched(rom.begin(), rom.end());
 
     for (const Write& write : writes) {
+        if (write.single_byte) {
+            if (write.rom_offset < patched.size()) {
+                patched[write.rom_offset] = static_cast<uint8_t>(write.value & 0xFF);
+            }
+            continue;
+        }
         if (write.rom_offset + 1 >= patched.size()) {
             continue;
         }

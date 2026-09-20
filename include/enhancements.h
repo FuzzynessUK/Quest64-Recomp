@@ -14,6 +14,18 @@ namespace zelda64::enhancements {
         // set to 1 in the ROM, and Brian's max HP is held at 1 each frame so
         // it applies to a save that is already in progress.
         bool one_hit_ko = false;
+
+        // Quality of life.
+        //
+        // Magic Barrier lasts longer, as it does in the Japanese release.
+        // Each status spell owns one byte of the per-effect parameter block
+        // at +0x34..+0x3F of its 68-byte entry; Magic Barrier's is +0x3A and
+        // ships as 1. Raising it is what lengthens the barrier. Note the JP
+        // ROM has the same byte, so its longer barrier comes from code: this
+        // reproduces the effect, not the exact mechanism.
+        bool long_magic_barrier = false;
+        // Turns written into that byte when the option is on.
+        int magic_barrier_turns = 5;
     };
 
     // Options as saved on disk; a missing file gives defaults.
