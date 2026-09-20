@@ -427,6 +427,30 @@ index, the handlers take a spell-cast context in $a0 and a target in $a1,
 so they cannot be called cold from the frame hook without building that
 context. What exists today warps to submap 0, entrance 0 of the current map.
 
+
+#### JP stat-gain effect: the routine is absent from the US ROM
+
+Eltale Monsters flashes a colour when a stat rises (red HP, blue MP, yellow
+DEF, green AGI); the US release has nothing. Investigated 2026-09-20.
+
+`func_80002F60` is the stat handler on both sides and they align, but JP has
+an extra call the US build does not, inserted around +0x17C..+0x1B4. Of the
+three functions JP calls there:
+
+- JP 0x8000D100 = US `func_8000B740` (US already calls it)
+- JP 0x8000D40C = US `func_8000BA4C` (US already calls it)
+- **JP 0x80014318 has no counterpart anywhere in the US ROM**
+
+The third is the effect, and a masked-signature search over the whole US
+code region does not find it. So this cannot be done by injecting a call the
+way a Stage 2 hook does: the routine to call does not exist. Recreating it
+means either writing the effect as MIPS in `patches/` against the game's own
+effect system, or drawing it ourselves through the display-list injection
+already used by `src/game/widescreen.cpp`.
+
+Detection is the easy half: `quest64_cheats_frame` already reads every stat
+each frame for the cheats readout, so spotting a rise is trivial.
+
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
 Merrow replaces the title-screen logo and can stamp the seed digits over the
