@@ -451,6 +451,22 @@ already used by `src/game/widescreen.cpp`.
 Detection is the easy half: `quest64_cheats_frame` already reads every stat
 each frame for the cheats readout, so spotting a rise is trivial.
 
+
+**Porting it is feasible, and here is what it needs.** The JP routine at
+0x80014318 (JP ROM 0x14F18) is an effect updater: float and matrix work over
+a table of entries, using JP globals around 0x80085AB0-0x80085AC0. It calls
+two helpers, and **both exist in the US build**:
+
+- JP 0x80038500 = US `func_80034F60`
+- JP 0x800271B4 = US `func_800232F4`
+
+So only the wrapper is missing, not the machinery under it. A port would
+mean transcribing that routine (and whatever creates its entries) against
+the US helper addresses, with our own storage in place of the JP globals,
+then triggering it from the stat-up site in `func_80002F60` with a colour
+per stat. `patches/` already compiles MIPS into this build, so the .nrm mod
+format is not required: it is the same capability with extra packaging.
+
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
 Merrow replaces the title-screen logo and can stamp the seed digits over the
