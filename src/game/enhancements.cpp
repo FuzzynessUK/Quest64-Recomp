@@ -29,10 +29,13 @@ namespace {
     constexpr int32_t player_hp = gPlayerMainData + 0x04;
     constexpr int32_t player_max_hp = gPlayerMainData + 0x06;
 
-    // Magic Barrier turns remaining, as found in RAM. A byte, per the
-    // GameShark-style address it came from.
+    // Magic Barrier, as found in RAM: a byte counting how much barrier is
+    // left. The value is one more than the number of enemy attacks it will
+    // absorb, so the stock 4 is three attacks and 6 is five.
     constexpr int32_t magic_barrier_timer = 0x8007BB42;
     constexpr int magic_barrier_bonus = 2;
+    constexpr int magic_barrier_min = 3;
+    constexpr int magic_barrier_max = 6;
 
     // Every monster's stat row, as used by the randomizer: six halfwords per
     // monster with HP first, and HP is stored twice in a row.
@@ -162,13 +165,18 @@ void zelda64::enhancements::on_frame(uint8_t* rdram) {
     const Options& options = active_options();
 
     if (options.longer_magic_barrier) {
-        // The counter only ever rises when the spell is cast, and falls a
-        // turn at a time after that, so topping up on a rise adds the bonus
-        // once per cast rather than every frame.
+        // The counter only rises when the spell is cast and falls as the
+        // barrier is used, so acting on a rise applies this once per cast
+        // rather than every frame.
+        //
+        // Each cast is extended by two and then held inside 3-6, so the
+        // stock top roll of 4 (three absorbed attacks) becomes 6 (five) and
+        // nothing can come out shorter than 3 or longer than 6.
         static int previous = 0;
         int current = MEM_BU(0, magic_barrier_timer);
         if (current > previous && current > 0) {
-            int extended = std::min(current + magic_barrier_bonus, 0xFF);
+            int extended = std::clamp(current + magic_barrier_bonus,
+                magic_barrier_min, magic_barrier_max);
             MEM_B(0, magic_barrier_timer) = static_cast<int8_t>(extended);
             current = extended;
         }
