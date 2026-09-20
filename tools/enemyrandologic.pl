@@ -262,6 +262,8 @@ my @settings = (
     [ H('Stat caps', 'Cap', '') ],
     [ 'HP cap', I(999), W('Vanilla monsters stay under 999; Hard Mode raises Brian\'s caps to 999 too.') ],
     [ 'ATK/DEF/AGI cap', I(255), W('Stored as bytes in the game\'s battle struct.') ],
+    [],
+    [ 'Shape exponent s', I(0.5), W('Rule 5: how much of a monster\'s deviation from its home average survives the move. 0.5 = square root (a monster at 3x its home average lands at 1.7x the destination\'s); 1 keeps the exact ratio; 0 makes every monster the destination average. This cell is B26.') ],
 );
 
 # ---------------------------------------------------------------- Logic
@@ -280,7 +282,7 @@ my @logic = (
     [ W('2. Monster native tier = tier of its home area (first area it appears in, by progression). The Monsters tab also computes a Power score from stats and a Power tier from thresholds (Settings), so you can see where a monster really sits versus where the game puts it (e.g. Cockatrice is T2 by area but T3 by numbers).') ],
     [ W('3. Spread (Settings B4 down / B5 up). Default 7 / 7: any monster set can appear in any area, the scaling below is what balances it. Narrower spreads (e.g. 1 / 1) keep an area to sets whose monsters are within that many tiers of its own; 0 / 0 is a reshuffle within difficulty bands. Note the game\x27s monsters come in six fixed sets that are placed whole (see Implementation), so the window applies to sets, not single monsters.') ],
     [ W('4. Roster size stays the same. Each area keeps its vanilla number of distinct monsters (Areas column E), because the pack definitions reference table slots 0..N-1 and the packs\' shapes (how many of each, min + extra) are kept as they are. The randomizer fills those slots from the allowed pool, no repeats within an area, and prefers monsters not already used by a neighbouring tier so the game does not become the same eight enemies everywhere.') ],
-    [ W('5. Stat scaling (Settings B6). For a monster placed in area A: factor = AreaAvg(A, stat) / AreaAvg(home, stat); new = round(own * factor ^ k * guard(A)). k = 1.0 fits the monster fully to the new area, 0.5 meets halfway, 0 leaves stats alone (not recommended). EXP always uses k = 1. HP capped at 999, ATK/DEF/AGI at 255. See ScalingExample for a live worked example.') ],
+    [ W('5. Stat scaling. For a monster placed in area A: new = AreaAvg(A, stat) * (own / AreaAvg(home, stat)) ^ s * guard(A). The monster is moved to the destination\x27s average and keeps its own deviation from its home average, compressed by the shape exponent s (Settings B26, 0.5): a monster three times its home average lands at 1.7 times the destination\x27s, so home-area bruisers like Ork Jr do not become super-bosses late. s = 1 would preserve the ratio exactly, 0 would make every monster the destination average. Applies to HP, ATK, DEF, AGI, EXP and Stones alike; spell damage follows ATK inside the game. HP capped at 999, ATK/DEF/AGI at 255. See ScalingExample.') ],
     [ W('6. Progression guard (Areas columns M-N). Each area gets a budget = MAX(its own vanilla average power, the previous area\'s budget), so budgets never fall as you move through the game. guard(A) = budget / own average power, which is 1.0 wherever vanilla already climbs and > 1 where it dips (East Limelin -> Windward Forest is the one real dip). Applied to every placed monster, this is what makes the randomized game strictly progressively harder.') ],
     [ W('7. Flying and dangerous flags (Monsters K-L) are informational only: nothing is excluded from any area. Cockatrice keeps its petrify wherever it lands, so it is the one monster whose danger the numbers do not capture; Settings B8 = Y pins it (and Flamed Mane) at their native tier or above if that proves too harsh early.') ],
     [ W('8. Bosses are out of scope. The boss logic that already exists in the randomizer stays as it is; nothing here moves, rescales or reads the boss entries (monster ids 67+).') ],
@@ -386,22 +388,21 @@ my @ex = (
     [ 'Home tier', F('INDEX(Monsters!$D:$D,MATCH($B$3,Monsters!$B:$B,0))', 0), 'Destination tier', F('INDEX(Areas!$C:$C,MATCH($B$4,Areas!$B:$B,0))', 0) ],
     [ 'Within allowed spread?', F('IF(AND(D6>=INDEX(Monsters!$Q:$Q,MATCH($B$3,Monsters!$B:$B,0)),D6<=INDEX(Monsters!$R:$R,MATCH($B$3,Monsters!$B:$B,0))),"yes","no (outside spread)")', 0) ],
     [ 'Destination guard x', F('INDEX(Areas!$N:$N,MATCH($B$4,Areas!$B:$B,0))') ],
-    [ H('Stat', 'Own (home)', 'Home area avg', 'Destination avg', 'Factor', 'k used', 'Scaled (with guard)', 'Cap') ],
+    [ H('Stat', 'Own (home)', 'Home area avg', 'Destination avg', 'Own / home avg', 'Shape ^ s', 'Scaled (with guard)', 'Cap') ],
 );
 my @statcols = ( [ 'HP', 'E', 'G', $S{hpcap} ], [ 'ATK', 'F', 'H', $S{statcap} ], [ 'DEF', 'G', 'I', $S{statcap} ], [ 'AGI', 'H', 'J', $S{statcap} ], [ 'EXP', 'I', 'K', '99999' ] );
 my $er = 9;
 for my $sc (@statcols) {
     $er++;
     my ($label, $mcol, $acol, $cap) = @$sc;
-    my $k = $label eq 'EXP' ? '1' : $S{k};
     push @ex, [
         $label,
         F("INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))", 0),
         F("INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0))"),
         F("INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$4,Areas!\$B:\$B,0))"),
-        F("D$er/C$er"),
-        F($k),
-        F("MIN(H$er,ROUND(B$er*E$er^F$er*\$B\$8,0))", 0),
+        F("B$er/C$er"),
+        F("E$er^Settings!\$B\$26"),
+        F("MIN(H$er,ROUND(D$er*F$er*\$B\$8,0))", 0),
         F($cap, 0),
     ];
 }
@@ -413,8 +414,7 @@ for my $name (@area_order) {
     my @cells = ( $name, F("INDEX(Areas!\$C:\$C,MATCH(\$A$pr,Areas!\$B:\$B,0))", 0) );
     for my $sc (@statcols) {
         my ($label, $mcol, $acol, $cap) = @$sc;
-        my $k = $label eq 'EXP' ? '1' : $S{k};
-        push @cells, F("MIN($cap,ROUND(INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))*(INDEX(Areas!\$$acol:\$$acol,MATCH(\$A$pr,Areas!\$B:\$B,0))/INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0)))^$k*INDEX(Areas!\$N:\$N,MATCH(\$A$pr,Areas!\$B:\$B,0)),0))", 0);
+        push @cells, F("MIN($cap,ROUND(INDEX(Areas!\$$acol:\$$acol,MATCH(\$A$pr,Areas!\$B:\$B,0))*(INDEX(Monsters!\$$mcol:\$$mcol,MATCH(\$B\$3,Monsters!\$B:\$B,0))/INDEX(Areas!\$$acol:\$$acol,MATCH(\$B\$5,Areas!\$B:\$B,0)))^Settings!\$B\$26*INDEX(Areas!\$N:\$N,MATCH(\$A$pr,Areas!\$B:\$B,0)),0))", 0);
     }
     push @cells, F("IF(AND(B$pr>=INDEX(Monsters!\$Q:\$Q,MATCH(\$B\$3,Monsters!\$B:\$B,0)),B$pr<=INDEX(Monsters!\$R:\$R,MATCH(\$B\$3,Monsters!\$B:\$B,0))),\"yes\",\"no\")", 0);
     push @ex, \@cells;
@@ -526,8 +526,9 @@ for my $name (@area_order) {
 }
 $cpp .= "};\n\nconst std::vector<MonsterInfo> monsters = {\n";
 for my $m (@monsters) {
-    $cpp .= sprintf("    { \"%s\", %d, %s, %s },\n", $m->{name}, $area_index{ $m->{home} } // -1,
-        $m->{dangerous} eq 'Y' ? 'true' : 'false', $m->{flying} eq 'Y' ? 'true' : 'false');
+    $cpp .= sprintf("    { \"%s\", %d, %s, %s, { %d, %d, %d, %d, %d } },\n", $m->{name}, $area_index{ $m->{home} } // -1,
+        $m->{dangerous} eq 'Y' ? 'true' : 'false', $m->{flying} eq 'Y' ? 'true' : 'false',
+        @{$m}{qw(hp atk def agi exp)});
 }
 $cpp .= "};\n\n// Monster id (index into monsters) for each entry of each of the six files.\n" .
     "const std::vector<std::vector<int>> table_monsters = {\n";

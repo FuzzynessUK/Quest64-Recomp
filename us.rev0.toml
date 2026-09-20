@@ -381,13 +381,8 @@ text = "quest64_hardmode_lookat(rdram, ctx);"
 before_vram = 0x80035E28
 
 # Randomizer enemy progression (DOCS/enemyrandologic.xlsx): rescale the
-# monster table right after an area's monster file is loaded, and scale the
-# spell base of damage dealt to Brian.
+# monster table right after an area's monster file is loaded.
 [[patches.hook]]
 func = "func_80008EF4"
 text = "quest64_randomizer_enemy_scale_table(rdram, ctx);"
 before_vram = 0x80008F5C
-[[patches.hook]]
-func = "func_80006BEC"
-text = "quest64_randomizer_enemy_scale_damage(rdram, ctx);"
-before_vram = 0x80006BF8

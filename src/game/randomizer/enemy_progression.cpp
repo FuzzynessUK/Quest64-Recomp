@@ -7,14 +7,23 @@
 
 namespace data = merrow::progression;
 using zelda64::randomizer::Options;
-using zelda64::randomizer::progression::Factors;
 using zelda64::randomizer::progression::Plan;
+using zelda64::randomizer::progression::Slot;
 using zelda64::randomizer::progression::Stat;
 
 namespace {
     Plan active_plan;
 
     constexpr int tier_count = 8;
+
+    // Sheet: Settings B4-B5 and B26. Any set may serve any area; a monster's
+    // deviation from its home average is compressed by the shape exponent.
+    constexpr int spread_down = 7;
+    constexpr int spread_up = 7;
+    constexpr double shape_exponent = 0.5;
+
+    // Sheet: Settings B23-B24. EXP is a word in the game; capped generously.
+    constexpr int caps[5] = { 999, 255, 255, 255, 65535 };
 
     int area_count() {
         return static_cast<int>(data::areas.size());
@@ -31,11 +40,6 @@ namespace {
         return tiers;
     }
 
-    // Sheet: Settings B4-B6. Any set may serve any area; scaling is full.
-    constexpr int spread_down = 7;
-    constexpr int spread_up = 7;
-    constexpr double scaling_k = 1.0;
-
     // Sheet: Areas columns M-N. budget[i] = MAX(avg_power[i], budget[i-1]).
     std::vector<double> guards() {
         std::vector<double> out;
@@ -46,24 +50,32 @@ namespace {
         }
         return out;
     }
+
+    // Sheet rule 5 with the shape exponent, then rule 6's guard.
+    int32_t rescale(int home, int dest, int stat, int32_t own) {
+        static const std::vector<double> guard = guards();
+        const data::AreaInfo& h = data::areas[static_cast<size_t>(home)];
+        const data::AreaInfo& d = data::areas[static_cast<size_t>(dest)];
+        if (h.avg[stat] <= 0.0 || own <= 0) {
+            return own;
+        }
+        double shape = std::pow(static_cast<double>(own) / h.avg[stat], shape_exponent);
+        double value = std::nearbyint(d.avg[stat] * shape * guard[static_cast<size_t>(dest)]);
+        return static_cast<int32_t>(std::min<double>(std::max<double>(value, 1.0), caps[stat]));
+    }
 }
 
 std::vector<int> zelda64::randomizer::progression::candidate_tables(int area, const Options& options) {
+    (void)options;
     std::vector<int> out;
     const data::AreaInfo& here = data::areas[static_cast<size_t>(area)];
-    (void)options;
     int low = std::max(1, here.tier - spread_down);
     int high = std::min(tier_count, here.tier + spread_up);
 
     for (int table = 0; table < static_cast<int>(data::table_monsters.size()); table++) {
-        std::vector<int> tiers = file_tiers(table);
-        if (tiers.empty()) continue;
         bool in_window = false;
-        for (int id : data::table_monsters[static_cast<size_t>(table)]) {
-            if (id < 0) continue;
-            const data::MonsterInfo& m = data::monsters[static_cast<size_t>(id)];
-            int native = m.home_area >= 0 ? data::areas[static_cast<size_t>(m.home_area)].tier : here.tier;
-            if (native >= low && native <= high) in_window = true;
+        for (int tier : file_tiers(table)) {
+            if (tier >= low && tier <= high) in_window = true;
         }
         // No other gate: any set may serve any tier (the scaling fits it),
         // so the dangerous and flying flags in the data are informational.
@@ -76,14 +88,13 @@ std::vector<int> zelda64::randomizer::progression::candidate_tables(int area, co
 }
 
 Plan zelda64::randomizer::progression::make_plan(const std::vector<int>& table_per_area, const Options& options, std::string& spoiler) {
+    (void)options;
     Plan plan;
     plan.enabled = true;
-    (void)options;
-    double k = scaling_k;
     std::vector<double> guard = guards();
 
     char line[256];
-    std::snprintf(line, sizeof(line), "  Enemy Randomizer: any set in any area, stats and damage scaled to the area (k = %.1f).\n", k);
+    std::snprintf(line, sizeof(line), "  Enemy Randomizer: any set in any area, stats scaled to the area (shape %.1f). Vanilla -> scaled HP/ATK/DEF/AGI/EXP:\n", shape_exponent);
     spoiler += line;
 
     for (int a = 0; a < area_count(); a++) {
@@ -93,32 +104,25 @@ Plan zelda64::randomizer::progression::make_plan(const std::vector<int>& table_p
             plan.table_index[static_cast<size_t>(raw)] = table;
         }
 
-        std::vector<Factors>& factors = plan.by_map[static_cast<size_t>(here.map_id)];
-        factors.clear();
+        std::vector<Slot>& slots = plan.by_map[static_cast<size_t>(here.map_id)];
+        slots.clear();
         std::snprintf(line, sizeof(line), "  %s (tier %d, file %d, guard x%.2f):\n", here.name, here.tier, table, guard[static_cast<size_t>(a)]);
         spoiler += line;
 
         for (int id : data::table_monsters[static_cast<size_t>(table)]) {
-            Factors f;
+            Slot slot;
             if (id >= 0 && data::monsters[static_cast<size_t>(id)].home_area >= 0) {
-                const data::AreaInfo& home = data::areas[static_cast<size_t>(data::monsters[static_cast<size_t>(id)].home_area)];
-                // Sheet rule 5: (dest / home) ^ k per stat, EXP with k = 1,
-                // then rule 6's guard on everything.
-                auto ratio = [&](int i, double exponent) {
-                    double r = home.avg[i] > 0.0 ? here.avg[i] / home.avg[i] : 1.0;
-                    return std::pow(r, exponent) * guard[static_cast<size_t>(a)];
-                };
-                f.hp = ratio(0, k);
-                f.atk = ratio(1, k);
-                f.def = ratio(2, k);
-                f.agi = ratio(3, k);
-                f.exp = ratio(4, 1.0);
-                f.dmg = std::sqrt(f.hp * f.atk);
-                std::snprintf(line, sizeof(line), "    %-18s HP x%.2f ATK x%.2f DEF x%.2f AGI x%.2f EXP x%.2f DMG x%.2f\n",
-                    data::monsters[static_cast<size_t>(id)].name, f.hp, f.atk, f.def, f.agi, f.exp, f.dmg);
+                const data::MonsterInfo& m = data::monsters[static_cast<size_t>(id)];
+                slot.home = m.home_area;
+                slot.dest = a;
+                std::snprintf(line, sizeof(line), "    %-18s %d/%d/%d/%d/%d -> %d/%d/%d/%d/%d\n", m.name,
+                    m.stat[0], m.stat[1], m.stat[2], m.stat[3], m.stat[4],
+                    rescale(slot.home, a, 0, m.stat[0]), rescale(slot.home, a, 1, m.stat[1]),
+                    rescale(slot.home, a, 2, m.stat[2]), rescale(slot.home, a, 3, m.stat[3]),
+                    rescale(slot.home, a, 4, m.stat[4]));
                 spoiler += line;
             }
-            factors.push_back(f);
+            slots.push_back(slot);
         }
     }
     return plan;
@@ -132,22 +136,14 @@ bool zelda64::randomizer::progression::active() {
     return active_plan.enabled;
 }
 
-double zelda64::randomizer::progression::factor(int map_id, int entry, Stat stat) {
+int32_t zelda64::randomizer::progression::scaled_value(int map_id, int entry, Stat stat, int32_t own) {
     if (!active_plan.enabled || map_id < 0 || map_id >= static_cast<int>(active_plan.by_map.size())) {
-        return 1.0;
+        return own;
     }
-    const std::vector<Factors>& factors = active_plan.by_map[static_cast<size_t>(map_id)];
-    if (entry < 0 || entry >= static_cast<int>(factors.size())) {
-        return 1.0;
+    const std::vector<Slot>& slots = active_plan.by_map[static_cast<size_t>(map_id)];
+    if (entry < 0 || entry >= static_cast<int>(slots.size()) || slots[static_cast<size_t>(entry)].home < 0) {
+        return own;
     }
-    const Factors& f = factors[static_cast<size_t>(entry)];
-    switch (stat) {
-        case Stat::HP: return f.hp;
-        case Stat::ATK: return f.atk;
-        case Stat::DEF: return f.def;
-        case Stat::AGI: return f.agi;
-        case Stat::EXP: return f.exp;
-        case Stat::DMG: return f.dmg;
-    }
-    return 1.0;
+    const Slot& slot = slots[static_cast<size_t>(entry)];
+    return rescale(slot.home, slot.dest, static_cast<int>(stat), own);
 }

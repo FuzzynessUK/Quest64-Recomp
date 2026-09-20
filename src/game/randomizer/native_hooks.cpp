@@ -241,16 +241,17 @@ void quest64_randomizer_beigis_map_check(recomp_context* ctx) {
 
 }
 
-// --- Enemy progression: per-area stat scaling -------------------------------
+// --- Enemy Randomizer: per-area stat scaling ------------------------------
 // DOCS/enemyrandologic.xlsx rules 5-6. func_80008EF4 loads an area's monster
 // file (the area's table_index picks a row of the file table at 0x80054160:
 // rom start, rom end, then RAM pointers to the end of the loaded monster
 // table, its start, and a third block) with one synchronous dma_write to
-// 0x8020E6F0. Hooked right after that call, the table is rescaled in place
-// for the area being loaded, so battle set-up, Soul Searcher, and the exp
-// and stones awards all read the same numbers. Every area load re-reads the
-// file from the ROM, so nothing compounds. gCurrentMap already names the
-// destination at that point.
+// 0x8020E6F0 and keeps the row pointer at 0x8007D0BC. Hooked right after
+// that call, the table is rewritten in place for the area being loaded, so
+// battle set-up, Soul Searcher and the exp/stones awards all read the same
+// numbers, and spell damage follows because the game derives it from ATK.
+// Every area load re-reads the file from the ROM, so nothing compounds.
+// gCurrentMap already names the destination at that point.
 //
 // Entry layout (0x38 bytes): +2 index, +4/+6 HP (twice), +0xC AGI, +0xE DEF,
 // +0x10 EXP (word), +0x14 Stones (word), +0x2A ATK.
@@ -259,32 +260,11 @@ namespace {
     constexpr int32_t gCurrentMap = 0x80084EEC;
     constexpr int32_t gNextMap = 0x80084EE4;
     constexpr int32_t file_table = 0x80054160;
-    constexpr int32_t file_table_row = 0x8007D0BC;   // set by func_80008EF4 (0x8008_0000 - 0x2F44)
+    constexpr int32_t file_table_row = 0x8007D0BC;   // 0x8008_0000 - 0x2F44
     constexpr int entry_size = 0x38;
-
-    // Sheet: Settings B23-B24 (HP 999; ATK/DEF/AGI 255). EXP and Stones are
-    // words in the game, capped generously.
-    constexpr int hp_cap = 999;
-    constexpr int stat_cap = 255;
-    constexpr int reward_cap = 65535;
-
-    // The table most recently loaded, for the damage hook's monster test.
-    int32_t loaded_table_start = 0;
-    int32_t loaded_table_end = 0;
 
     bool progressing() {
         return randomizing() && progression::active();
-    }
-
-    int32_t scaled(int32_t value, double f, int cap) {
-        if (f == 1.0) return value;
-        double out = std::nearbyint(static_cast<double>(value) * f);
-        return static_cast<int32_t>(std::min<double>(std::max<double>(out, 1.0), cap));
-    }
-
-    bool is_monster_entry(gpr entry) {
-        int32_t e = static_cast<int32_t>(entry);
-        return loaded_table_start != 0 && e >= loaded_table_start && e < loaded_table_end;
     }
 }
 
@@ -299,57 +279,27 @@ void quest64_randomizer_enemy_scale_table(uint8_t* rdram, recomp_context* ctx) {
     int32_t end = MEM_W(0x8, row);
     int entries = (end - table) / entry_size;
     if (entries <= 0 || entries > 16) return;
-    loaded_table_start = table;
-    loaded_table_end = end;
 
     int map = MEM_W(0, gCurrentMap);
-    if (progression::factor(map, 0, progression::Stat::HP) == 1.0 &&
-        progression::factor(MEM_W(0, gNextMap), 0, progression::Stat::HP) != 1.0) {
+    // A map the plan has no slots for (the load-request slot is the fallback).
+    if (progression::scaled_value(map, 0, progression::Stat::HP, 100) == 100 &&
+        progression::scaled_value(MEM_W(0, gNextMap), 0, progression::Stat::HP, 100) != 100) {
         map = MEM_W(0, gNextMap);
     }
 
-    std::ofstream out(zelda64::get_app_folder_path() / "randomizer_hooks.txt", std::ios::app);
-    out << "enemy_table: map " << map << " table row " << (row - file_table) / 20 << " entries " << entries << "\n";
-
     for (int i = 0; i < entries; i++) {
         int32_t e = table + i * entry_size;
-        auto f = [&](progression::Stat s) { return progression::factor(map, i, s); };
-        int32_t hp = scaled(MEM_HU(0x4, e), f(progression::Stat::HP), hp_cap);
-        MEM_H(0x4, e) = static_cast<int16_t>(hp);
-        MEM_H(0x6, e) = static_cast<int16_t>(scaled(MEM_HU(0x6, e), f(progression::Stat::HP), hp_cap));
-        MEM_H(0xC, e) = static_cast<int16_t>(scaled(MEM_HU(0xC, e), f(progression::Stat::AGI), stat_cap));
-        MEM_H(0xE, e) = static_cast<int16_t>(scaled(MEM_HU(0xE, e), f(progression::Stat::DEF), stat_cap));
-        MEM_H(0x2A, e) = static_cast<int16_t>(scaled(MEM_HU(0x2A, e), f(progression::Stat::ATK), stat_cap));
-        MEM_W(0x10, e) = scaled(MEM_W(0x10, e), f(progression::Stat::EXP), reward_cap);
-        MEM_W(0x14, e) = scaled(MEM_W(0x14, e), f(progression::Stat::EXP), reward_cap);
-        out << "  entry " << i << ": HP " << hp << " ATK " << MEM_HU(0x2A, e) << " DEF " << MEM_HU(0xE, e)
-            << " AGI " << MEM_HU(0xC, e) << " EXP " << MEM_W(0x10, e) << "\n";
+        auto set_h = [&](int offset, progression::Stat stat) {
+            MEM_H(offset, e) = static_cast<int16_t>(progression::scaled_value(map, i, stat, MEM_HU(offset, e)));
+        };
+        set_h(0x4, progression::Stat::HP);
+        set_h(0x6, progression::Stat::HP);
+        set_h(0xC, progression::Stat::AGI);
+        set_h(0xE, progression::Stat::DEF);
+        set_h(0x2A, progression::Stat::ATK);
+        MEM_W(0x10, e) = progression::scaled_value(map, i, progression::Stat::EXP, MEM_W(0x10, e));
+        MEM_W(0x14, e) = progression::scaled_value(map, i, progression::Stat::EXP, MEM_W(0x14, e));
     }
-}
-
-// func_80006BEC(base, ?, attacker record) is the damage Brian takes: base *
-// attacker ATK / (ATK + Brian's DEF), then a random spread. The base is the
-// spell's own power, which is what actually carries an enemy's damage across
-// the game, so it is scaled here on entry (before 0x80006BF8, with s0 = base
-// and a2 = the attacker's record, whose +0x64 is its table entry only for
-// monsters). Brian's own attacks go through the monster-side formula
-// (func_8000ACC0) and never reach this function.
-void quest64_randomizer_enemy_scale_damage(uint8_t* rdram, recomp_context* ctx) {
-    if (!progressing()) return;
-    gpr record = ctx->r6;
-    int32_t entry = record ? MEM_W(0x64, record) : 0;
-    if (!is_monster_entry(entry)) return;
-    int index = MEM_HU(2, entry);
-    int map = MEM_W(0, gCurrentMap);
-    double f = progression::factor(map, index, progression::Stat::DMG);
-    if (f == 1.0) f = progression::factor(MEM_W(0, gNextMap), index, progression::Stat::DMG);
-    static int noted = 0;
-    if (noted < 20) {
-        noted++;
-        std::ofstream out(zelda64::get_app_folder_path() / "randomizer_hooks.txt", std::ios::app);
-        out << "player_damage: base " << static_cast<int32_t>(ctx->r16) << " entry " << index << " x" << f << "\n";
-    }
-    ctx->r16 = static_cast<gpr>(scaled(static_cast<int32_t>(ctx->r16), f, reward_cap));
 }
 
 }

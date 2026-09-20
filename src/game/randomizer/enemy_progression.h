@@ -8,58 +8,54 @@
 
 #include "randomizer.h"
 
-// Progression-aware enemy randomizer: the design in DOCS/enemyrandologic.xlsx.
+// The Enemy Randomizer: the design in DOCS/enemyrandologic.xlsx.
 //
 // Two halves. At boot, each area is given one of the game's six monster
-// files, chosen from those whose monsters sit within the tier spread of the
-// area (sheet: Settings B4/B5, Monsters Q-R). The files are the unit of
-// placement because every file loads to the same RAM base (the file table at
+// files; any file may serve any area. The files are the unit of placement
+// because every file loads to the same RAM base (the file table at
 // 0x80054160: rom start, rom end, three pointers into the loaded file), so
 // two files' monsters can never be in memory at once and a roster cannot mix
-// them. Then, when a battle starts, every monster's stats are multiplied on
-// the way into the battle struct by the area's factors (sheet rules 5-6):
+// them. Then, whenever an area's monster file is loaded, every entry of its
+// table is rewritten in place for that area (sheet rules 5-6):
 //
-//     stat * (AreaAvg(here, stat) / AreaAvg(home, stat)) ^ k * guard(here)
+//     new = AreaAvg(here, stat) * (own / AreaAvg(home, stat)) ^ s * guard(here)
 //
+// i.e. the monster is moved to the destination's average and keeps its own
+// deviation from its home average, compressed by the shape exponent s (0.5:
+// a monster three times its home average is 1.7 times the destination's).
 // guard(here) = budget / avg_power, budget = MAX(own avg power, previous
-// area's budget), so the numbers never fall as the story advances. EXP and
-// Stones use k = 1. Scaling at battle time rather than in the ROM is what
-// lets one file serve two areas of different tiers (as it does in vanilla).
+// area's budget), so the numbers never fall as the story advances. Spell
+// damage follows ATK inside the game (the base passed to the damage routine
+// already tracks the attacker's ATK), so nothing else needs scaling.
 namespace zelda64::randomizer::progression {
-    struct Factors {
-        double hp = 1.0;
-        double atk = 1.0;
-        double def = 1.0;
-        double agi = 1.0;
-        double exp = 1.0;
-        // Spell base damage: between the HP and ATK factors (base power grows
-        // faster than ATK through the game), sqrt(hp * atk).
-        double dmg = 1.0;
+    struct Slot {
+        int home = -1;   // index into progression data areas, -1 = leave alone
+        int dest = -1;
     };
 
     struct Plan {
         bool enabled = false;
         // The file each of the 27 raw areas (mapdata::areas order) uses.
         std::array<int, 27> table_index{};
-        // Per game map: factors for each entry of the file the area uses.
-        std::array<std::vector<Factors>, 36> by_map{};
+        // Per game map: home/destination areas for each entry of the file.
+        std::array<std::vector<Slot>, 36> by_map{};
     };
 
-    // Files an area may use under the options' spread (sheet rule 3). With the
-    // default spread of "any" that is every file. Never empty: with no
-    // candidate the area's vanilla file is returned.
+    // Files an area may use (all of them, with the sheet's default spread).
     std::vector<int> candidate_tables(int area, const Options& options);
 
-    // Builds the factors for the chosen files and appends the spoiler text.
+    // Builds the plan for the chosen files and appends the spoiler text.
     Plan make_plan(const std::vector<int>& table_per_area, const Options& options, std::string& spoiler);
 
     // What the game booted with, for the hooks.
     void set_active(const Plan& plan);
     bool active();
-    // Multiplier for one stat of the monster in table entry `entry` of the
-    // file the current map uses. 1.0 when nothing applies.
-    enum class Stat { HP, ATK, DEF, AGI, EXP, DMG };
-    double factor(int map_id, int entry, Stat stat);
+
+    enum class Stat { HP, ATK, DEF, AGI, EXP };
+    // The value a stat should have for the monster in table entry `entry` of
+    // the file the given map uses, from what the file holds (`own`). Returns
+    // `own` unchanged when the plan has nothing for that map or entry.
+    int32_t scaled_value(int map_id, int entry, Stat stat, int32_t own);
 }
 
 #endif

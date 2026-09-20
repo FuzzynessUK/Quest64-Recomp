@@ -27,6 +27,7 @@ namespace merrow::progression {
         int home_area;      // index into areas (first area it appears in)
         bool dangerous;     // sheet: Monsters column L
         bool flying;        // the ROM's flag (Monsters column K)
+        int stat[5];        // vanilla HP, ATK, DEF, AGI, EXP (for the spoiler log)
     };
 
     extern const std::vector<AreaInfo> areas;          // progression order
