@@ -15,8 +15,6 @@ namespace {
     Plan active_plan;
 
     constexpr int tier_count = 8;
-    // Sheet: Settings B7 (max fliers per area) and rule 7 (none in tier 1).
-    constexpr int max_fliers = 2;
 
     int area_count() {
         return static_cast<int>(data::areas.size());
@@ -63,20 +61,15 @@ std::vector<int> zelda64::randomizer::progression::candidate_tables(int area, co
         std::vector<int> tiers = file_tiers(table);
         if (tiers.empty()) continue;
         bool in_window = false;
-        bool pinned_out = false;
-        int fliers = 0;
         for (int id : data::table_monsters[static_cast<size_t>(table)]) {
             if (id < 0) continue;
             const data::MonsterInfo& m = data::monsters[static_cast<size_t>(id)];
             int native = m.home_area >= 0 ? data::areas[static_cast<size_t>(m.home_area)].tier : here.tier;
             if (native >= low && native <= high) in_window = true;
-            // Rule 3: a dangerous monster never goes below its native tier.
-            if (m.dangerous && here.tier < native) pinned_out = true;
-            if (m.flying) fliers++;
         }
-        // Rule 7: at most max_fliers per area and none in tier 1.
-        if (fliers > max_fliers || (here.tier == 1 && fliers > 0)) continue;
-        if (in_window && !pinned_out) out.push_back(table);
+        // No other gate: any set may serve any tier (the scaling fits it),
+        // so the dangerous and flying flags in the data are informational.
+        if (in_window) out.push_back(table);
     }
     if (out.empty()) {
         out.push_back(here.vanilla_table);

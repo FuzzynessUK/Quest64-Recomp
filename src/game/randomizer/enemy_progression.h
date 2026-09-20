@@ -42,8 +42,8 @@ namespace zelda64::randomizer::progression {
         std::array<std::vector<Factors>, 36> by_map{};
     };
 
-    // Files an area may use under the options' spread (sheet rule 3, plus the
-    // dangerous pin and the flier limits of rules 6-7). Never empty: with no
+    // Files an area may use under the options' spread (sheet rule 3). With the
+    // default spread of "any" that is every file. Never empty: with no
     // candidate the area's vanilla file is returned.
     std::vector<int> candidate_tables(int area, const Options& options);
 

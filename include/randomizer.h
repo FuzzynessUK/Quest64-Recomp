@@ -161,8 +161,8 @@ namespace zelda64::randomizer {
         // tier-aware, plus every monster scaled to the area it appears in
         // when a battle starts. Takes precedence over enemy_tables.
         bool enemy_progression = false;
-        int enemy_spread_down = 1;   // tiers below the area it may draw from
-        int enemy_spread_up = 1;     // tiers above
+        int enemy_spread_down = 7;   // tiers below the area it may draw from (7 = any)
+        int enemy_spread_up = 7;     // tiers above (7 = any)
         int enemy_scaling = 2;       // 0 off, 1 half (k = 0.5), 2 full (k = 1)
     };
 

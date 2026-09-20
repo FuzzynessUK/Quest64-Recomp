@@ -384,7 +384,7 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Enemy progression gives every area a tier (1-8, story order) and each area draws one of the game's six monster sets from within the tier spread of its own; then, as each battle starts, every monster's HP, ATK, DEF, AGI, EXP and Stones are scaled from its home area to the area it is in, and a guard keeps each area's budget at least the previous area's, so the game always gets harder as you go. Replaces "Shuffle enemy tables" when on; "Shuffle encounters" still works with it. Scaling Off keeps home stats (not recommended), Half meets halfway, Full fits the area. The spoiler log lists each area's set and multipliers.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Enemy progression gives every area a tier (1-8, story order). Any of the game's six monster sets can land in any area (narrow that with the tiers below/above settings if you want); then, as each battle starts, every monster's HP, ATK, DEF, AGI, EXP and Stones are scaled from its home area to the area it is in, and a guard keeps each area's budget at least the previous area's, so the game always gets harder as you go. Replaces "Shuffle enemy tables" when on; "Shuffle encounters" still works with it. Scaling Off keeps home stats (not recommended), Half meets halfway, Full fits the area. The spoiler log lists each area's set and multipliers.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
