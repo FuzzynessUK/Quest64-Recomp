@@ -37,15 +37,11 @@
                                 <div>Quality of Life</div>
                             </label>
                             <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Up to 5 turn Magic Barrier</div></div>
-                                        <select data-value="enh_magic_barrier_turns" id="enh_magic_barrier_turns_select">
+                                <div class="config-debug__option-controls">                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Exit from anywhere</div></div>
+                                        <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
                                             <option value="0">Off</option>
-                                            <option value="4">4</option>
-                                            <option value="5">5</option>
-                                            <option value="6">6</option>
-                                            <option value="8">8</option>
+                                            <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
@@ -59,21 +55,9 @@
                             </div>
                         </div>
                         <div class="config-debug-option">
-                            <label class="config-debug-option__label">                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Magic Barrier is written with the number of turns you pick, replacing the stock value of 1. Whether the game spends one of those turns on the cast itself is not known, so if 5 feels like 4, use 6. Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. Exit can also be bound to a button under Controls as "Exit Spell", and works without the spell or the MP.</div>
-                            </label>
-                        </div>
-                        <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>Exit from anywhere (Items Menu)</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. Exit from anywhere lets the control you bind to "Exit Spell" under Controls warp you to the start of the area without owning the spell or paying the MP; with it off the binding does nothing.</div>
                             </label>
-                            <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">
-                                    <div class="config-debug__select-label"><div>Returns you to the start of the current area</div></div>
-                                </div>
-                                <div class="config-debug__option-trigger">
-                                    <button class="button" onclick="enh_cast_exit">Exit</button>
-                                </div>
-                            </div>
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">

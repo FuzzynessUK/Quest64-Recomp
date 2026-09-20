@@ -33,12 +33,6 @@ namespace {
     // monster with HP first, and HP is stored twice in a row.
     constexpr int monster_count = 75;
 
-    // Magic Barrier is spell 27; its effect parameter sits at +0x3A of the
-    // 68-byte entry. Looked up by name so a change to the table cannot
-    // silently point this at a different spell.
-    constexpr int spell_entry_size = 68;
-    constexpr int magic_barrier_param = 0x3A;
-
     // Healing Lv2 potency, the one field that differs between the US and
     // Japanese spell tables.
     constexpr int healing_potency = 0x0C;
@@ -71,13 +65,6 @@ namespace {
                     std::stoul(data::monsterstatlocations[monster][0], nullptr, 16));
                 writes.push_back({ address, 1, false });
                 writes.push_back({ address + 2, 1, false });
-            }
-        }
-        if (options.magic_barrier_turns > 0) {
-            uint32_t entry = spell_entry_address("Magic Barrier");
-            if (entry != 0) {
-                writes.push_back({ entry + magic_barrier_param,
-                    static_cast<uint16_t>(std::clamp(options.magic_barrier_turns, 1, 99)), true });
             }
         }
         if (options.jp_healing) {
@@ -114,8 +101,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     };
     get("one_hit_ko", o.one_hit_ko);
     get("jp_healing", o.jp_healing);
-    get("magic_barrier_turns", o.magic_barrier_turns);
-    o.magic_barrier_turns = std::clamp(o.magic_barrier_turns, 0, 99);
+    get("exit_from_anywhere", o.exit_from_anywhere);
     return o;
 }
 
@@ -123,7 +109,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     nlohmann::json j;
     j["one_hit_ko"] = o.one_hit_ko;
     j["jp_healing"] = o.jp_healing;
-    j["magic_barrier_turns"] = o.magic_barrier_turns;
+    j["exit_from_anywhere"] = o.exit_from_anywhere;
     std::ofstream out(options_path());
     out << j.dump(4);
 }
@@ -182,6 +168,9 @@ void zelda64::enhancements::on_frame(uint8_t* rdram) {
 }
 
 void zelda64::enhancements::cast_exit() {
+    if (!active_options().exit_from_anywhere) {
+        return;
+    }
     // What the Exit spell does: drop the player back at the start of the area
     // they are in. Goes through the same queued warp the cheats menu uses, so
     // the game runs its own fade and spawn, and it waits for a safe moment.

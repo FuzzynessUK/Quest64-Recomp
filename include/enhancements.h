@@ -17,22 +17,17 @@ namespace zelda64::enhancements {
 
         // Quality of life.
         //
-        // Magic Barrier lasts longer, as it does in the Japanese release.
-        // Each status spell owns one byte of the per-effect parameter block
-        // at +0x34..+0x3F of its 68-byte entry; Magic Barrier's is +0x3A and
-        // ships as 1. Raising it is what lengthens the barrier. Note the JP
-        // ROM has the same byte, so its longer barrier comes from code: this
-        // reproduces the effect, not the exact mechanism.
-        // 0 leaves it alone; anything else is written straight into that byte.
-        // Whether the game spends one of those turns on the cast itself is
-        // not known, so the value is exposed rather than fixed at 5.
-        int magic_barrier_turns = 0;
 
         // Healing Lv2 restores what it does in the Japanese release. Its
         // potency halfword at entry +0x0C is 8 in the US ROM and 16 in the
         // Japanese one; this is the only byte that differs across the whole
         // 60-entry spell table, so it is an exact match rather than a guess.
         bool jp_healing = false;
+
+        // Lets the bound "Exit Spell" control warp out of an area without
+        // owning the spell or paying the MP. There is no menu button: the
+        // binding under Controls is how it is used.
+        bool exit_from_anywhere = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.

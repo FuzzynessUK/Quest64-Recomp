@@ -682,7 +682,7 @@ EnhancementsContext enhancements_context;
 std::string enhancements_status() {
     const zelda64::enhancements::Options& active = zelda64::enhancements::active_options();
     bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko ||
-        active.magic_barrier_turns != enhancements_context.edited.magic_barrier_turns ||
+        active.exit_from_anywhere != enhancements_context.edited.exit_from_anywhere ||
         active.jp_healing != enhancements_context.edited.jp_healing;
     return std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
         (pending ? ". Changed settings apply when the game is next launched." : ".");
@@ -710,10 +710,10 @@ void make_enhancements_bindings(Rml::Context* context) {
         }
     );
 
-    constructor.BindFunc("enh_magic_barrier_turns",
-        [](Rml::Variant& out) { out = enhancements_context.edited.magic_barrier_turns; },
+    constructor.BindFunc("enh_exit_from_anywhere",
+        [](Rml::Variant& out) { out = enhancements_context.edited.exit_from_anywhere ? 1 : 0; },
         [](const Rml::Variant& in) {
-            enhancements_context.edited.magic_barrier_turns = std::clamp(in.Get<int>(), 0, 99);
+            enhancements_context.edited.exit_from_anywhere = in.Get<int>() != 0;
             enhancements_option_changed();
         }
     );
@@ -1017,11 +1017,6 @@ public:
         recompui::register_event(listener, "do_map_warp",
             [](const std::string& param, Rml::Event& event) {
                 zelda64::do_map_warp(cheats_context.warp_map, cheats_context.warp_submap, cheats_context.warp_entrance);
-            });
-
-        recompui::register_event(listener, "enh_cast_exit",
-            [](const std::string& param, Rml::Event& event) {
-                zelda64::enhancements::cast_exit();
             });
 
         recompui::register_event(listener, "cheat_give_item",

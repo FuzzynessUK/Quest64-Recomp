@@ -359,13 +359,23 @@ Mapped from the 60 US entries:
 The values track spell level where a spell has two (Evade 1/2, Spirit Armor
 3/4), which is what makes this look like the effect's turn parameter.
 
-**Up to 5 turn Magic Barrier** writes 5 over Magic Barrier's slot at ROM
-**0xD4C1C6** (entry 0xD4C18C + 0x3A), which ships as 1. The address is looked
-up by spell name at runtime rather than hardcoded. Caveat: the JP ROM carries
-the *same* byte (verified), so JP's longer barrier comes from its battle code;
-this reproduces the effect, not the mechanism, and is untested in game. If it
-turns out +0x3A is strength rather than turns, only this one byte is involved.
+**The +0x3A theory was wrong.** Writing to Magic Barrier's slot was tested
+in game on 2026-09-20 and had no effect at all, so the option was removed
+rather than left as a dead control. The parameter block above is still a
+real structure, but +0x3A is not the barrier duration. Also ruled out:
++0x2F (3 on Fire Ball too) and +0x31 (3 on Power Staff and Homing Arrow),
+so neither is status-specific.
 
+The ROM patch mechanism itself is fine: `get_rom()` and
+`set_rom_contents()` share one buffer, so the randomizer's and the
+enhancements' passes compose correctly.
+
+Searches that came up empty for the barrier timer: no code reads a spell
+entry at +0x3A; no load/decrement/store of a byte or halfword field in the
+0x8002C000-0x80060000 battle range except the RLE counter in
+`func_800386D0`; and the near-identical US/JP battle functions differ only
+in relocated pointers and jal targets, not constants. The timer is
+reached through a computed offset, so it needs the runtime RAM search.
 
 #### JP Healing Amounts
 
@@ -375,24 +385,22 @@ the US and Japanese ROMs is **Healing Lv2's potency**, the halfword at entry
 toggle writes 16, so unlike the Magic Barrier option this is an exact match
 for JP rather than an approximation.
 
-#### Exit from anywhere (Items Menu)
+#### Exit from anywhere
 
-Button that warps to the start of the current area, the way the Exit spell
-does, without needing the spell or the MP. It reuses the queued map warp the
-cheats menu uses, so the game runs its own fade and spawn and the warp waits
-for the field to be idle. Two supporting changes:
+A Quality of Life toggle, with no menu button: it enables the bindable
+**"Exit Spell"** control under Controls, which warps to the start of the
+current area without owning the spell or paying the MP. `cast_exit()`
+returns immediately when the toggle is off, so an unbound or disabled
+setup does nothing. Two supporting changes:
 
-- `do_map_warp` gained a `from_cheats` flag. The cheats master switch now
-  only drops warps that came from the cheats tab, so an enhancement warp
-  still works with cheats off.
-- `gCurrentMap` (0x80084EEC) is cached into an atomic each frame, the same
-  way the stat readouts are, so the menu thread can read it without touching
-  RDRAM.
+- `do_map_warp` gained a `from_cheats` flag, so the cheats master switch
+  only drops warps that came from the cheats tab.
+- `gCurrentMap` (0x80084EEC) is cached into an atomic each frame, like the
+  stat readouts, so the menu thread never touches RDRAM.
 
-It warps to submap 0, entrance 0 of the current map. That is an assumption
+It targets submap 0, entrance 0 of the current map. That is an assumption
 about where an area starts, not something read from the game's own Exit
-handler, which was not located. If a dungeon turns out to start elsewhere,
-this needs a per-map destination rather than submap 0.
+handler, which was not located.
 
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
