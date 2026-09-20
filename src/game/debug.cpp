@@ -65,6 +65,11 @@ namespace {
     constexpr int32_t D_80085368 = 0x80085368; // s32 destination map
     constexpr int32_t D_8008536C = 0x8008536C; // s32 destination submap
     constexpr int32_t D_80085370 = 0x80085370; // s32 entrance index within the submap
+    // gBattleState, per Quest64Syms. Bit 0 is set while a battle is running:
+    // func_8001C5F4 checks exactly this before counting down to the next
+    // encounter, and skips when it is set.
+    constexpr int32_t gBattleState = 0x8008C592;
+    constexpr int32_t battle_running = 0x1;
 
     constexpr uint16_t game_mode_field = 1;
     // Any of these set means a transition or battle is already under way; the
@@ -117,7 +122,8 @@ static void apply_map_warp(uint8_t* rdram) {
     }
 
     bool ready = MEM_HU(0, gGameMode) == game_mode_field
-        && (MEM_W(0, gGameState) & game_state_busy) == 0;
+        && (MEM_W(0, gGameState) & game_state_busy) == 0
+        && (MEM_HU(0, gBattleState) & battle_running) == 0;
 
     MapWarp warp;
     {
