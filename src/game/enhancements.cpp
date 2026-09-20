@@ -201,13 +201,6 @@ void zelda64::enhancements::cast_exit() {
     if (!active_options().exit_from_anywhere) {
         return;
     }
-    // Refused outright in a battle, a menu or a transition. Without this the
-    // warp would sit in the queue and fire the moment the battle ended, which
-    // is worse than doing nothing: the press appears to be ignored and then
-    // takes effect much later.
-    if (!zelda64::in_field()) {
-        return;
-    }
     // What the Exit spell does: drop the player back at the start of the area
     // they are in. Goes through the same queued warp the cheats menu uses, so
     // the game runs its own fade and spawn, and it waits for a safe moment.
@@ -216,5 +209,8 @@ void zelda64::enhancements::cast_exit() {
     if (map < 0 || map >= zelda64::map_count()) {
         return;
     }
-    zelda64::do_map_warp(map, 0, 0, false);
+    // drop_if_busy: pressed in a battle, a menu or a transition this does
+    // nothing at all. Queuing it instead would fire the warp the moment the
+    // battle ended, which is worse than ignoring the press.
+    zelda64::do_map_warp(map, 0, 0, false, true);
 }
