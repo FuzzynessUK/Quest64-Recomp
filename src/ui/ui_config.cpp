@@ -776,6 +776,7 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_wingsmiths", &Options::wingsmiths);
     bind_randomizer_field(constructor, "rnd_shuffle_shannon", &Options::shuffle_shannon);
     bind_randomizer_field(constructor, "rnd_wingsmith_wings_only", &Options::wingsmith_wings_only);
+    bind_randomizer_field(constructor, "rnd_boss_rewards_shuffler", &Options::boss_rewards_shuffler);
     bind_randomizer_field(constructor, "rnd_monster_stats", &Options::monster_stats);
     bind_randomizer_field(constructor, "rnd_variance", &Options::variance);
     bind_randomizer_field(constructor, "rnd_monster_scale", &Options::monster_scale);

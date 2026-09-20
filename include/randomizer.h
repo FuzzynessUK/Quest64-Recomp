@@ -56,6 +56,11 @@ namespace zelda64::randomizer {
         // mode; Shuffle only moves items that were already in a list. Lost
         // Keys places wings deliberately and ignores this.
         bool wingsmith_wings_only = false;
+        // The four gems, the Eletale Book and the Dark Gaol Key. Off keeps
+        // them out of the random pool and leaves them in their vanilla
+        // places, so only ordinary items move. Lost Keys places them
+        // deliberately and ignores this.
+        bool boss_rewards_shuffler = true;
 
         // Monsters
         bool monster_stats = false;

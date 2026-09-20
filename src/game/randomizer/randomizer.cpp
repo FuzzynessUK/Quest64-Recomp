@@ -700,14 +700,45 @@ namespace {
         // out of the random pool everywhere except the wingsmith list itself,
         // so a wingsmith stays the only place they turn up. Shuffle mode is
         // unaffected: it only moves items that were already in the list.
+        static bool is_wing(int id) { return id >= 14 && id <= 19; }
+        // The four gems, the Eletale Book and the Dark Gaol Key.
+        static bool is_boss_reward(int id) { return id >= 20 && id <= 25; }
+
+        // What a Random roll may produce. Wings and boss rewards can each be
+        // held back so they only turn up where vanilla puts them.
         int roll_item(bool allow_wings) {
-            constexpr int first_wing = 14;
-            constexpr int wing_items = 6;
-            if (allow_wings || !options.wingsmith_wings_only) {
-                return rng.next(item_count);
+            std::vector<int> pool;
+            pool.reserve(item_count);
+            for (int id = 0; id < item_count; id++) {
+                if (is_wing(id) && !allow_wings && options.wingsmith_wings_only) {
+                    continue;
+                }
+                if (is_boss_reward(id) && !options.boss_rewards_shuffler) {
+                    continue;
+                }
+                pool.push_back(id);
             }
-            int id = rng.next(item_count - wing_items);
-            return id < first_wing ? id : id + wing_items;
+            if (pool.empty()) {
+                return 0;
+            }
+            return pool[static_cast<size_t>(rng.next(static_cast<int>(pool.size())))];
+        }
+
+        // Fisher-Yates over only the entries not pinned in place.
+        void shuffle_unpinned(std::vector<int>& list, const std::vector<bool>& pinned) {
+            std::vector<int> movable;
+            for (size_t i = 0; i < list.size(); i++) {
+                if (!pinned[i]) {
+                    movable.push_back(list[i]);
+                }
+            }
+            rng.shuffle(movable);
+            size_t next = 0;
+            for (size_t i = 0; i < list.size(); i++) {
+                if (!pinned[i]) {
+                    list[i] = movable[next++];
+                }
+            }
         }
 
         void roll_list(std::vector<int>& list, ListMode mode, bool allow_wings = false) {
@@ -750,18 +781,34 @@ namespace {
                 gifts[l] = data::itemgranters[l * 2 + 1];
             }
             if (options.gifts != ListMode::Off) {
-                if (options.gifts == ListMode::Random) {
-                    for (int& slot : gifts) {
-                        slot = roll_item(false);
+                // With the boss rewards held back, the gift slots that hold
+                // them in vanilla (8 and 9, the final Shannons, with the
+                // Eletale Book and Dark Gaol Key) keep them and sit out the
+                // shuffle; only the other slots move.
+                std::vector<bool> pinned(gifts.size(), false);
+                if (!options.boss_rewards_shuffler) {
+                    for (size_t l = 0; l < gifts.size(); l++) {
+                        int vanilla = data::itemgranters[l * 2 + 1];
+                        if (is_boss_reward(vanilla)) {
+                            pinned[l] = true;
+                            gifts[l] = vanilla;
+                        }
                     }
-                    if (!options.shuffle_shannon) {
+                }
+                if (options.gifts == ListMode::Random) {
+                    for (size_t l = 0; l < gifts.size(); l++) {
+                        if (!pinned[l]) {
+                            gifts[l] = roll_item(false);
+                        }
+                    }
+                    if (!options.shuffle_shannon && options.boss_rewards_shuffler) {
                         // Keep one book and one key in circulation.
                         gifts[8] = 24;
                         gifts[9] = 25;
                     }
                 }
-                rng.shuffle(gifts);
-                if (!options.shuffle_shannon) {
+                shuffle_unpinned(gifts, pinned);
+                if (!options.shuffle_shannon && options.boss_rewards_shuffler) {
                     // The final Shannons must never hold the book or key.
                     int newloc1 = 0;
                     int newloc2 = 0;
@@ -1831,6 +1878,7 @@ static nlohmann::json options_to_json(const Options& o) {
     j["wingsmiths"] = list_mode_name(o.wingsmiths);
     j["shuffle_shannon"] = o.shuffle_shannon;
     j["wingsmith_wings_only"] = o.wingsmith_wings_only;
+    j["boss_rewards_shuffler"] = o.boss_rewards_shuffler;
     j["monster_stats"] = o.monster_stats;
     j["variance"] = o.variance;
     j["monster_scale"] = o.monster_scale;
@@ -1924,6 +1972,7 @@ static Options options_from_json(const nlohmann::json& j) {
     list = "off"; get("wingsmiths", list); o.wingsmiths = list_mode_from_name(list);
     get("shuffle_shannon", o.shuffle_shannon);
     get("wingsmith_wings_only", o.wingsmith_wings_only);
+    get("boss_rewards_shuffler", o.boss_rewards_shuffler);
     get("monster_stats", o.monster_stats);
     get("variance", o.variance);
     get("monster_scale", o.monster_scale);
