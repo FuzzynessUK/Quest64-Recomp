@@ -25,18 +25,6 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Speedrun Timer</div></div>
-                                        <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">Top left</option>
-                                            <option value="5">Top middle</option>
-                                            <option value="2">Top right</option>
-                                            <option value="3">Bottom left</option>
-                                            <option value="6">Bottom middle</option>
-                                            <option value="4">Bottom right</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label"><div>JP Magic barrier (+2 Turns)</div></div>
                                         <select data-value="enh_longer_magic_barrier" id="enh_longer_magic_barrier_select">
                                             <option value="0">Off</option>
@@ -48,6 +36,18 @@
                                         <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Speedrun Timer</div></div>
+                                        <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Top left</option>
+                                            <option value="5">Top middle</option>
+                                            <option value="2">Top right</option>
+                                            <option value="3">Bottom left</option>
+                                            <option value="6">Bottom middle</option>
+                                            <option value="4">Bottom right</option>
                                         </select>
                                     </div>
                                 </div>
@@ -104,7 +104,7 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">N64 Mode renders the way the console did: native resolution, 4:3 and no antialiasing. It changes the graphics settings directly and takes effect straight away; switching it off restores whatever you had before. One Hit KO means everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">One Hit KO means everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
