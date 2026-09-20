@@ -4,6 +4,7 @@
 #include "recomp_input.h"
 #include "ultramodern/ultramodern.hpp"
 #include "zelda_game.h"
+#include "enhancements.h"
 
 // Arrays that hold the mappings for every input for keyboard and controller respectively.
 using input_mapping = std::array<recomp::InputField, recomp::bindings_per_input>;
@@ -96,6 +97,19 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
             zelda64::restart_application();
         }
         reset_was_held = reset_held;
+    }
+
+    // Exit works from anywhere, with or without the spell, so it is checked
+    // here rather than gated on the menu being open.
+    {
+        constexpr size_t exit_index = static_cast<size_t>(GameInput::EXIT_SPELL);
+        static bool exit_was_held = false;
+        bool exit_held = recomp::get_input_digital(keyboard_input_mappings[exit_index])
+                      || recomp::get_input_digital(controller_input_mappings[exit_index]);
+        if (exit_held && !exit_was_held) {
+            zelda64::enhancements::cast_exit();
+        }
+        exit_was_held = exit_held;
     }
 
     if (!recomp::game_input_disabled()) {

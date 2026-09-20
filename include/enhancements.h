@@ -23,9 +23,10 @@ namespace zelda64::enhancements {
         // ships as 1. Raising it is what lengthens the barrier. Note the JP
         // ROM has the same byte, so its longer barrier comes from code: this
         // reproduces the effect, not the exact mechanism.
-        bool long_magic_barrier = false;
-        // Turns written into that byte when the option is on.
-        int magic_barrier_turns = 5;
+        // 0 leaves it alone; anything else is written straight into that byte.
+        // Whether the game spends one of those turns on the cast itself is
+        // not known, so the value is exposed rather than fixed at 5.
+        int magic_barrier_turns = 0;
 
         // Healing Lv2 restores what it does in the Japanese release. Its
         // potency halfword at entry +0x0C is 8 in the US ROM and 16 in the

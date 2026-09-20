@@ -682,7 +682,7 @@ EnhancementsContext enhancements_context;
 std::string enhancements_status() {
     const zelda64::enhancements::Options& active = zelda64::enhancements::active_options();
     bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko ||
-        active.long_magic_barrier != enhancements_context.edited.long_magic_barrier ||
+        active.magic_barrier_turns != enhancements_context.edited.magic_barrier_turns ||
         active.jp_healing != enhancements_context.edited.jp_healing;
     return std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
         (pending ? ". Changed settings apply when the game is next launched." : ".");
@@ -710,10 +710,10 @@ void make_enhancements_bindings(Rml::Context* context) {
         }
     );
 
-    constructor.BindFunc("enh_long_magic_barrier",
-        [](Rml::Variant& out) { out = enhancements_context.edited.long_magic_barrier ? 1 : 0; },
+    constructor.BindFunc("enh_magic_barrier_turns",
+        [](Rml::Variant& out) { out = enhancements_context.edited.magic_barrier_turns; },
         [](const Rml::Variant& in) {
-            enhancements_context.edited.long_magic_barrier = in.Get<int>() != 0;
+            enhancements_context.edited.magic_barrier_turns = std::clamp(in.Get<int>(), 0, 99);
             enhancements_option_changed();
         }
     );
@@ -775,6 +775,7 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_gifts", &Options::gifts);
     bind_randomizer_field(constructor, "rnd_wingsmiths", &Options::wingsmiths);
     bind_randomizer_field(constructor, "rnd_shuffle_shannon", &Options::shuffle_shannon);
+    bind_randomizer_field(constructor, "rnd_wingsmith_wings_only", &Options::wingsmith_wings_only);
     bind_randomizer_field(constructor, "rnd_monster_stats", &Options::monster_stats);
     bind_randomizer_field(constructor, "rnd_variance", &Options::variance);
     bind_randomizer_field(constructor, "rnd_monster_scale", &Options::monster_scale);

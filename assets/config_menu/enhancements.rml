@@ -40,9 +40,12 @@
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label"><div>Up to 5 turn Magic Barrier</div></div>
-                                        <select data-value="enh_long_magic_barrier" id="enh_long_magic_barrier_select">
+                                        <select data-value="enh_magic_barrier_turns" id="enh_magic_barrier_turns_select">
                                             <option value="0">Off</option>
-                                            <option value="1">On</option>
+                                            <option value="4">4</option>
+                                            <option value="5">5</option>
+                                            <option value="6">6</option>
+                                            <option value="8">8</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
@@ -56,7 +59,7 @@
                             </div>
                         </div>
                         <div class="config-debug-option">
-                            <label class="config-debug-option__label">                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Magic Barrier holds for up to 5 turns instead of 1, and Healing Lv2 restores 16 instead of 8, matching the Japanese release. The healing value is an exact match, taken from the only byte that differs across the whole spell table between the two ROMs. Exit works even without the spell or the MP, and takes effect on the next frame the game is in the field.</div>
+                            <label class="config-debug-option__label">                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Magic Barrier is written with the number of turns you pick, replacing the stock value of 1. Whether the game spends one of those turns on the cast itself is not known, so if 5 feels like 4, use 6. Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. Exit can also be bound to a button under Controls as "Exit Spell", and works without the spell or the MP.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">

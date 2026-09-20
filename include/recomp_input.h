@@ -43,7 +43,8 @@ namespace recomp {
         DEFINE_INPUT(TOGGLE_MENU, 0, "Toggle Menu") \
         DEFINE_INPUT(ACCEPT_MENU, 0, "Accept (Menu)") \
         DEFINE_INPUT(APPLY_MENU, 0, "Apply (Menu)") \
-        DEFINE_INPUT(RESET_GAME, 0, "Reset Game")
+        DEFINE_INPUT(RESET_GAME, 0, "Reset Game") \
+        DEFINE_INPUT(EXIT_SPELL, 0, "Exit Spell")
 
     #define DEFINE_ALL_INPUTS() \
         DEFINE_N64_BUTTON_INPUTS() \

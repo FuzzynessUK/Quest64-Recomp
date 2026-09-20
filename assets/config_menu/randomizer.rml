@@ -230,6 +230,13 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Wings from wingsmiths only</div></div>
+                                        <select data-value="rnd_wingsmith_wings_only" id="rnd_wingsmith_wings_only_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>

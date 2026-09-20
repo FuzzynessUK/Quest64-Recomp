@@ -138,8 +138,9 @@ static void apply_map_warp(uint8_t* rdram) {
 //
 // gPlayerMainData (0x8007BA80) is the live PlayerMainStats block laid out in
 // patches/main.c; the status screen (func_80026F34, func_80029448) reads these
-// fields straight from it. The element bytes are drawn top/left/bottom/right on
-// the spirit diamond, which is Fire, Earth, Wind, Water.
+// fields straight from it. The element bytes run Fire, Earth, Water, Wind in
+// memory: +0x26 is Water and +0x27 is Wind. Having those two the wrong way
+// round had the Wind and Water sliders editing each other.
 namespace {
     constexpr int32_t gPlayerMainData = 0x8007BA80;
 
@@ -159,8 +160,8 @@ namespace {
         { gPlayerMainData + 0x0E, false }, // Defense
         { gPlayerMainData + 0x24, true },  // Fire
         { gPlayerMainData + 0x25, true },  // Earth
-        { gPlayerMainData + 0x26, true },  // Wind
-        { gPlayerMainData + 0x27, true },  // Water
+        { gPlayerMainData + 0x27, true },  // Wind
+        { gPlayerMainData + 0x26, true },  // Water
     };
 
     constexpr int32_t no_pending_stat = -1;

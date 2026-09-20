@@ -51,6 +51,11 @@ namespace zelda64::randomizer {
         ListMode gifts = ListMode::Off;
         ListMode wingsmiths = ListMode::Off;
         bool shuffle_shannon = false;
+        // Keep wings (item ids 14-19) out of the random item pool, so the
+        // only place they appear is a wingsmith. Affects the Random list
+        // mode; Shuffle only moves items that were already in a list. Lost
+        // Keys places wings deliberately and ignores this.
+        bool wingsmith_wings_only = false;
 
         // Monsters
         bool monster_stats = false;

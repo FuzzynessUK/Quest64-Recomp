@@ -696,10 +696,24 @@ namespace {
 
         // Fill a location list either with its vanilla items or with rolls
         // from the whole item pool, then shuffle it.
-        void roll_list(std::vector<int>& list, ListMode mode) {
+        // Wings are item ids 14-19. With wingsmith_wings_only on they are cut
+        // out of the random pool everywhere except the wingsmith list itself,
+        // so a wingsmith stays the only place they turn up. Shuffle mode is
+        // unaffected: it only moves items that were already in the list.
+        int roll_item(bool allow_wings) {
+            constexpr int first_wing = 14;
+            constexpr int wing_items = 6;
+            if (allow_wings || !options.wingsmith_wings_only) {
+                return rng.next(item_count);
+            }
+            int id = rng.next(item_count - wing_items);
+            return id < first_wing ? id : id + wing_items;
+        }
+
+        void roll_list(std::vector<int>& list, ListMode mode, bool allow_wings = false) {
             if (mode == ListMode::Random) {
                 for (int& slot : list) {
-                    slot = rng.next(item_count);
+                    slot = roll_item(allow_wings);
                 }
             }
             rng.shuffle(list);
@@ -738,7 +752,7 @@ namespace {
             if (options.gifts != ListMode::Off) {
                 if (options.gifts == ListMode::Random) {
                     for (int& slot : gifts) {
-                        slot = rng.next(item_count);
+                        slot = roll_item(false);
                     }
                     if (!options.shuffle_shannon) {
                         // Keep one book and one key in circulation.
@@ -769,7 +783,7 @@ namespace {
                 wings[l] = data::itemgranters[20 + (l * 2 + 1)];
             }
             if (options.wingsmiths != ListMode::Off) {
-                roll_list(wings, options.wingsmiths);
+                roll_list(wings, options.wingsmiths, true);
             }
 
             place_lost_keys();
@@ -1816,6 +1830,7 @@ static nlohmann::json options_to_json(const Options& o) {
     j["gifts"] = list_mode_name(o.gifts);
     j["wingsmiths"] = list_mode_name(o.wingsmiths);
     j["shuffle_shannon"] = o.shuffle_shannon;
+    j["wingsmith_wings_only"] = o.wingsmith_wings_only;
     j["monster_stats"] = o.monster_stats;
     j["variance"] = o.variance;
     j["monster_scale"] = o.monster_scale;
@@ -1908,6 +1923,7 @@ static Options options_from_json(const nlohmann::json& j) {
     list = "off"; get("gifts", list); o.gifts = list_mode_from_name(list);
     list = "off"; get("wingsmiths", list); o.wingsmiths = list_mode_from_name(list);
     get("shuffle_shannon", o.shuffle_shannon);
+    get("wingsmith_wings_only", o.wingsmith_wings_only);
     get("monster_stats", o.monster_stats);
     get("variance", o.variance);
     get("monster_scale", o.monster_scale);

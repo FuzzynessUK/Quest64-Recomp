@@ -73,13 +73,11 @@ namespace {
                 writes.push_back({ address + 2, 1, false });
             }
         }
-        if (options.long_magic_barrier) {
+        if (options.magic_barrier_turns > 0) {
             uint32_t entry = spell_entry_address("Magic Barrier");
-            uint32_t address = entry ? entry + magic_barrier_param : 0;
-            if (address != 0) {
-                // One byte, so only the low half of the halfword write is used;
-                // write it as a byte value in the high position of its own pair.
-                writes.push_back({ address, static_cast<uint16_t>(std::clamp(options.magic_barrier_turns, 1, 255)), true });
+            if (entry != 0) {
+                writes.push_back({ entry + magic_barrier_param,
+                    static_cast<uint16_t>(std::clamp(options.magic_barrier_turns, 1, 99)), true });
             }
         }
         if (options.jp_healing) {
@@ -115,17 +113,15 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
         }
     };
     get("one_hit_ko", o.one_hit_ko);
-    get("long_magic_barrier", o.long_magic_barrier);
     get("jp_healing", o.jp_healing);
     get("magic_barrier_turns", o.magic_barrier_turns);
-    o.magic_barrier_turns = std::clamp(o.magic_barrier_turns, 1, 255);
+    o.magic_barrier_turns = std::clamp(o.magic_barrier_turns, 0, 99);
     return o;
 }
 
 void zelda64::enhancements::save_options(const Options& o) {
     nlohmann::json j;
     j["one_hit_ko"] = o.one_hit_ko;
-    j["long_magic_barrier"] = o.long_magic_barrier;
     j["jp_healing"] = o.jp_healing;
     j["magic_barrier_turns"] = o.magic_barrier_turns;
     std::ofstream out(options_path());
