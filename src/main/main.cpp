@@ -35,6 +35,7 @@
 #include "zelda_support.h"
 #include "zelda_game.h"
 #include "enhancements.h"
+#include "hardmode.h"
 #include "randomizer.h"
 #include "recomp_data.h"
 #include "ovl_patches.hpp"
@@ -350,9 +351,14 @@ extern "C" void recomp_entrypoint(uint8_t * rdram, recomp_context * ctx);
 gpr get_entrypoint_address();
 
 // Runs once the stored ROM is loaded and the boot segment copied, before
-// mods; the randomizer patches the ROM in memory here.
+// mods; the boot-time ROM patches are applied here. Hard Mode goes first
+// and, when it is on, replaces the randomizer: both rewrite the same monster,
+// spell and spirit tables, and the randomizer would undo the hack's.
 void quest64_on_init(uint8_t* rdram, recomp_context* ctx) {
-    zelda64::randomizer::apply_at_boot(rdram);
+    zelda64::hardmode::apply_at_boot(rdram);
+    if (!zelda64::hardmode::active()) {
+        zelda64::randomizer::apply_at_boot(rdram);
+    }
     zelda64::enhancements::apply_at_boot(rdram);
 }
 

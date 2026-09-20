@@ -10,6 +10,7 @@
 #include "zelda_game.h"
 #include "randomizer.h"
 #include "enhancements.h"
+#include "hardmode.h"
 #include "speedrun.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
@@ -684,9 +685,14 @@ std::string enhancements_status() {
     const zelda64::enhancements::Options& active = zelda64::enhancements::active_options();
     bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko ||
         active.exit_from_anywhere != enhancements_context.edited.exit_from_anywhere ||
-        active.jp_healing != enhancements_context.edited.jp_healing;
-    return std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
-        (pending ? ". Changed settings apply when the game is next launched." : ".");
+        active.jp_healing != enhancements_context.edited.jp_healing ||
+        active.hard_mode != enhancements_context.edited.hard_mode;
+    std::string status = std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
+        ", Hard Mode " + (zelda64::hardmode::active() ? "on" : "off");
+    if (active.hard_mode != enhancements_context.edited.hard_mode) {
+        status += ". Hard Mode changes on the next launch: use Reset on the General tab to restart now";
+    }
+    return status + (pending ? ". Changed settings apply when the game is next launched." : ".");
 }
 
 void enhancements_option_changed() {
@@ -796,6 +802,14 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    constructor.BindFunc("enh_hard_mode",
+        [](Rml::Variant& out) { out = enhancements_context.edited.hard_mode ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.hard_mode = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_hard_mode_version", [](Rml::Variant& out) { out = zelda64::hardmode::patch_version(); });
 
     enhancements_context.model_handle = constructor.GetModelHandle();
 }

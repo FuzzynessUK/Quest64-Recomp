@@ -87,6 +87,34 @@ file(GLOB FUNC_CXX_SOURCES ${CMAKE_SOURCE_DIR}/RecompiledFuncs/*.cpp)
 
 target_sources(RecompiledFuncs PRIVATE ${FUNC_C_SOURCES} ${FUNC_CXX_SOURCES})
 
+# HardModeFuncs - The Hard Mode hack's code payload, recompiled by N64Recomp out
+# of the patched ROM (tools/hardmode/recompile_payload.pl). Checked in, so the
+# build needs neither the ROM nor the tool.
+add_library(HardModeFuncs STATIC)
+
+target_compile_options(HardModeFuncs PRIVATE
+    -fno-strict-aliasing
+    -Wno-unused-variable
+    -Wno-implicit-function-declaration
+)
+
+target_include_directories(HardModeFuncs PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/game/hardmode/recompiled
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/ultramodern/include
+    ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/librecomp/include
+    ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/N64Recomp/include
+)
+
+target_sources(HardModeFuncs PRIVATE ${CMAKE_SOURCE_DIR}/src/game/hardmode/recompiled/payload.c)
+
+# The Hard Mode patch itself, embedded so it can be applied to the ROM at boot.
+file(GLOB HARDMODE_RUP ${CMAKE_SOURCE_DIR}/tools/hardmode/Quest64.HM.*.rup)
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/hardmode_rup.c ${CMAKE_BINARY_DIR}/hardmode_rup.h
+    COMMAND file_to_c ${HARDMODE_RUP} hardmode_rup ${CMAKE_BINARY_DIR}/hardmode_rup.c ${CMAKE_BINARY_DIR}/hardmode_rup.h
+    DEPENDS ${HARDMODE_RUP}
+)
+
 # PatchesLib - Library containing the recompiled output for any custom function patches
 add_library(PatchesLib STATIC)
 
@@ -166,6 +194,9 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/native_hooks.cpp
     ${CMAKE_SOURCE_DIR}/src/game/enhancements.cpp
     ${CMAKE_SOURCE_DIR}/src/game/speedrun.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/hardmode/hardmode.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/hardmode/hooks.cpp
+    ${CMAKE_BINARY_DIR}/hardmode_rup.c
     ${CMAKE_SOURCE_DIR}/src/game/debug.cpp
     ${CMAKE_SOURCE_DIR}/src/game/quicksaving.cpp
     ${CMAKE_SOURCE_DIR}/src/game/recomp_api.cpp
@@ -218,6 +249,7 @@ endif()
 target_include_directories(Quest64Recompiled PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src/game/randomizer
+    ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/N64Recomp/include
     ${CMAKE_SOURCE_DIR}/lib/concurrentqueue
     ${CMAKE_SOURCE_DIR}/lib/GamepadMotionHelpers
@@ -361,6 +393,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif()
 
 target_link_libraries(Quest64Recompiled PRIVATE
+    HardModeFuncs
     PatchesLib
     RecompiledFuncs
     librecomp

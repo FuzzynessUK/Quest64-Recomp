@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <fstream>
 
+#include "hardmode.h"
 #include "randomizer.h"
 #include "recomp.h"
 #include "zelda_config.h"
@@ -33,8 +34,10 @@ using zelda64::randomizer::native_state;
 using zelda64::randomizer::Options;
 
 namespace {
+    // Hard Mode replaces the randomizer outright (see quest64_on_init), so
+    // these hooks stand down with it on even if the randomizer is enabled.
     bool randomizing() {
-        return active_options().mode == Mode::Randomizer;
+        return active_options().mode == Mode::Randomizer && !zelda64::hardmode::active();
     }
 }
 

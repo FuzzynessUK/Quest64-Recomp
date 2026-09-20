@@ -119,6 +119,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("jp_healing", o.jp_healing);
     get("exit_from_anywhere", o.exit_from_anywhere);
     get("longer_magic_barrier", o.longer_magic_barrier);
+    get("hard_mode", o.hard_mode);
     return o;
 }
 
@@ -135,6 +136,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["jp_healing"] = o.jp_healing;
     j["exit_from_anywhere"] = o.exit_from_anywhere;
     j["longer_magic_barrier"] = o.longer_magic_barrier;
+    j["hard_mode"] = o.hard_mode;
     std::ofstream out(options_path());
     out << j.dump(4);
 }

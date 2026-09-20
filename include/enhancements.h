@@ -50,6 +50,15 @@ namespace zelda64::enhancements {
         // fresh cast is the only time the counter goes up, and that is when
         // the two extra turns are added.
         bool longer_magic_barrier = false;
+
+        // Hacks.
+        //
+
+        // Landmine36's Quest 64 Hard Mode, applied at boot from the embedded
+        // .rup patch: its data goes into the ROM, its code payload into RAM at
+        // 0x80400000, and src/game/hardmode/ supplies the hooks the hack's
+        // code patches would otherwise have made. Uses its own save folder.
+        bool hard_mode = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.

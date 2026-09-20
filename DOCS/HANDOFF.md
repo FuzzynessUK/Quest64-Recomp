@@ -481,6 +481,38 @@ This is a project decision, not an oversight, so a future pass should not treat
 these as missing features. Everything else in "Randomizer work still open"
 below is still fair game.
 
+### Hard Mode (Landmine36's hack) — DONE 2026-09-20
+
+Enhancements tab, "Hacks" group. Applied at boot from the embedded `.rup`
+(`tools/hardmode/Quest64.HM.0.9.8.3A.rup`); restart to change. Uses its own
+save folder (`saves/hardmode/`) and overrides the randomizer while on.
+`include/hardmode.h` has the design summary; the short version:
+
+- The hack = ~60 KB of data records + ~60 code-segment patch sites (40 are
+  `j` into new code) + a 118 KB payload at ROM 0x1000000 → RAM 0x80400000
+  (64 KB text, then asm shims, C code and tables). Needs the Expansion Pak
+  on console; the recomp has 8 MB anyway.
+- `src/game/hardmode/hardmode.cpp` parses the .rup, patches the ROM in
+  memory (mirroring boot-segment writes into RAM, as the randomizer does) and
+  copies the payload to RDRAM.
+- `src/game/hardmode/recompiled/payload.c` is the payload's C code,
+  recompiled by N64Recomp out of the patched ROM with a hand-built symbols
+  section (`tools/hardmode/recompile_payload.pl`; function extents in
+  `payload_funcs.txt` came from control-flow reachability over the
+  disassembly). Two `teq` instructions are nop'd by instruction patches.
+- `src/game/hardmode/hooks.cpp` reproduces every code-segment patch site
+  as a native hook (all in `us.rev0.toml`, gated on `hardmode::active()`).
+  Function-entry `j`s call the recompiled function and `return;` out of the
+  generated body; the asm shims are re-done on the register context.
+- Facts learned: the payload's `0x80410658` check is a **night** test on
+  `gCurrentTime` (0x800859D0): outside 0x1600..0x5400 monsters get x1.5
+  stats and x2 exp/stones. Save-flag bytes at 0x800869F0..F8 carry the
+  hack's special items (exp doublers), second-quest boss flags and the
+  encounter-rate flag. A hook cannot sit on a delay slot (N64Recomp emits it
+  inside the call), hence the death-jingle hook at `UpdateBGM`'s entry.
+- Not verified in-game yet: the night multipliers, level-up screen digits,
+  boss rematch flag redirection, the Mammon message swap.
+
 ## Randomizer work still open
 
 - **Combat EXP display** (Merrow's numerical EXP readout) is the one Stage 2

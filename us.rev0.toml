@@ -60,19 +60,19 @@ before_vram = 0x80000B08
 # the register the previous lui set; this replaces that value).
 [[patches.hook]]
 func = "func_8001C5F4"
-text = "quest64_randomizer_encounter_step(ctx);"
+text = "quest64_randomizer_encounter_step(ctx); quest64_hardmode_encounter_step(rdram, ctx);"
 before_vram = 0x8001C654
 # Same function: override the roll/max just before get_rand(max) is called
 # and the roll-adjusted counter is stored.
 [[patches.hook]]
 func = "func_8001C5F4"
-text = "quest64_randomizer_encounter_roll_max(ctx);"
+text = "quest64_randomizer_encounter_roll_max(ctx); quest64_hardmode_encounter_roll(rdram, ctx);"
 before_vram = 0x8001C690
 
 # Walking MP regen amount, before the store that commits it.
 [[patches.hook]]
 func = "func_80002F60"
-text = "quest64_randomizer_walk_mp_regain(ctx);"
+text = "quest64_randomizer_walk_mp_regain(ctx); quest64_hardmode_walk_mp_regain(rdram, ctx);"
 before_vram = 0x8000385C
 # MP regained per staff hit, before the store that commits it.
 [[patches.hook]]
@@ -97,41 +97,41 @@ text = "quest64_randomizer_element_all_maxed(ctx);"
 before_vram = 0x80007964
 [[patches.hook]]
 func = "func_80002F60"
-text = "quest64_randomizer_element_spirit_grab(ctx);"
+text = "quest64_randomizer_element_spirit_grab(ctx); quest64_hardmode_spirit_cap(rdram, ctx);"
 before_vram = 0x800032D8
 # The four per-element gates, all the same shape.
 [[patches.hook]]
 func = "func_8001F3DC"
-text = "quest64_randomizer_element_cap(ctx);"
+text = "quest64_randomizer_element_cap(ctx); quest64_hardmode_element_cap(rdram, ctx);"
 before_vram = 0x8001F700
 [[patches.hook]]
 func = "func_8001F3DC"
-text = "quest64_randomizer_element_cap(ctx);"
+text = "quest64_randomizer_element_cap(ctx); quest64_hardmode_element_cap(rdram, ctx);"
 before_vram = 0x8001F740
 [[patches.hook]]
 func = "func_8001F3DC"
-text = "quest64_randomizer_element_cap(ctx);"
+text = "quest64_randomizer_element_cap(ctx); quest64_hardmode_element_cap(rdram, ctx);"
 before_vram = 0x8001F780
 [[patches.hook]]
 func = "func_8001F3DC"
-text = "quest64_randomizer_element_cap(ctx);"
+text = "quest64_randomizer_element_cap(ctx); quest64_hardmode_element_cap(rdram, ctx);"
 before_vram = 0x8001F7C8
 
 # Enemy drop limit: skip the write that marks a drop slot used up.
 [[patches.hook]]
 func = "func_80002F60"
-text = "quest64_randomizer_drop_limit(ctx);"
+text = "quest64_randomizer_drop_limit(ctx); quest64_hardmode_drop_lock(rdram, ctx);"
 before_vram = 0x800036B0
 
 # Wings indoors / on the Isle of Skye, both in the "may wings be used here"
 # check, before each branch that would disable them.
 [[patches.hook]]
 func = "func_800222B4"
-text = "quest64_randomizer_wings_indoors(ctx);"
+text = "quest64_randomizer_wings_indoors(ctx); quest64_hardmode_wings_indoors(rdram, ctx);"
 before_vram = 0x800222CC
 [[patches.hook]]
 func = "func_800222B4"
-text = "quest64_randomizer_wings_skye(ctx);"
+text = "quest64_randomizer_wings_skye(ctx); quest64_hardmode_wings_skye(rdram, ctx);"
 before_vram = 0x800222E4
 
 # Disable Beigis's special map check when boss order moved him out of his arena.
@@ -145,7 +145,7 @@ before_vram = 0x8001C8DC
 # hooking that call is the exact end of a run.
 [[patches.hook]]
 func = "func_80007A50"
-text = "quest64_speedrun_stop(ctx);"
+text = "quest64_speedrun_stop(ctx); quest64_hardmode_scripted_message_4(rdram, ctx);"
 before_vram = 0x80007B44
 
 # Runs every frame the title screen is up. The run starts on the first frame
@@ -154,3 +154,228 @@ before_vram = 0x80007B44
 func = "func_801000A8_ovl_title"
 text = "quest64_speedrun_title_frame();"
 before_vram = 0x801000A8
+
+# Hard Mode (Landmine36's hack, see src/game/hardmode/). One hook per
+# instruction the hack rewrites in the game's code; hooks.cpp documents each.
+# All of them return immediately unless Hard Mode is active. Sites the hack
+# shares with a randomizer hook above carry both calls on that hook.
+
+# Whole functions the hack replaces with C code in its payload: hooked at
+# the entry, the recompiled payload function runs and the original returns.
+[[patches.hook]]
+func = "func_800074A0"
+text = "if (quest64_hardmode_replace_800074A0(rdram, ctx)) return;"
+before_vram = 0x800074A0
+[[patches.hook]]
+func = "func_80008A00"
+text = "if (quest64_hardmode_replace_80008A00(rdram, ctx)) return;"
+before_vram = 0x80008A00
+[[patches.hook]]
+func = "func_80012220"
+text = "if (quest64_hardmode_replace_80012220(rdram, ctx)) return;"
+before_vram = 0x80012220
+[[patches.hook]]
+func = "func_8001EBDC"
+text = "if (quest64_hardmode_replace_8001EBDC(rdram, ctx)) return;"
+before_vram = 0x8001EBDC
+[[patches.hook]]
+func = "func_80020D4C"
+text = "if (quest64_hardmode_replace_80020D4C(rdram, ctx)) return;"
+before_vram = 0x80020D4C
+[[patches.hook]]
+func = "func_8002684C"
+text = "if (quest64_hardmode_replace_8002684C(rdram, ctx)) return;"
+before_vram = 0x8002684C
+[[patches.hook]]
+func = "func_800278B0"
+text = "if (quest64_hardmode_replace_800278B0(rdram, ctx)) return;"
+before_vram = 0x800278B0
+[[patches.hook]]
+func = "func_80029448"
+text = "if (quest64_hardmode_replace_80029448(rdram, ctx)) return;"
+before_vram = 0x80029448
+[[patches.hook]]
+func = "get_rand"
+text = "if (quest64_hardmode_replace_get_rand(rdram, ctx)) return;"
+before_vram = 0x80022FD0
+
+# The hack's per-frame function, called from the two loop-back branches at
+# the end of the main loop.
+[[patches.hook]]
+func = "func_80024BEC"
+text = "quest64_hardmode_main_frame(rdram, ctx);"
+before_vram = 0x80024FC0
+[[patches.hook]]
+func = "func_80024BEC"
+text = "quest64_hardmode_main_frame(rdram, ctx);"
+before_vram = 0x80024FF8
+
+# Asm shims and immediates, in address order.
+[[patches.hook]]
+func = "func_80003A1C"
+text = "quest64_hardmode_battle_value_t3(rdram, ctx);"
+before_vram = 0x80003AE8
+[[patches.hook]]
+func = "func_80004448"
+text = "quest64_hardmode_hp_exp_t3(rdram, ctx);"
+before_vram = 0x80004578
+[[patches.hook]]
+func = "func_8000534C"
+text = "quest64_hardmode_walk_speed(rdram, ctx);"
+before_vram = 0x8000541C
+[[patches.hook]]
+func = "func_80006BEC"
+text = "quest64_hardmode_hp_exp_t9(rdram, ctx);"
+before_vram = 0x80006EA0
+[[patches.hook]]
+func = "func_80006BEC"
+text = "quest64_hardmode_def_exp_t2(rdram, ctx);"
+before_vram = 0x80006EB0
+[[patches.hook]]
+func = "func_800072A8"
+text = "quest64_hardmode_spell_table_t4(rdram, ctx);"
+before_vram = 0x80007310
+[[patches.hook]]
+func = "func_800073CC"
+text = "quest64_hardmode_agi_exp_t9(rdram, ctx);"
+before_vram = 0x80007474
+[[patches.hook]]
+func = "func_80007A50"
+text = "quest64_hardmode_scripted_message_1(rdram, ctx);"
+before_vram = 0x80007B1C
+[[patches.hook]]
+func = "UpdateBGM"
+text = "quest64_hardmode_death_jingle(rdram, ctx);"
+before_vram = 0x800267B8
+[[patches.hook]]
+func = "func_80008FE0"
+text = "quest64_hardmode_night_hp(rdram, ctx);"
+before_vram = 0x8000908C
+[[patches.hook]]
+func = "func_80008FE0"
+text = "quest64_hardmode_night_stats_a(rdram, ctx);"
+before_vram = 0x80009224
+[[patches.hook]]
+func = "func_80008FE0"
+text = "quest64_hardmode_night_stats_b(rdram, ctx);"
+before_vram = 0x80009234
+[[patches.hook]]
+func = "func_80008FE0"
+text = "quest64_hardmode_night_stats_c(rdram, ctx);"
+before_vram = 0x80009244
+[[patches.hook]]
+func = "func_80009818"
+text = "quest64_hardmode_battle_exp(rdram, ctx);"
+before_vram = 0x800098D8
+[[patches.hook]]
+func = "func_80009818"
+text = "quest64_hardmode_battle_stones(rdram, ctx);"
+before_vram = 0x800098F8
+[[patches.hook]]
+func = "func_8000ACC0"
+text = "quest64_hardmode_damage_double(rdram, ctx);"
+before_vram = 0x8000AD9C
+[[patches.hook]]
+func = "func_8000B300"
+text = "quest64_hardmode_spell_table_t5(rdram, ctx);"
+before_vram = 0x8000B45C
+[[patches.hook]]
+func = "func_8000B9D8"
+text = "quest64_hardmode_flag_get(rdram, ctx);"
+before_vram = 0x8000B9F4
+[[patches.hook]]
+func = "func_8000BA0C"
+text = "quest64_hardmode_flag_set(rdram, ctx);"
+before_vram = 0x8000BA20
+[[patches.hook]]
+func = "func_8000BB68"
+text = "quest64_hardmode_max_hp_gain_check(rdram, ctx);"
+before_vram = 0x8000BCDC
+[[patches.hook]]
+func = "func_8000BB68"
+text = "quest64_hardmode_max_hp_gain_clamp(rdram, ctx);"
+before_vram = 0x8000BCE8
+[[patches.hook]]
+func = "func_80010150"
+text = "quest64_hardmode_store_redirect(rdram, ctx);"
+before_vram = 0x800102BC
+[[patches.hook]]
+func = "func_80014890"
+text = "quest64_hardmode_spell_table_a0(rdram, ctx);"
+before_vram = 0x80014954
+[[patches.hook]]
+func = "func_800149D0"
+text = "quest64_hardmode_spell_table_t0(rdram, ctx);"
+before_vram = 0x800149F8
+[[patches.hook]]
+func = "func_80014A98"
+text = "quest64_hardmode_spell_table_t8(rdram, ctx);"
+before_vram = 0x80014B58
+[[patches.hook]]
+func = "func_80014A98"
+text = "quest64_hardmode_brian_spell_entry(rdram, ctx);"
+before_vram = 0x80014B78
+[[patches.hook]]
+func = "func_80016520"
+text = "quest64_hardmode_mp_exp_t4(rdram, ctx);"
+before_vram = 0x800165B8
+[[patches.hook]]
+func = "func_800165E4"
+text = "quest64_hardmode_mp_exp_t9(rdram, ctx);"
+before_vram = 0x80016774
+[[patches.hook]]
+func = "func_80016CB0"
+text = "quest64_hardmode_battle_value_t9_0(rdram, ctx);"
+before_vram = 0x80016CF8
+[[patches.hook]]
+func = "func_800170DC"
+text = "quest64_hardmode_battle_value_t9_2(rdram, ctx);"
+before_vram = 0x8001712C
+[[patches.hook]]
+func = "func_800170DC"
+text = "quest64_hardmode_battle_value_t2_4(rdram, ctx);"
+before_vram = 0x80017140
+[[patches.hook]]
+func = "func_8001817C"
+text = "quest64_hardmode_battle_value_t0(rdram, ctx);"
+before_vram = 0x80018198
+[[patches.hook]]
+func = "func_8001E25C"
+text = "quest64_hardmode_hud_counter(rdram, ctx);"
+before_vram = 0x8001E4B0
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_hardmode_levelup_fire(rdram, ctx);"
+before_vram = 0x8001F68C
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_hardmode_levelup_earth(rdram, ctx);"
+before_vram = 0x8001F6A4
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_hardmode_levelup_water(rdram, ctx);"
+before_vram = 0x8001F6BC
+[[patches.hook]]
+func = "func_8001F3DC"
+text = "quest64_hardmode_levelup_wind(rdram, ctx);"
+before_vram = 0x8001F6D4
+[[patches.hook]]
+func = "func_800228F8"
+text = "quest64_hardmode_flag_test_off(rdram, ctx);"
+before_vram = 0x8002291C
+[[patches.hook]]
+func = "func_80026F34"
+text = "quest64_hardmode_bar_scale(rdram, ctx);"
+before_vram = 0x800276C4
+[[patches.hook]]
+func = "func_80026F34"
+text = "quest64_hardmode_bar_scale(rdram, ctx);"
+before_vram = 0x80027724
+[[patches.hook]]
+func = "guLookAtReflectF"
+text = "quest64_hardmode_lookat(rdram, ctx);"
+before_vram = 0x80035D8C
+[[patches.hook]]
+func = "guLookAtReflectF"
+text = "quest64_hardmode_lookat(rdram, ctx);"
+before_vram = 0x80035E28

@@ -93,6 +93,27 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
+                                <div>Hacks</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Hard Mode ({{enh_hard_mode_version}})</div></div>
+                                        <select data-value="enh_hard_mode" id="enh_hard_mode_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Hard Mode is Landmine36's Quest 64 Hard Mode hack: tougher monsters that get stronger again at night, stat caps raised to 999 and element levels to 99, reworked spells, new spirit locations, shops that take the Stones you earn, special items, boss rematches and more. Restart the game after changing it (Reset on the General tab). It uses its own save folder, so your normal saves are left alone, and it turns the Randomizer off while it is on.</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Settings save as you change them and take effect the next time the game is launched.</div>
                             </label>
                         </div>
