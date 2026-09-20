@@ -8,6 +8,8 @@
 #include "randomizer.h"
 #include "merrow_data.h"
 #include "merrow_mapdata.h"
+#include "enemy_progression.h"
+#include "enemy_progression_data.h"
 #include "zelda_config.h"
 #include "json/json.hpp"
 #include "librecomp/game.hpp"
@@ -24,6 +26,7 @@ using zelda64::randomizer::ListMode;
 using zelda64::randomizer::Mode;
 using zelda64::randomizer::Options;
 using zelda64::randomizer::Write;
+namespace progression = zelda64::randomizer::progression;
 
 namespace {
     constexpr int player_spells = 60;
@@ -303,6 +306,8 @@ namespace {
         std::vector<mapdata::MonsterPack> enemy_packs;
         std::vector<mapdata::Region> enemy_regions;
         std::string enemy_group_notes;
+        // Enemy progression: the file each of the 16 merged areas was given.
+        std::vector<int> progression_tables;
         bool beigis_moved = false;
 
         Builder(const Options& opts, uint32_t seed) : options(opts), rng(seed) {}
@@ -1619,7 +1624,7 @@ namespace {
         // any member of the group ended up with, or a submap could reference an
         // enemy its own table does not have.
         void shuffle_enemies() {
-            if (!options.enemy_tables && !options.enemy_composition) {
+            if (!options.enemy_tables && !options.enemy_composition && !options.enemy_progression) {
                 return;
             }
             enemy_areas = mapdata::areas;
@@ -1643,7 +1648,30 @@ namespace {
                 }
             };
 
-            if (options.enemy_tables) {
+            if (options.enemy_progression) {
+                // Tier-aware: each merged area draws one of the files whose
+                // monsters fall inside its spread (DOCS/enemyrandologic.xlsx).
+                // Runs before the random table shuffle and replaces it.
+                progression_tables.assign(merrow::progression::areas.size(), 0);
+                int previous = -1;
+                for (size_t a = 0; a < merrow::progression::areas.size(); a++) {
+                    std::vector<int> candidates = progression::candidate_tables(static_cast<int>(a), options);
+                    // Prefer not to repeat the previous area's file when there
+                    // is a choice, so consecutive areas look different.
+                    if (candidates.size() > 1) {
+                        candidates.erase(std::remove(candidates.begin(), candidates.end(), previous), candidates.end());
+                    }
+                    int table = candidates[static_cast<size_t>(rng.next(static_cast<int>(candidates.size())))];
+                    progression_tables[a] = table;
+                    previous = table;
+                    const merrow::progression::AreaInfo& info = merrow::progression::areas[a];
+                    for (int raw = info.first_raw; raw <= info.last_raw; raw++) {
+                        enemy_areas[static_cast<size_t>(raw)].map.table_index = static_cast<uint16_t>(table);
+                        cap_ids(enemy_areas[static_cast<size_t>(raw)], table_size(enemy_areas[static_cast<size_t>(raw)]));
+                    }
+                }
+            }
+            else if (options.enemy_tables) {
                 std::vector<int> table_indices;
                 table_indices.reserve(enemy_areas.size());
                 for (const mapdata::Area& area : enemy_areas) {
@@ -1708,7 +1736,7 @@ namespace {
         // header with its (possibly new) table index folded back in, and each
         // region's preset list, which starts 8 bytes past the region address.
         void patch_enemies() {
-            if (!options.enemy_tables && !options.enemy_composition) {
+            if (!options.enemy_tables && !options.enemy_composition && !options.enemy_progression) {
                 return;
             }
 
@@ -1725,7 +1753,12 @@ namespace {
 
             log("");
             log("ENEMIES:");
-            if (options.enemy_tables) {
+            if (options.enemy_progression) {
+                std::string text;
+                progression::make_plan(progression_tables, options, text);
+                spoiler += text;
+            }
+            else if (options.enemy_tables) {
                 log("  Area enemy tables shuffled.");
             }
             if (options.enemy_composition) {
@@ -1915,6 +1948,10 @@ static nlohmann::json options_to_json(const Options& o) {
     j["shannon_hints"] = o.shannon_hints;
     j["enemy_tables"] = o.enemy_tables;
     j["enemy_composition"] = o.enemy_composition;
+    j["enemy_progression"] = o.enemy_progression;
+    j["enemy_spread_down"] = o.enemy_spread_down;
+    j["enemy_spread_up"] = o.enemy_spread_up;
+    j["enemy_scaling"] = o.enemy_scaling;
     j["encounter_rate"] = o.encounter_rate;
     j["mp_regain"] = o.mp_regain;
     j["staff_hit_mp"] = o.staff_hit_mp;
@@ -2009,6 +2046,13 @@ static Options options_from_json(const nlohmann::json& j) {
     get("shannon_hints", o.shannon_hints);
     get("enemy_tables", o.enemy_tables);
     get("enemy_composition", o.enemy_composition);
+    get("enemy_progression", o.enemy_progression);
+    get("enemy_spread_down", o.enemy_spread_down);
+    get("enemy_spread_up", o.enemy_spread_up);
+    get("enemy_scaling", o.enemy_scaling);
+    o.enemy_spread_down = std::clamp(o.enemy_spread_down, 0, 7);
+    o.enemy_spread_up = std::clamp(o.enemy_spread_up, 0, 7);
+    o.enemy_scaling = std::clamp(o.enemy_scaling, 0, 2);
     o.lost_keys = std::clamp(o.lost_keys, 0, 2);
     o.zoom_out = std::clamp(o.zoom_out, 0, 4);
     get("encounter_rate", o.encounter_rate);
@@ -2142,6 +2186,7 @@ zelda64::randomizer::Result zelda64::randomizer::generate(const Options& options
     result.writes = std::move(builder.writes);
     result.spoiler = std::move(builder.spoiler);
     result.beigis_moved = builder.beigis_moved;
+    result.progression_tables = std::move(builder.progression_tables);
     return result;
 }
 
@@ -2157,6 +2202,10 @@ void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
 
     Result result = generate(options);
     native.beigis_moved = result.beigis_moved;
+    if (!result.progression_tables.empty()) {
+        std::string unused;
+        progression::set_active(progression::make_plan(result.progression_tables, options, unused));
+    }
 
     std::span<const uint8_t> rom = recomp::get_rom();
     std::vector<uint8_t> patched(rom.begin(), rom.end());

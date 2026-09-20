@@ -249,7 +249,7 @@ text = "quest64_hardmode_death_jingle(rdram, ctx);"
 before_vram = 0x800267B8
 [[patches.hook]]
 func = "func_80008FE0"
-text = "quest64_hardmode_night_hp(rdram, ctx);"
+text = "quest64_randomizer_enemy_scale_hp(rdram, ctx); quest64_hardmode_night_hp(rdram, ctx);"
 before_vram = 0x8000908C
 [[patches.hook]]
 func = "func_80008FE0"
@@ -257,19 +257,19 @@ text = "quest64_hardmode_night_stats_a(rdram, ctx);"
 before_vram = 0x80009224
 [[patches.hook]]
 func = "func_80008FE0"
-text = "quest64_hardmode_night_stats_b(rdram, ctx);"
+text = "quest64_randomizer_enemy_scale_agi(rdram, ctx); quest64_hardmode_night_stats_b(rdram, ctx);"
 before_vram = 0x80009234
 [[patches.hook]]
 func = "func_80008FE0"
-text = "quest64_hardmode_night_stats_c(rdram, ctx);"
+text = "quest64_randomizer_enemy_scale_def(rdram, ctx); quest64_hardmode_night_stats_c(rdram, ctx);"
 before_vram = 0x80009244
 [[patches.hook]]
 func = "func_80009818"
-text = "quest64_hardmode_battle_exp(rdram, ctx);"
+text = "quest64_randomizer_enemy_scale_exp(rdram, ctx); quest64_hardmode_battle_exp(rdram, ctx);"
 before_vram = 0x800098D8
 [[patches.hook]]
 func = "func_80009818"
-text = "quest64_hardmode_battle_stones(rdram, ctx);"
+text = "quest64_randomizer_enemy_scale_stones(rdram, ctx); quest64_hardmode_battle_stones(rdram, ctx);"
 before_vram = 0x800098F8
 [[patches.hook]]
 func = "func_8000ACC0"
@@ -379,3 +379,15 @@ before_vram = 0x80035D8C
 func = "guLookAtReflectF"
 text = "quest64_hardmode_lookat(rdram, ctx);"
 before_vram = 0x80035E28
+
+# Randomizer enemy progression (DOCS/enemyrandologic.xlsx): the two stat
+# copies in func_80008FE0 that no Hard Mode hook already sits on. The other
+# five sites share the Hard Mode hooks above.
+[[patches.hook]]
+func = "func_80008FE0"
+text = "quest64_randomizer_enemy_scale_max_hp(rdram, ctx);"
+before_vram = 0x8000909C
+[[patches.hook]]
+func = "func_80008FE0"
+text = "quest64_randomizer_enemy_scale_atk(rdram, ctx);"
+before_vram = 0x80009228

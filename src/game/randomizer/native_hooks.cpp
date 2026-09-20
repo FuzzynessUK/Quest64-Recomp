@@ -1,8 +1,10 @@
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 
 #include "hardmode.h"
 #include "randomizer.h"
+#include "enemy_progression.h"
 #include "recomp.h"
 #include "zelda_config.h"
 
@@ -32,6 +34,7 @@ using zelda64::randomizer::active_options;
 using zelda64::randomizer::Mode;
 using zelda64::randomizer::native_state;
 using zelda64::randomizer::Options;
+namespace progression = zelda64::randomizer::progression;
 
 namespace {
     // Hard Mode replaces the randomizer outright (see quest64_on_init), so
@@ -234,6 +237,86 @@ void quest64_randomizer_beigis_map_check(recomp_context* ctx) {
         return;
     }
     ctx->r1 = ADD32(0, 0x0A);
+}
+
+}
+
+// --- Enemy progression: per-area stat scaling -------------------------------
+// DOCS/enemyrandologic.xlsx rules 5-6, applied where the game copies a
+// monster's table entry into its battle struct (func_80008FE0) and where it
+// awards the spoils (func_80009818). Each site is one `lhu`/`lw` from the
+// entry followed by the store; the hook multiplies the loaded register in
+// between. The entry's own index halfword (+2) says which file entry it is,
+// and gCurrentMap says which area, so the factor comes straight from the
+// plan built at boot. Hard Mode's night hooks sit on the same addresses;
+// the two never run together (Hard Mode stands the randomizer down).
+
+namespace {
+    constexpr int32_t gCurrentMap = 0x80084EE4;
+
+    // Round like the FPU's cvt.w.s (nearest) and keep the halfword sane.
+    gpr scaled_stat(uint8_t* rdram, recomp_context* ctx, gpr entry, gpr value, progression::Stat stat, int cap) {
+        int map = MEM_W(0, gCurrentMap);
+        int index = MEM_HU(2, entry);
+        double f = progression::factor(map, index, stat);
+        if (f == 1.0) {
+            return value;
+        }
+        double out = std::nearbyint(static_cast<double>(static_cast<int32_t>(value)) * f);
+        out = std::min<double>(std::max<double>(out, 1.0), cap);
+        return static_cast<gpr>(static_cast<int32_t>(out));
+    }
+
+    bool progressing() {
+        return randomizing() && progression::active();
+    }
+
+    // Sheet: Settings B23-B24 (HP 999; ATK/DEF/AGI 255). EXP and Stones are
+    // words in the game, capped generously.
+    constexpr int hp_cap = 999;
+    constexpr int stat_cap = 255;
+    constexpr int reward_cap = 65535;
+}
+
+extern "C" {
+
+// func_80008FE0 0x80009088 `lhu $t4, 0x6($v1)` (HP), before the `sh` at
+// 0x8000908C; v1 is the table entry.
+void quest64_randomizer_enemy_scale_hp(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    ctx->r12 = scaled_stat(rdram, ctx, ctx->r3, ctx->r12, progression::Stat::HP, hp_cap);
+}
+// 0x80009090 `lhu $t5, 0x6($v1)` (max HP), before the `sh` at 0x8000909C.
+void quest64_randomizer_enemy_scale_max_hp(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    ctx->r13 = scaled_stat(rdram, ctx, ctx->r3, ctx->r13, progression::Stat::HP, hp_cap);
+}
+// 0x80009220 `lhu $t6, 0x2A($t5)` (ATK), before the `sh` at 0x80009228; t5
+// is the entry.
+void quest64_randomizer_enemy_scale_atk(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    ctx->r14 = scaled_stat(rdram, ctx, ctx->r13, ctx->r14, progression::Stat::ATK, stat_cap);
+}
+// 0x80009230 `lhu $t9, 0xC($t7)` (AGI), before the `sh` at 0x80009234.
+void quest64_randomizer_enemy_scale_agi(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    ctx->r25 = scaled_stat(rdram, ctx, ctx->r15, ctx->r25, progression::Stat::AGI, stat_cap);
+}
+// 0x8000923C `lhu $t1, 0xE($t0)` (DEF), before the `sh` at 0x80009244.
+void quest64_randomizer_enemy_scale_def(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    ctx->r9 = scaled_stat(rdram, ctx, ctx->r8, ctx->r9, progression::Stat::DEF, stat_cap);
+}
+// func_80009818 0x800098D4 `lw $t7, 0x10($t6)` (EXP), before 0x800098D8.
+void quest64_randomizer_enemy_scale_exp(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    ctx->r15 = scaled_stat(rdram, ctx, ctx->r14, ctx->r15, progression::Stat::EXP, reward_cap);
+}
+// 0x800098F4 `lw $t1, 0x14($t0)` (Stones), before 0x800098F8. Stones follow
+// the EXP factor: the sheet scales both with the destination.
+void quest64_randomizer_enemy_scale_stones(uint8_t* rdram, recomp_context* ctx) {
+    if (!progressing()) return;
+    ctx->r9 = scaled_stat(rdram, ctx, ctx->r8, ctx->r9, progression::Stat::EXP, reward_cap);
 }
 
 }

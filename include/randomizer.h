@@ -157,6 +157,13 @@ namespace zelda64::randomizer {
         // each pack holds. Independent, and either can be used alone.
         bool enemy_tables = false;
         bool enemy_composition = false;
+        // Enemy progression (DOCS/enemyrandologic.xlsx): the tables option done
+        // tier-aware, plus every monster scaled to the area it appears in
+        // when a battle starts. Takes precedence over enemy_tables.
+        bool enemy_progression = false;
+        int enemy_spread_down = 1;   // tiers below the area it may draw from
+        int enemy_spread_up = 1;     // tiers above
+        int enemy_scaling = 2;       // 0 off, 1 half (k = 0.5), 2 full (k = 1)
     };
 
     // Options as saved on disk; a missing file gives defaults.
@@ -183,6 +190,9 @@ namespace zelda64::randomizer {
         std::vector<Write> writes;
         std::string spoiler;
         uint32_t seed_value = 0;
+        // Enemy progression: the files chosen per area and the per-area stat
+        // factors the battle hooks apply (progression::Plan, kept opaque here).
+        std::vector<int> progression_tables;
         // Boss order moved Beigis out of his own arena, which the native hook
         // for his map check needs to know about.
         bool beigis_moved = false;

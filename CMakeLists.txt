@@ -192,6 +192,8 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_mapdata.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/native_hooks.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/enemy_progression.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/enemy_progression_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/enhancements.cpp
     ${CMAKE_SOURCE_DIR}/src/game/speedrun.cpp
     ${CMAKE_SOURCE_DIR}/src/game/hardmode/hardmode.cpp

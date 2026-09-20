@@ -68,7 +68,12 @@ menu:
   capture off so it draws without swallowing anything.
 - `src/game/randomizer/` — Merrow port. **Both** `merrow_data.cpp` and
   `merrow_mapdata.cpp` are GENERATED (`tools/convert_merrow_datastore.pl` and
-  `tools/convert_merrow_mapdata.pl`); never edit them by hand. Applied to the
+  `tools/convert_merrow_mapdata.pl`); never edit them by hand. So is
+  `enemy_progression_data.cpp` (`tools/enemyrandologic.pl`, which also writes
+  `DOCS/enemyrandologic.xlsx`, the design of the enemy progression option).
+  Enemy stats are scaled per area at battle start by hooks in
+  `native_hooks.cpp`, not in the ROM: the six monster files all load to one
+  RAM base (file table 0x80054160), so a file serves several areas. Applied to the
   in-memory ROM at boot via `quest64_on_init` in `src/main/main.cpp`.
 - `src/game/randomizer/native_hooks.cpp` — the randomizer options that patch
   code rather than data. Each hook writes a register in the window between the

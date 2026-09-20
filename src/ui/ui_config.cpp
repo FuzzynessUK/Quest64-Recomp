@@ -898,6 +898,10 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_shannon_hints", &Options::shannon_hints);
     bind_randomizer_field(constructor, "rnd_enemy_tables", &Options::enemy_tables);
     bind_randomizer_field(constructor, "rnd_enemy_composition", &Options::enemy_composition);
+    bind_randomizer_field(constructor, "rnd_enemy_progression", &Options::enemy_progression);
+    bind_randomizer_field(constructor, "rnd_enemy_spread_down", &Options::enemy_spread_down);
+    bind_randomizer_field(constructor, "rnd_enemy_spread_up", &Options::enemy_spread_up);
+    bind_randomizer_field(constructor, "rnd_enemy_scaling", &Options::enemy_scaling);
     bind_randomizer_field(constructor, "rnd_encounter_rate", &Options::encounter_rate);
     bind_randomizer_field(constructor, "rnd_mp_regain", &Options::mp_regain);
     bind_randomizer_field(constructor, "rnd_staff_hit_mp", &Options::staff_hit_mp);
