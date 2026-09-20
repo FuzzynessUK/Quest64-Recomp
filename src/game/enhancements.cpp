@@ -8,6 +8,7 @@
 #include "enhancements.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
+#include "zelda_debug.h"
 #include "json/json.hpp"
 #include "librecomp/game.hpp"
 #include "recomp.h"
@@ -38,10 +39,17 @@ namespace {
     constexpr int spell_entry_size = 68;
     constexpr int magic_barrier_param = 0x3A;
 
-    uint32_t magic_barrier_param_address() {
+    // Healing Lv2 potency, the one field that differs between the US and
+    // Japanese spell tables.
+    constexpr int healing_potency = 0x0C;
+    constexpr int jp_healing_lv2 = 16;
+
+    // Spell entries are found by name so a change to the table cannot
+    // silently point a patch at a different spell.
+    uint32_t spell_entry_address(const std::string& name) {
         for (size_t i = 0; i + 3 < data::spells.size(); i += 4) {
-            if (data::spells[i] == "Magic Barrier") {
-                return static_cast<uint32_t>(std::stoul(data::spells[i + 1], nullptr, 16)) + magic_barrier_param;
+            if (data::spells[i] == name) {
+                return static_cast<uint32_t>(std::stoul(data::spells[i + 1], nullptr, 16));
             }
         }
         return 0;
@@ -66,11 +74,18 @@ namespace {
             }
         }
         if (options.long_magic_barrier) {
-            uint32_t address = magic_barrier_param_address();
+            uint32_t entry = spell_entry_address("Magic Barrier");
+            uint32_t address = entry ? entry + magic_barrier_param : 0;
             if (address != 0) {
                 // One byte, so only the low half of the halfword write is used;
                 // write it as a byte value in the high position of its own pair.
                 writes.push_back({ address, static_cast<uint16_t>(std::clamp(options.magic_barrier_turns, 1, 255)), true });
+            }
+        }
+        if (options.jp_healing) {
+            uint32_t entry = spell_entry_address("Healing Lv2");
+            if (entry != 0) {
+                writes.push_back({ entry + healing_potency, jp_healing_lv2, false });
             }
         }
         return writes;
@@ -101,6 +116,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     };
     get("one_hit_ko", o.one_hit_ko);
     get("long_magic_barrier", o.long_magic_barrier);
+    get("jp_healing", o.jp_healing);
     get("magic_barrier_turns", o.magic_barrier_turns);
     o.magic_barrier_turns = std::clamp(o.magic_barrier_turns, 1, 255);
     return o;
@@ -110,6 +126,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     nlohmann::json j;
     j["one_hit_ko"] = o.one_hit_ko;
     j["long_magic_barrier"] = o.long_magic_barrier;
+    j["jp_healing"] = o.jp_healing;
     j["magic_barrier_turns"] = o.magic_barrier_turns;
     std::ofstream out(options_path());
     out << j.dump(4);
@@ -166,4 +183,16 @@ void zelda64::enhancements::on_frame(uint8_t* rdram) {
     if (MEM_HU(0, player_hp) > 1) {
         MEM_H(0, player_hp) = 1;
     }
+}
+
+void zelda64::enhancements::cast_exit() {
+    // What the Exit spell does: drop the player back at the start of the area
+    // they are in. Goes through the same queued warp the cheats menu uses, so
+    // the game runs its own fade and spawn, and it waits for a safe moment.
+    // Passing from_cheats = false keeps it working with cheats turned off.
+    int map = zelda64::current_map();
+    if (map < 0 || map >= zelda64::map_count()) {
+        return;
+    }
+    zelda64::do_map_warp(map, 0, 0, false);
 }

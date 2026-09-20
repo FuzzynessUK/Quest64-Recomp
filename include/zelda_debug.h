@@ -23,7 +23,11 @@ namespace zelda64 {
 
     // Queue a field warp to entrance `entrance` of `submap` in `map`. It fires
     // on the next frame the game is in the field and not already transitioning.
-    void do_map_warp(int map, int submap, int entrance);
+    // `from_cheats` warps are dropped when the cheats master switch is off;
+    // enhancements pass false so their warps are independent of it.
+    void do_map_warp(int map, int submap, int entrance, bool from_cheats = true);
+    // The map the player is currently in, or -1 before the game has loaded one.
+    int current_map();
 
     // Layout of the game's maps (see src/game/map_table.cpp). Indices past
     // these counts read outside the game's tables.

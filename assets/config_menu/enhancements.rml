@@ -45,12 +45,32 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>JP Healing Amounts</div></div>
+                                        <select data-value="enh_jp_healing" id="enh_jp_healing_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="config-debug-option">
-                            <label class="config-debug-option__label">                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Magic Barrier holds for up to 5 turns instead of 1, as in the Japanese release. Each status spell owns one byte of the effect parameter block in its spell entry, and Magic Barrier owns +0x3A. The Japanese ROM carries the same byte, so this reproduces the effect rather than the exact mechanism, and it is untested in game.</div>
+                            <label class="config-debug-option__label">                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Magic Barrier holds for up to 5 turns instead of 1, and Healing Lv2 restores 16 instead of 8, matching the Japanese release. The healing value is an exact match, taken from the only byte that differs across the whole spell table between the two ROMs. Exit works even without the spell or the MP, and takes effect on the next frame the game is in the field.</div>
                             </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Exit from anywhere (Items Menu)</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-label"><div>Returns you to the start of the current area</div></div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="enh_cast_exit">Exit</button>
+                                </div>
+                            </div>
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">

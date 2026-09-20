@@ -366,6 +366,34 @@ the *same* byte (verified), so JP's longer barrier comes from its battle code;
 this reproduces the effect, not the mechanism, and is untested in game. If it
 turns out +0x3A is strength rather than turns, only this one byte is involved.
 
+
+#### JP Healing Amounts
+
+The single byte that differs across the whole 60-entry spell table between
+the US and Japanese ROMs is **Healing Lv2's potency**, the halfword at entry
++0x0C: **8 in US, 16 in JP** (ROM 0xD4C50C). Healing Lv1 is 2 in both. The
+toggle writes 16, so unlike the Magic Barrier option this is an exact match
+for JP rather than an approximation.
+
+#### Exit from anywhere (Items Menu)
+
+Button that warps to the start of the current area, the way the Exit spell
+does, without needing the spell or the MP. It reuses the queued map warp the
+cheats menu uses, so the game runs its own fade and spawn and the warp waits
+for the field to be idle. Two supporting changes:
+
+- `do_map_warp` gained a `from_cheats` flag. The cheats master switch now
+  only drops warps that came from the cheats tab, so an enhancement warp
+  still works with cheats off.
+- `gCurrentMap` (0x80084EEC) is cached into an atomic each frame, the same
+  way the stat readouts are, so the menu thread can read it without touching
+  RDRAM.
+
+It warps to submap 0, entrance 0 of the current map. That is an assumption
+about where an area starts, not something read from the game's own Exit
+handler, which was not located. If a dungeon turns out to start elsewhere,
+this needs a per-map destination rather than submap 0.
+
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
 Merrow replaces the title-screen logo and can stamp the seed digits over the

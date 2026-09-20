@@ -13,6 +13,9 @@ namespace {
     // Master switch for everything on the cheats tab; defined with the
     // inventory code at the bottom of this file.
     extern std::atomic<bool> cheats_on;
+    extern std::atomic<int32_t> live_current_map;
+    // gCurrentMap, per Quest64Syms/data_dump.toml.
+    constexpr int32_t gCurrentMap = 0x80084EEC;
     void apply_pending_item(uint8_t* rdram);
 }
 
@@ -75,6 +78,7 @@ namespace {
         int32_t map;
         int32_t submap;
         int32_t entrance;
+        bool from_cheats;
     };
 
     std::mutex pending_map_warp_mutex;
@@ -83,7 +87,7 @@ namespace {
     std::atomic<bool> map_warp_queued = false;
 }
 
-void zelda64::do_map_warp(int map, int submap, int entrance) {
+void zelda64::do_map_warp(int map, int submap, int entrance, bool from_cheats) {
     // The spawner indexes the map's tables unchecked, so never queue a
     // location the map doesn't have.
     map = std::clamp(map, 0, map_count() - 1);
@@ -91,16 +95,13 @@ void zelda64::do_map_warp(int map, int submap, int entrance) {
     entrance = std::clamp(entrance, 0, entrance_count(map, submap) - 1);
 
     std::lock_guard lock{pending_map_warp_mutex};
-    pending_map_warp = MapWarp{map, submap, entrance};
+    pending_map_warp = MapWarp{map, submap, entrance, from_cheats};
     map_warp_queued.store(true);
 }
 
 // The request stays queued until the game is in the field and idle, so a warp
 // asked for mid-transition fires once that transition has settled.
 static void apply_map_warp(uint8_t* rdram) {
-    if (!cheats_on.load()) {
-        return;
-    }
     if (!map_warp_queued.load()) {
         return;
     }
@@ -118,6 +119,10 @@ static void apply_map_warp(uint8_t* rdram) {
         warp = *pending_map_warp;
         pending_map_warp.reset();
         map_warp_queued.store(false);
+    }
+
+    if (warp.from_cheats && !cheats_on.load()) {
+        return;
     }
 
     MEM_W(0, D_80085368) = warp.map;
@@ -220,6 +225,7 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     apply_map_warp(rdram);
     sync_player_stats(rdram);
     apply_pending_item(rdram);
+    live_current_map.store(static_cast<int32_t>(MEM_W(0, gCurrentMap)));
     zelda64::enhancements::on_frame(rdram);
 }
 
@@ -293,6 +299,9 @@ namespace {
     constexpr int32_t no_pending_item = -1;
 
     std::atomic<bool> cheats_on = true;
+    // Cached each frame so the menu can read it without touching RDRAM off
+    // the game thread.
+    std::atomic<int32_t> live_current_map = -1;
     std::atomic<int32_t> pending_item = no_pending_item;
 
     void apply_pending_item(uint8_t* rdram) {
@@ -328,3 +337,7 @@ void zelda64::give_item(int item_id) {
     pending_item.store(item_id);
 }
 
+
+int zelda64::current_map() {
+    return live_current_map.load();
+}

@@ -26,6 +26,12 @@ namespace zelda64::enhancements {
         bool long_magic_barrier = false;
         // Turns written into that byte when the option is on.
         int magic_barrier_turns = 5;
+
+        // Healing Lv2 restores what it does in the Japanese release. Its
+        // potency halfword at entry +0x0C is 8 in the US ROM and 16 in the
+        // Japanese one; this is the only byte that differs across the whole
+        // 60-entry spell table, so it is an exact match rather than a guess.
+        bool jp_healing = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.
@@ -40,6 +46,11 @@ namespace zelda64::enhancements {
     void apply_at_boot(uint8_t* rdram);
     // The RAM-level part, run once per frame from the cheats hook.
     void on_frame(uint8_t* rdram);
+
+    // Warps the player to the start of the area they are in, the way the
+    // Exit spell does, without needing the spell or the MP. Takes effect on
+    // the next frame the game is in the field and not already transitioning.
+    void cast_exit();
 }
 
 #endif
