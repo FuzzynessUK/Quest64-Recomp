@@ -10,6 +10,7 @@
 #include "zelda_game.h"
 #include "randomizer.h"
 #include "enhancements.h"
+#include "speedrun.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
 #include "promptfont.h"
@@ -781,6 +782,28 @@ void make_enhancements_bindings(Rml::Context* context) {
         }
     );
 
+    constructor.BindFunc("enh_speedrun_timer",
+        [](Rml::Variant& out) { out = enhancements_context.edited.speedrun_timer ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.speedrun_timer = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_timer_position",
+        [](Rml::Variant& out) { out = enhancements_context.edited.timer_position; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.timer_position = std::clamp(in.Get<int>(), 0, 3);
+            enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_timer_format",
+        [](Rml::Variant& out) { out = enhancements_context.edited.timer_format; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.timer_format = std::clamp(in.Get<int>(), 0, 2);
+            enhancements_option_changed();
+        }
+    );
+
     enhancements_context.model_handle = constructor.GetModelHandle();
 }
 
@@ -934,6 +957,80 @@ void recompui::update_cheats_model() {
     }
 }
 
+
+// Speedrun timer overlay. Its own context so it can stay up while the game is
+// running; it never captures input or the mouse, so it only draws.
+struct SpeedrunContext {
+    Rml::DataModelHandle model_handle;
+    std::string shown_text;
+    bool shown_visible = false;
+    bool shown_finished = false;
+};
+
+SpeedrunContext speedrun_context_state;
+recompui::ContextId speedrun_context;
+
+recompui::ContextId recompui::get_speedrun_context_id() {
+    return speedrun_context;
+}
+
+void recompui::show_speedrun_overlay() {
+    if (speedrun_context == recompui::ContextId::null()) {
+        return;
+    }
+    if (!recompui::is_context_shown(speedrun_context)) {
+        recompui::show_context(speedrun_context, "");
+    }
+}
+
+// Refreshes the clock. Runs on the UI thread every frame, so it only marks
+// variables dirty when the text it would draw has actually changed.
+void recompui::update_speedrun_model() {
+    if (!speedrun_context_state.model_handle) {
+        return;
+    }
+
+    bool visible = zelda64::enhancements::active_options().speedrun_timer
+        && (zelda64::speedrun::running() || zelda64::speedrun::finished());
+    if (visible != speedrun_context_state.shown_visible) {
+        speedrun_context_state.shown_visible = visible;
+        speedrun_context_state.model_handle.DirtyVariable("timer_visible");
+    }
+    if (!visible) {
+        return;
+    }
+
+    bool done = zelda64::speedrun::finished();
+    if (done != speedrun_context_state.shown_finished) {
+        speedrun_context_state.shown_finished = done;
+        speedrun_context_state.model_handle.DirtyVariable("timer_finished");
+    }
+
+    std::string text = zelda64::speedrun::display();
+    if (text != speedrun_context_state.shown_text) {
+        speedrun_context_state.shown_text = std::move(text);
+        speedrun_context_state.model_handle.DirtyVariable("timer_text");
+    }
+}
+
+void make_speedrun_bindings(Rml::Context* context) {
+    Rml::DataModelConstructor constructor = context->CreateDataModel("speedrun_model");
+    if (!constructor) {
+        throw std::runtime_error("Failed to make RmlUi data model for the speedrun timer");
+    }
+
+    constructor.BindFunc("timer_text",
+        [](Rml::Variant& out) { out = speedrun_context_state.shown_text; });
+    constructor.BindFunc("timer_visible",
+        [](Rml::Variant& out) { out = speedrun_context_state.shown_visible; });
+    constructor.BindFunc("timer_finished",
+        [](Rml::Variant& out) { out = speedrun_context_state.shown_finished; });
+    constructor.BindFunc("timer_position",
+        [](Rml::Variant& out) { out = zelda64::enhancements::active_options().timer_position; });
+
+    speedrun_context_state.model_handle = constructor.GetModelHandle();
+}
+
 recompui::ContextId config_context;
 
 recompui::ContextId recompui::get_config_context_id() {
@@ -988,6 +1085,10 @@ public:
     }
     void load_document() override {
 		config_context = recompui::create_context(zelda64::get_asset_path("config_menu.rml"));
+        speedrun_context = recompui::create_context(zelda64::get_asset_path("speedrun_timer.rml"));
+        // Draw only: the game keeps every button and the mouse.
+        speedrun_context.set_captures_input(false);
+        speedrun_context.set_captures_mouse(false);
         recompui::update_mod_list(false);
         recompui::get_config_tabset()->AddEventListener(Rml::EventId::Tabchange, &config_tabset_listener);
     }
@@ -1635,6 +1736,7 @@ public:
         make_debug_bindings(context);
         make_cheats_bindings(context);
         make_enhancements_bindings(context);
+        make_speedrun_bindings(context);
         make_randomizer_bindings(context);
     }
 };

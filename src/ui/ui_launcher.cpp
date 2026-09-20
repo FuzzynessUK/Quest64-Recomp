@@ -1,5 +1,6 @@
 #include "recomp_ui.h"
 #include "zelda_config.h"
+#include "speedrun.h"
 #include "zelda_support.h"
 #include "librecomp/game.hpp"
 #include "ultramodern/ultramodern.hpp"
@@ -81,6 +82,10 @@ public:
             [](const std::string& param, Rml::Event& event) {
                 recomp::start_game(supported_games[0].game_id);
                 recompui::hide_all_contexts();
+                // The run starts here, and the overlay has to be put back
+                // because hide_all_contexts() just took it down with the menus.
+                zelda64::speedrun::start();
+                recompui::show_speedrun_overlay();
             }
         );
         recompui::register_event(listener, "open_controls",

@@ -139,3 +139,11 @@ before_vram = 0x800222E4
 func = "func_8001C8C4"
 text = "quest64_randomizer_beigis_map_check(ctx);"
 before_vram = 0x8001C8DC
+
+# Speedrun timer. func_80007A50 calls the message display with
+# gMsg_Shannon_Mammon_has_been_destroyed (0x80054C04) once Mammon is down, so
+# hooking that call is the exact end of a run.
+[[patches.hook]]
+func = "func_80007A50"
+text = "quest64_speedrun_stop(ctx);"
+before_vram = 0x80007B44
