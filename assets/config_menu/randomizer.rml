@@ -338,45 +338,10 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Shuffle encounters</div></div>
-                                        <select data-value="rnd_enemy_composition" id="rnd_enemy_composition_select">
+                                        <div class="config-debug__select-label"><div>Enemy Randomizer</div></div>
+                                        <select data-value="rnd_enemy_randomizer" id="rnd_enemy_randomizer_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Enemy progression</div></div>
-                                        <select data-value="rnd_enemy_progression" id="rnd_enemy_progression_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Progression: tiers below</div></div>
-                                        <select data-value="rnd_enemy_spread_down" id="rnd_enemy_spread_down_select">
-                                            <option value="0">0</option>
-                                            <option value="1">1</option>
-                                            <option value="2">2</option>
-                                            <option value="3">3</option>
-                                            <option value="7">Any</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Progression: tiers above</div></div>
-                                        <select data-value="rnd_enemy_spread_up" id="rnd_enemy_spread_up_select">
-                                            <option value="0">0</option>
-                                            <option value="1">1</option>
-                                            <option value="2">2</option>
-                                            <option value="3">3</option>
-                                            <option value="7">Any</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Progression: stat scaling</div></div>
-                                        <select data-value="rnd_enemy_scaling" id="rnd_enemy_scaling_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">Half</option>
-                                            <option value="2">Full</option>
                                         </select>
                                     </div>
                                 </div>
@@ -384,7 +349,7 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Enemy progression gives every area a tier (1-8, story order). Any of the game's six monster sets can land in any area (narrow that with the tiers below/above settings if you want); then, as each battle starts, every monster's HP, ATK, DEF, AGI, EXP and Stones are scaled from its home area to the area it is in, and a guard keeps each area's budget at least the previous area's, so the game always gets harder as you go. Replaces "Shuffle enemy tables" when on; "Shuffle encounters" still works with it. Scaling Off keeps home stats (not recommended), Half meets halfway, Full fits the area. The spoiler log lists each area's set and multipliers.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Enemy Randomizer: any of the game's six monster sets can appear in any area and the encounter packs are rerolled; then every monster's HP, ATK, DEF, AGI, EXP, Stones and spell damage are scaled from its home area to the area it is in, with a guard that keeps each area at least as hard as the one before, so the game always gets harder as you go. Replaces "Shuffle enemy tables" when on. The spoiler log lists each area's set and multipliers.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">

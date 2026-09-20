@@ -1624,7 +1624,7 @@ namespace {
         // any member of the group ended up with, or a submap could reference an
         // enemy its own table does not have.
         void shuffle_enemies() {
-            if (!options.enemy_tables && !options.enemy_composition && !options.enemy_progression) {
+            if (!options.enemy_tables && !options.enemy_randomizer) {
                 return;
             }
             enemy_areas = mapdata::areas;
@@ -1648,7 +1648,7 @@ namespace {
                 }
             };
 
-            if (options.enemy_progression) {
+            if (options.enemy_randomizer) {
                 // Tier-aware: each merged area draws one of the files whose
                 // monsters fall inside its spread (DOCS/enemyrandologic.xlsx).
                 // Runs before the random table shuffle and replaces it.
@@ -1684,7 +1684,7 @@ namespace {
                 }
             }
 
-            if (options.enemy_composition) {
+            if (options.enemy_randomizer) {
                 for (const mapdata::Area& area : enemy_areas) {
                     // Every region gets a full seven presets, wrapping if the
                     // area has fewer packs than that.
@@ -1736,7 +1736,7 @@ namespace {
         // header with its (possibly new) table index folded back in, and each
         // region's preset list, which starts 8 bytes past the region address.
         void patch_enemies() {
-            if (!options.enemy_tables && !options.enemy_composition && !options.enemy_progression) {
+            if (!options.enemy_tables && !options.enemy_randomizer) {
                 return;
             }
 
@@ -1753,7 +1753,7 @@ namespace {
 
             log("");
             log("ENEMIES:");
-            if (options.enemy_progression) {
+            if (options.enemy_randomizer) {
                 std::string text;
                 progression::make_plan(progression_tables, options, text);
                 spoiler += text;
@@ -1761,7 +1761,7 @@ namespace {
             else if (options.enemy_tables) {
                 log("  Area enemy tables shuffled.");
             }
-            if (options.enemy_composition) {
+            if (options.enemy_randomizer) {
                 log("  Encounter compositions shuffled.");
             }
 
@@ -1794,7 +1794,7 @@ namespace {
                 // Two of Merrow's 72 regions carry preset lists that disagree
                 // with the ROM (they look swapped with each other), so writing
                 // unchanged region data back would quietly alter them.
-                for (int r = 0; options.enemy_composition && r < area.region_count; r++) {
+                for (int r = 0; options.enemy_randomizer && r < area.region_count; r++) {
                     const mapdata::Region& region = enemy_regions[area.region_start + r];
                     auto preset = [&](size_t i) {
                         return i < region.presets.size() ? static_cast<uint32_t>(region.presets[i]) : 0u;
@@ -1947,11 +1947,7 @@ static nlohmann::json options_to_json(const Options& o) {
     j["fire_book"] = o.fire_book;
     j["shannon_hints"] = o.shannon_hints;
     j["enemy_tables"] = o.enemy_tables;
-    j["enemy_composition"] = o.enemy_composition;
-    j["enemy_progression"] = o.enemy_progression;
-    j["enemy_spread_down"] = o.enemy_spread_down;
-    j["enemy_spread_up"] = o.enemy_spread_up;
-    j["enemy_scaling"] = o.enemy_scaling;
+    j["enemy_randomizer"] = o.enemy_randomizer;
     j["encounter_rate"] = o.encounter_rate;
     j["mp_regain"] = o.mp_regain;
     j["staff_hit_mp"] = o.staff_hit_mp;
@@ -2045,14 +2041,9 @@ static Options options_from_json(const nlohmann::json& j) {
     get("fire_book", o.fire_book);
     get("shannon_hints", o.shannon_hints);
     get("enemy_tables", o.enemy_tables);
-    get("enemy_composition", o.enemy_composition);
-    get("enemy_progression", o.enemy_progression);
-    get("enemy_spread_down", o.enemy_spread_down);
-    get("enemy_spread_up", o.enemy_spread_up);
-    get("enemy_scaling", o.enemy_scaling);
-    o.enemy_spread_down = std::clamp(o.enemy_spread_down, 0, 7);
-    o.enemy_spread_up = std::clamp(o.enemy_spread_up, 0, 7);
-    o.enemy_scaling = std::clamp(o.enemy_scaling, 0, 2);
+    // "enemy_progression" is the name the option had for a day.
+    get("enemy_progression", o.enemy_randomizer);
+    get("enemy_randomizer", o.enemy_randomizer);
     o.lost_keys = std::clamp(o.lost_keys, 0, 2);
     o.zoom_out = std::clamp(o.zoom_out, 0, 4);
     get("encounter_rate", o.encounter_rate);

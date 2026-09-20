@@ -31,13 +31,10 @@ namespace {
         return tiers;
     }
 
-    double scaling_k(const Options& options) {
-        switch (options.enemy_scaling) {
-            case 0: return 0.0;
-            case 1: return 0.5;
-            default: return 1.0;
-        }
-    }
+    // Sheet: Settings B4-B6. Any set may serve any area; scaling is full.
+    constexpr int spread_down = 7;
+    constexpr int spread_up = 7;
+    constexpr double scaling_k = 1.0;
 
     // Sheet: Areas columns M-N. budget[i] = MAX(avg_power[i], budget[i-1]).
     std::vector<double> guards() {
@@ -54,8 +51,9 @@ namespace {
 std::vector<int> zelda64::randomizer::progression::candidate_tables(int area, const Options& options) {
     std::vector<int> out;
     const data::AreaInfo& here = data::areas[static_cast<size_t>(area)];
-    int low = std::max(1, here.tier - options.enemy_spread_down);
-    int high = std::min(tier_count, here.tier + options.enemy_spread_up);
+    (void)options;
+    int low = std::max(1, here.tier - spread_down);
+    int high = std::min(tier_count, here.tier + spread_up);
 
     for (int table = 0; table < static_cast<int>(data::table_monsters.size()); table++) {
         std::vector<int> tiers = file_tiers(table);
@@ -80,13 +78,12 @@ std::vector<int> zelda64::randomizer::progression::candidate_tables(int area, co
 Plan zelda64::randomizer::progression::make_plan(const std::vector<int>& table_per_area, const Options& options, std::string& spoiler) {
     Plan plan;
     plan.enabled = true;
-    double k = scaling_k(options);
+    (void)options;
+    double k = scaling_k;
     std::vector<double> guard = guards();
 
     char line[256];
-    std::snprintf(line, sizeof(line), "  Progression: tiers below %d, above %d, scaling %s.\n",
-        options.enemy_spread_down, options.enemy_spread_up,
-        k == 0.0 ? "off" : (k == 0.5 ? "half" : "full"));
+    std::snprintf(line, sizeof(line), "  Enemy Randomizer: any set in any area, stats and damage scaled to the area (k = %.1f).\n", k);
     spoiler += line;
 
     for (int a = 0; a < area_count(); a++) {

@@ -259,7 +259,7 @@ namespace {
     constexpr int32_t gCurrentMap = 0x80084EEC;
     constexpr int32_t gNextMap = 0x80084EE4;
     constexpr int32_t file_table = 0x80054160;
-    constexpr int32_t file_table_row = 0x8008D0BC;   // set by func_80008EF4
+    constexpr int32_t file_table_row = 0x8007D0BC;   // set by func_80008EF4 (0x8008_0000 - 0x2F44)
     constexpr int entry_size = 0x38;
 
     // Sheet: Settings B23-B24 (HP 999; ATK/DEF/AGI 255). EXP and Stones are

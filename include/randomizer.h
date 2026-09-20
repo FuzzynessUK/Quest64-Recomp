@@ -152,18 +152,14 @@ namespace zelda64::randomizer {
         int lost_keys = 0;
         bool fire_book = false;
         bool shannon_hints = false;
-        // Enemy shuffling. Tables swap which roster each area draws from;
-        // compositions reroll which packs a region spawns and which enemies
-        // each pack holds. Independent, and either can be used alone.
+        // Merrow's table shuffle: swaps which monster set each area draws from,
+        // with no regard for difficulty. Superseded by enemy_randomizer.
         bool enemy_tables = false;
-        bool enemy_composition = false;
-        // Enemy progression (DOCS/enemyrandologic.xlsx): the tables option done
-        // tier-aware, plus every monster scaled to the area it appears in
-        // when a battle starts. Takes precedence over enemy_tables.
-        bool enemy_progression = false;
-        int enemy_spread_down = 7;   // tiers below the area it may draw from (7 = any)
-        int enemy_spread_up = 7;     // tiers above (7 = any)
-        int enemy_scaling = 2;       // 0 off, 1 half (k = 0.5), 2 full (k = 1)
+        // Enemy Randomizer (DOCS/enemyrandologic.xlsx): any monster set can land
+        // in any area, the encounter packs are rerolled, and every monster's
+        // stats and spell damage are scaled to the area it appears in (spread
+        // any/any, scaling full, as the sheet's Settings tab). One switch.
+        bool enemy_randomizer = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.
