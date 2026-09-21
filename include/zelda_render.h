@@ -21,6 +21,9 @@ namespace zelda64 {
         // pixels (240 tall, x from the window's left edge); `custom` false
         // leaves a block where the game puts it (Enhancements > HUD).
         void set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y);
+        // Widens the game's inset scissor and frame clear to the full frame
+        // so the scene reaches the window's edges (Layout: Remove black borders).
+        void set_borders_removed(bool value);
         // Writes the next frame's display list to widescreen_frame.txt (F9).
         void request_widescreen_frame_dump();
 

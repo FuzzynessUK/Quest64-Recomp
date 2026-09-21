@@ -53,10 +53,12 @@ int recompui::config_tab_to_index(recompui::ConfigTab tab) {
         return 6;
     case recompui::ConfigTab::Enhancements:
         return 7;
-    case recompui::ConfigTab::Audio:
+    case recompui::ConfigTab::Layout:
         return 8;
-    case recompui::ConfigTab::Debug:
+    case recompui::ConfigTab::Audio:
         return 9;
+    case recompui::ConfigTab::Debug:
+        return 10;
     default:
         assert(false && "Unknown config tab.");
         return 0;
@@ -855,6 +857,14 @@ void make_enhancements_bindings(Rml::Context* context) {
         [](const Rml::Variant& in) {
             enhancements_context.edited.faster_walk = in.Get<int>() != 0;
             enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_remove_borders",
+        [](Rml::Variant& out) { out = enhancements_context.edited.remove_borders ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.remove_borders = in.Get<int>() != 0;
+            zelda64::renderer::set_borders_removed(enhancements_context.edited.remove_borders);
+            enhancements_option_changed(false);
         }
     );
     constructor.BindFunc("enh_notifications",

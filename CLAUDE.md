@@ -92,7 +92,12 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   starting stats and cosmetics have none on request.
 - **Reset** — a button on General and a bindable "Reset Game" control.
 - Tab order (`config_menu.rml` and `config_tab_to_index`): General, Controls,
-  Graphics, Sound, Mods, Cheats, Randomizer, Enhancements, Audio, Debug. It
+  Graphics, Sound, Mods, Cheats, Randomizer, Enhancements, Layout, Audio,
+  Debug. **Layout** (`layout.rml`, shares `enhancements_model`) holds the HUD
+  group (Remove black borders: the walker rewrites the inset scissor
+  8..312x8..232 and the 8..311 frame clear to the full frame in place; the
+  drag preview for the HP/MP block and the spirits) and the Notifications
+  group; both moved out of Enhancements 2026-09-21. It
   relaunches the application, because ultramodern can start a game but has no
   way to tear a running one down.
 

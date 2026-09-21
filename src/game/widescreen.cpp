@@ -243,6 +243,23 @@ namespace {
     uint32_t game_scissor_w0 = 0xED020020; // 8,8 .. 312,232, the game's default
     uint32_t game_scissor_w1 = 0x004E03A0;
 
+    // "Remove black borders" (Layout tab). The game scissors and clears an
+    // inset frame, 8..312 x 8..232, while its 3D viewport (the Vp at
+    // 0x80072E90) is the full 320x240, so the outer eight pixels are never
+    // drawn: a black border, scaled up with the window. Rewriting that one
+    // scissor and the frame clear to the full frame, in place (same-size
+    // commands), lets the scene reach the edges. Other scissors and fills
+    // are left alone.
+    std::atomic<bool> remove_borders = false;
+    constexpr uint32_t inset_scissor_w0 = 0xED020020;
+    constexpr uint32_t inset_scissor_w1 = 0x004E03A0;
+    constexpr uint32_t full_scissor_w0 = 0xED000000;            // 0,0
+    constexpr uint32_t full_scissor_w1 = (1280u << 12) | 960u;  // 320,240 in 10.2
+    constexpr uint32_t inset_clear_w0 = (0xF6u << 24) | ((311u * 4) << 12) | (231u * 4);
+    constexpr uint32_t inset_clear_w1 = ((8u * 4) << 12) | (8u * 4);
+    constexpr uint32_t full_clear_w0 = (0xF6u << 24) | ((319u * 4) << 12) | (239u * 4);
+    constexpr uint32_t full_clear_w1 = 0x00000000;
+
     // Appends commands to a sub-list allocated from the ring.
     struct SubList {
         uint8_t* rdram;
@@ -386,8 +403,10 @@ namespace {
         int ulx = (w1 >> 12) & 0xFFF;
         int tile = (w1 >> 24) & 0x7;
         // 10.2 fixed point throughout; nothing left of or above the window.
-        int dx = static_cast<int>(block.x.load() * 4.0f);
-        int dy = static_cast<int>(block.y.load() * 4.0f) - anchor_y * 4;
+        // Whole pixels only: a quarter-pixel offset makes the bar's last row
+        // sample the next row of the texture atlas.
+        int dx = static_cast<int>(std::lround(block.x.load())) * 4;
+        int dy = (static_cast<int>(std::lround(block.y.load())) - anchor_y) * 4;
         auto shift = [](int v, int d) { return static_cast<uint32_t>(std::max(v + d, 0)); };
 
         SubList sub(rdram, 34);
@@ -422,6 +441,12 @@ namespace {
                     return;
 
                 case op_setscissor:
+                    if (remove_borders.load() && w0 == inset_scissor_w0 && w1 == inset_scissor_w1) {
+                        w0 = full_scissor_w0;
+                        w1 = full_scissor_w1;
+                        write_w(rdram, addr, w0);
+                        write_w(rdram, addr + 4, w1);
+                    }
                     game_scissor_w0 = w0;
                     game_scissor_w1 = w1;
                     break;
@@ -492,6 +517,12 @@ namespace {
                 }
 
                 case op_fillrect: {
+                    if (remove_borders.load() && w0 == inset_clear_w0 && w1 == inset_clear_w1) {
+                        w0 = full_clear_w0;
+                        w1 = full_clear_w1;
+                        write_w(rdram, addr, w0);
+                        write_w(rdram, addr + 4, w1);
+                    }
                     int lrx = (w0 >> 12) & 0xFFF;
                     int ulx = (w1 >> 12) & 0xFFF;
                     log_rect(op, ulx >> 2, (w1 & 0xFFF) >> 2, lrx >> 2, (w0 & 0xFFF) >> 2);
@@ -536,6 +567,10 @@ namespace {
 
 void zelda64::renderer::set_widescreen_2d_enabled(bool value) {
     enabled.store(value);
+}
+
+void zelda64::renderer::set_borders_removed(bool value) {
+    remove_borders.store(value);
 }
 
 void zelda64::renderer::set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y) {

@@ -63,6 +63,9 @@ namespace zelda64::enhancements {
         // HUD layout (the HUD group): the HP/MP block and the four spirits,
         // dragged in the tab's preview. Frame pixels, x from the window's
         // left edge; custom false is the game's own place. Applied live.
+        // The eight-pixel black border the game leaves around the frame is
+        // drawn over (widescreen.cpp). Applied live.
+        bool remove_borders = false;
         bool hud_hp_custom = false;
         float hud_hp_x = 0.0f;
         float hud_hp_y = 0.0f;

@@ -124,6 +124,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("exit_from_anywhere", o.exit_from_anywhere);
     get("longer_magic_barrier", o.longer_magic_barrier);
     get("faster_walk", o.faster_walk);
+    get("remove_borders", o.remove_borders);
     get("hud_hp_custom", o.hud_hp_custom);
     get("hud_hp_x", o.hud_hp_x);
     get("hud_hp_y", o.hud_hp_y);
@@ -158,6 +159,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["exit_from_anywhere"] = o.exit_from_anywhere;
     j["longer_magic_barrier"] = o.longer_magic_barrier;
     j["faster_walk"] = o.faster_walk;
+    j["remove_borders"] = o.remove_borders;
     j["hud_hp_custom"] = o.hud_hp_custom;
     j["hud_hp_x"] = o.hud_hp_x;
     j["hud_hp_y"] = o.hud_hp_y;
@@ -196,6 +198,7 @@ void zelda64::enhancements::apply_at_boot(uint8_t* rdram) {
     const Options& options = active_options();
     zelda64::renderer::set_hud_layout(options.hud_hp_custom, options.hud_hp_x, options.hud_hp_y,
         options.hud_sp_custom, options.hud_sp_x, options.hud_sp_y);
+    zelda64::renderer::set_borders_removed(options.remove_borders);
     std::vector<Write> writes = build_writes(options);
     if (writes.empty()) {
         return;

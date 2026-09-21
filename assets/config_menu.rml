@@ -32,6 +32,7 @@
 	<link type="text/template" href="config_menu/cheats.rml" />
 	<link type="text/template" href="config_menu/randomizer.rml" />
 	<link type="text/template" href="config_menu/enhancements.rml" />
+	<link type="text/template" href="config_menu/layout.rml" />
 	<link type="text/template" href="config_menu/audio.rml" />
 </head>
 <body class="window">
@@ -95,6 +96,13 @@
 						</tab>
 						<panel class="config" data-model="enhancements_model">
 							<template src="config-menu__enhancements" />
+						</panel>
+						<tab class="tab" id="tab_layout">
+							<div>Layout</div>
+							<div class="tab__indicator"></div>
+						</tab>
+						<panel class="config" data-model="enhancements_model">
+							<template src="config-menu__layout" />
 						</panel>
 						<tab class="tab" id="tab_audio">
 							<div>Audio</div>

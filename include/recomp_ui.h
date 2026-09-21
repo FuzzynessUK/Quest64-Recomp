@@ -68,6 +68,7 @@ namespace recompui {
         Cheats,
         Randomizer,
         Enhancements,
+        Layout,
         Audio,
         Debug,
     };

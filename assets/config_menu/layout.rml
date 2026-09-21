@@ -1,0 +1,121 @@
+<template name="config-menu__layout">
+    <head>
+    </head>
+    <body>
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>HUD</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Remove black borders</div><div class="config-tip-text">The game leaves an eight-pixel black frame around the picture that scales up with the window; this draws the scene right to the edges instead. Applies straight away.</div></div>
+                                        <select data-value="enh_remove_borders" id="enh_remove_borders_select" style="nav-up: #tab_layout">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" style="align-items: flex-start;">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Layout</div><div class="config-tip-text">The box is your window and the lighter part the 4:3 picture. Drag the HP/MP block and the four spirits to where you want them on screen; each default button puts one back where the game draws it. The Notifications box shows where messages appear (set under Notifications). Applies straight away.</div></div>
+                                        <div id="hud_preview" class="hud-preview">
+                                            <div id="hud_area" class="hud-area"></div>
+                                            <div id="hud_hp_box" class="hud-box">HP/MP</div>
+                                            <div id="hud_sp_box" class="hud-box">Spirits</div>
+                                            <div id="hud_notice_box" class="hud-box hud-box--notice">Notifications</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="hud_reset_hp">HP/MP default</button>
+                                    <button class="button" onclick="hud_reset_sp">Spirits default</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Notifications</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notifications</div><div class="config-tip-text">The on-screen messages in the top-left corner. Off hides the options below and shows nothing. Applies straight away.</div></div>
+                                        <select data-value="enh_notifications" id="enh_notifications_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div data-if="enh_notifications == 1">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Position</div><div class="config-tip-text">Where the messages sit on screen. Top left shares its column with the Speedrun Timer when that is top left too. Applies straight away.</div></div>
+                                        <select data-value="enh_notify_position" id="enh_notify_position_select">
+                                            <option value="0">Top left</option>
+                                            <option value="1">Top middle</option>
+                                            <option value="2">Top right</option>
+                                            <option value="3">Left</option>
+                                            <option value="4">Right</option>
+                                            <option value="5">Middle</option>
+                                            <option value="6">Bottom left</option>
+                                            <option value="7">Bottom middle</option>
+                                            <option value="8">Bottom right</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Never expire</div><div class="config-tip-text">Messages stay on screen instead of fading after three seconds; the oldest is pushed out when the maximum is reached. Applies straight away.</div></div>
+                                        <select data-value="enh_notify_never_expire" id="enh_notify_never_expire_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Max messages: {{enh_notify_max}}</div><div class="config-tip-text">How many messages can be on screen at once; beyond that the oldest is pushed out. Applies straight away.</div></div>
+                                        <input
+                                            class="nav-vert"
+                                            id="enh_notify_max_input"
+                                            type="range"
+                                            data-value="enh_notify_max"
+                                            min="1"
+                                            max="10"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show spell learnt</div><div class="config-tip-text">The game says nothing when a spirit takes an element to a spell's unlock level. With this on, "You have learnt ..." appears top-left for three seconds for each spell as it unlocks, using the unlock levels in play (the randomizer's level options included).</div></div>
+                                        <select data-value="enh_spell_notice" id="enh_spell_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show item received</div><div class="config-tip-text">"Received ..." appears top-left for three seconds whenever an item is added to your bag - chests, gifts, drops and shops alike.</div></div>
+                                        <select data-value="enh_item_notice" id="enh_item_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Speedrun Timer</div><div class="config-tip-text">Shows a run timer on screen. It starts when you leave the title screen and stops on the message that Mammon has been destroyed. Pick where on the screen it sits.</div></div>
+                                        <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Top left</option>
+                                            <option value="5">Top middle</option>
+                                            <option value="2">Top right</option>
+                                            <option value="3">Bottom left</option>
+                                            <option value="6">Bottom middle</option>
+                                            <option value="4">Bottom right</option>
+                                        </select>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>
