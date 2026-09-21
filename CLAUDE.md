@@ -16,10 +16,11 @@ detailed record; this file is the working guide.
 Four user-facing additions on top of the base port, all reached from the config
 menu (F5 Cheats, F6 Randomizer, Enhancements tab):
 
-- **Cheats tab** — warp, stat sliders, movement speed (scales the final
-  velocity, clamped to 3 units a step), Get Item, and a master on/off that
+- **Cheats tab** — warp, stat sliders, Get Item, and a master on/off that
   gates everything on the tab.
-- **Randomizer tab** — a port of Merrow (MIT). Data-only options are ROM writes
+- **Randomizer tab** — a port of Merrow (MIT). One On/Off toggle at the top;
+  everything else on the tab is hidden (`data-if="rnd_mode == 1"`) while it
+  is off. Data-only options are ROM writes
   applied at boot; options that patch *code* are native hooks instead. Includes
   Lost Keys (both rulesets), Shannon hints, the cosmetic palettes, Merrow's
   table/stat shuffles, and our own **Enemy Randomizer** (below).
@@ -75,12 +76,17 @@ Chronologically, newest last. All committed and pushed unless noted.
    collapsed to one control (settings on disk unchanged: `speedrun_timer` +
    `timer_position`), "Text improvements" label shrunk to 16dp because the
    word IMPROVEMENTS alone is wider than the 196dp label column.
-5. **Faster walking** (`89bd879`) — Hard Mode's only movement change is the
-   walk target speed `lui $at, 0x4000` (2.0) → 2.75 at 0x80005418 in
-   `func_8000534C`; the option does the same on vanilla/randomizer, sharing
-   the hook site. It also lowers the stop friction (D_800710B8, 0.9 a frame,
-   applied at 0x80005638) to 18/(18+2.75) so Brian coasts the vanilla 18
-   units instead of 25. Deployed; awaiting the user's play-test.
+5. **Faster walking** (`89bd879`, reworked 2026-09-21) — now the mechanism the
+   old Movement speed cheat used, fixed at 140%: the velocity every movement
+   state hands to `func_80005748` (player struct +0x18/+0x20, a1) is scaled
+   on entry and divided back before the routine's single `jr $ra` at
+   0x80005A08, 3-unit step cap kept. The restore is the point: the cheat left
+   the scaled value in the struct, the walk handler's 0.2 lerp read it back
+   and ran away to the cap (so "140%" was really 150%), and the skid's
+   0.68-a-frame decay became 0.95 — the long slide the user reported. With
+   the restore the slide keeps its vanilla 8 frames and covers 1.4x the
+   distance, like Hard Mode's 2.75 pace. Off under Hard Mode. The cheat and
+   the 0x8000541C/0x80005638 walk hooks are gone. Awaiting play-test.
 
 Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
 ("Randomizer work still open", "Known gaps / ideas").
@@ -169,8 +175,7 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   cannot be patched in the ROM at all and need `on_frame` or a hook.
 - Hook functions named in `us.rev0.toml` are implicitly declared in the
   generated C; define them `extern "C"` and rerun N64Recomp.
-- **One hook per address.** Two features that need the same site (Hard Mode
-  and Faster walking both at 0x8000541C) go in one `text = "a(rdram, ctx); b(rdram, ctx);"`.
+- **One hook per address.** Two features that need the same site go in one `text = "a(rdram, ctx); b(rdram, ctx);"`.
 - A hook cannot sit on a jump's delay slot: N64Recomp emits the slot inside
   the call, so the hook lands in dead code after it. Hook the callee's entry
   or the jump itself instead. A hook's text may `return;` to skip the rest of
@@ -237,5 +242,9 @@ and why the stat-gain sparkle effect cannot be ported by injecting a call.
   released `.rup` in `tools/hardmode/` is the authority.
 - Zelda64Recomp `patches/ui_patches.c` — reference for RT64 extended-GBI use.
 - Movement constants (func_8000534C, data at 0x80071068..): 0.025 stick
-  scale, 0.4 turn lerp, 0.2 accel lerp (D_800710B0), 0.9 stop friction
-  (D_800710B8), target speed 2.0 as an immediate at 0x80005418.
+  scale, 0.4 turn lerp, 0.2 accel lerp (D_800710B0), target speed 2.0 as an
+  immediate at 0x80005418. Letting go of the stick multiplies the velocity
+  by 0.9 (D_800710B8) **once** and enters skid state 4 for 8 frames
+  (`func_80003F98`: move, then velocity ×= 0.68, D_80070F50 — the constant
+  Merrow's Celtland Drift raises above 1). State 1 is the battle-movement
+  twin `func_80004E58`; every state moves through `func_80005748`.

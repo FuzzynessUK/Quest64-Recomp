@@ -37,12 +37,17 @@ before_vram = 0x80024260
 func = "func_80026658"
 text = "quest64_cheats_frame(rdram);"
 before_vram = 0x80026658
-# Scale Brian's per-frame velocity (player struct +0x18/+0x20, passed in a1)
-# right after the walk/run handlers compute it and before collision uses it.
+# Faster walking: scale Brian's per-frame velocity (player struct +0x18/+0x20,
+# passed in a1) on entry to the collision/move routine and restore it before
+# the routine's single `jr $ra`, so the handlers never see the scaled value.
 [[patches.hook]]
 func = "func_80005748"
-text = "quest64_scale_player_velocity(rdram, ctx);"
+text = "quest64_enh_walk_scale(rdram, ctx);"
 before_vram = 0x80005748
+[[patches.hook]]
+func = "func_80005748"
+text = "quest64_enh_walk_unscale(rdram, ctx);"
+before_vram = 0x80005A08
 
 # Post-process each frame's display list for widescreen just before the
 # graphics task is loaded; a0 holds the NUScTask at this point.
@@ -221,12 +226,8 @@ text = "quest64_hardmode_hp_exp_t3(rdram, ctx);"
 before_vram = 0x80004578
 [[patches.hook]]
 func = "func_8000534C"
-text = "quest64_hardmode_walk_speed(rdram, ctx); quest64_enh_walk_speed(rdram, ctx);"
+text = "quest64_hardmode_walk_speed(rdram, ctx);"
 before_vram = 0x8000541C
-[[patches.hook]]
-func = "func_8000534C"
-text = "quest64_enh_walk_friction(rdram, ctx);"
-before_vram = 0x80005638
 [[patches.hook]]
 func = "func_80006BEC"
 text = "quest64_hardmode_hp_exp_t9(rdram, ctx);"

@@ -266,62 +266,6 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     zelda64::speedrun::update(false);
 }
 
-// Movement speed.
-//
-// The walk and run handlers (func_8000534C / func_80004E58) leave the frame's
-// velocity in the player struct at +0x18 (x) and +0x20 (z), and func_80003B60
-// then calls func_80005748 with the struct in a1 to resolve collisions using
-// position + velocity. Scaling the velocity on entry to that call keeps the
-// game's own collision in the loop.
-namespace {
-    std::atomic<float> player_speed_scale = 1.0f;
-
-    float read_f32(uint8_t* rdram, int32_t addr) {
-        int32_t bits = MEM_W(0, addr);
-        float value;
-        std::memcpy(&value, &bits, sizeof(value));
-        return value;
-    }
-
-    void write_f32(uint8_t* rdram, int32_t addr, float value) {
-        int32_t bits;
-        std::memcpy(&bits, &value, sizeof(bits));
-        MEM_W(0, addr) = bits;
-    }
-}
-
-void zelda64::set_player_speed_scale(float scale) {
-    player_speed_scale.store(scale);
-}
-
-float zelda64::get_player_speed_scale() {
-    return cheats_on.load() ? player_speed_scale.load() : 1.0f;
-}
-
-// Walls are about 3.5 units thick and the collision test is on position +
-// velocity rather than swept, so a single step must stay under that or Brian
-// ends up on the far side. Vanilla moves about 2 units per update.
-constexpr float max_step_units = 3.0f;
-
-extern "C" void quest64_scale_player_velocity(uint8_t* rdram, recomp_context* ctx) {
-    float scale = player_speed_scale.load();
-    if (scale == 1.0f) {
-        return;
-    }
-    int32_t player = static_cast<int32_t>(ctx->r5);
-    float vx = read_f32(rdram, player + 0x18) * scale;
-    float vz = read_f32(rdram, player + 0x20) * scale;
-
-    float step = std::sqrt(vx * vx + vz * vz);
-    if (step > max_step_units) {
-        vx *= max_step_units / step;
-        vz *= max_step_units / step;
-    }
-
-    write_f32(rdram, player + 0x18, vx);
-    write_f32(rdram, player + 0x20, vz);
-}
-
 // Master switch, inventory and the kill button.
 //
 // gInventory (0x8008CF78) is a flat list of 150 item ids with 0xFF for an

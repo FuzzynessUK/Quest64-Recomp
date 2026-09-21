@@ -84,31 +84,6 @@
                                 "interior" rooms only connect within their own map.</div>
                             </label>
                         </div>
-                        <div class="config-debug-option">
-                            <label
-                                class="config-debug-option__label"
-                            >
-                                <div>Movement speed</div>
-                            </label>
-                            <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">
-                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
-                                        <div class="config-debug__select-label"><div>Speed: {{cheat_speed_percent}}%</div></div>
-                                        <input
-                                            data-event-blur="set_cur_config_index(-1)"
-                                            data-event-focus="set_cur_config_index(1)"
-                                            class="nav-vert"
-                                            id="cheat_speed_percent_input"
-                                            type="range"
-                                            data-value="cheat_speed_percent"
-                                            min="100"
-                                            max="150"
-                                            step="10"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                         <div class="config-debug-option" data-if="cheat_stats_available">
                             <label
                                 class="config-debug-option__label"

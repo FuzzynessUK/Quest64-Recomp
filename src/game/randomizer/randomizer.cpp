@@ -2228,7 +2228,7 @@ void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
 
 std::string zelda64::randomizer::describe(const Options& options) {
     if (options.mode != Mode::Randomizer) {
-        return "Vanilla";
+        return "Randomizer off";
     }
-    return "Randomizer, seed " + (options.seed.empty() ? std::string("(empty)") : options.seed);
+    return "Randomizer on, seed " + (options.seed.empty() ? std::string("(empty)") : options.seed);
 }

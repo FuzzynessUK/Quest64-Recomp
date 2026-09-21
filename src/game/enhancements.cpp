@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <span>
@@ -6,6 +8,7 @@
 #include <vector>
 
 #include "enhancements.h"
+#include "hardmode.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
 #include "zelda_debug.h"
@@ -234,33 +237,74 @@ void zelda64::enhancements::cast_exit() {
     zelda64::do_map_warp(map, 0, 0, false, true);
 }
 
-// Walk speed and stop friction (Options::faster_walk). Both sit in
-// func_8000534C. The target speed is `lui $at, 0x4000` (2.0) at 0x80005418,
-// consumed by the mtc1 after it; Hard Mode patches the same instruction, so
-// the two hooks share the site in us.rev0.toml. The friction is the double
-// D_800710B8 (0.9), loaded into $f0 at 0x80005604 and applied to the
-// velocity at 0x80005638 once the stick is neutral.
+// Faster walking (Options::faster_walk). The movement handlers leave the
+// frame's velocity in the player struct at +0x18 (x) and +0x20 (z), and
+// func_80005748 then moves Brian by it, resolving collisions against
+// position + velocity. The velocity is scaled on entry to that call and
+// restored on its return, so the game's own wall test sees the longer step
+// while the handlers read back next frame exactly what they wrote. (Leaving
+// it scaled fed the scaled value into the walk handler's speed lerp, which
+// ran away to the cap, and into the skid's 0.68-a-frame decay, which then
+// barely decayed at all: that was the long slide after letting go of the
+// stick.) Every state moves through this call - the field walk
+// (func_8000534C), battle movement (func_80004E58) and the eight-frame skid
+// after the stick is released (func_80003F98, D_80070F50) - so the slide
+// keeps its vanilla frame count and covers 1.4x the distance, the same
+// shape as Hard Mode's 2.75 target speed gives. Hard Mode keeps its own
+// pace: the scale is not stacked on top of it.
 namespace {
-    constexpr double vanilla_walk_speed = 2.0;
-    constexpr double fast_walk_speed = 2.75;      // 0x4030 as a float's high half
-    constexpr double vanilla_friction = 0.9;
-    // Multiplying the velocity by f each frame coasts speed * f / (1 - f)
-    // units: 18 in the vanilla game. The friction that coasts the same 18
-    // from the faster speed is 18 / (18 + speed), about 0.8675.
-    constexpr double vanilla_coast = vanilla_walk_speed * vanilla_friction / (1.0 - vanilla_friction);
-    constexpr double fast_friction = vanilla_coast / (vanilla_coast + fast_walk_speed);
+    constexpr float walk_speed_scale = 1.4f;
+    // Walls are about 3.5 units thick and the collision test is on position +
+    // velocity rather than swept, so a single step must stay under that or
+    // Brian ends up on the far side. Vanilla walks 2 units a frame.
+    constexpr float max_step_units = 3.0f;
+
+    // Left by the entry hook for the exit hook: the struct that was scaled
+    // and the factor actually applied (smaller than walk_speed_scale when
+    // the step cap bit). Both hooks run on the game thread.
+    int32_t scaled_player = 0;
+    float applied_scale = 1.0f;
+
+    float read_f32(uint8_t* rdram, int32_t addr) {
+        int32_t bits = MEM_W(0, addr);
+        float value;
+        std::memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+
+    void write_f32(uint8_t* rdram, int32_t addr, float value) {
+        int32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        MEM_W(0, addr) = bits;
+    }
 }
 
-extern "C" void quest64_enh_walk_speed(uint8_t*, recomp_context* ctx) {
-    if (!zelda64::enhancements::active_options().faster_walk) {
+extern "C" void quest64_enh_walk_scale(uint8_t* rdram, recomp_context* ctx) {
+    applied_scale = 1.0f;
+    if (!zelda64::enhancements::active_options().faster_walk || zelda64::hardmode::active()) {
         return;
     }
-    ctx->r1 = S32(0x4030 << 16);
+    int32_t player = static_cast<int32_t>(ctx->r5);
+    float vx = read_f32(rdram, player + 0x18);
+    float vz = read_f32(rdram, player + 0x20);
+    float scale = walk_speed_scale;
+    float step = std::sqrt(vx * vx + vz * vz) * scale;
+    if (step > max_step_units) {
+        scale *= max_step_units / step;
+    }
+    write_f32(rdram, player + 0x18, vx * scale);
+    write_f32(rdram, player + 0x20, vz * scale);
+    scaled_player = player;
+    applied_scale = scale;
 }
 
-extern "C" void quest64_enh_walk_friction(uint8_t*, recomp_context* ctx) {
-    if (!zelda64::enhancements::active_options().faster_walk) {
+extern "C" void quest64_enh_walk_unscale(uint8_t* rdram, recomp_context*) {
+    if (applied_scale == 1.0f) {
         return;
     }
-    ctx->f0.d = fast_friction;
+    // func_80005748 may have zeroed or projected the velocity on a wall;
+    // dividing keeps whatever it decided in the game's own units.
+    write_f32(rdram, scaled_player + 0x18, read_f32(rdram, scaled_player + 0x18) / applied_scale);
+    write_f32(rdram, scaled_player + 0x20, read_f32(rdram, scaled_player + 0x20) / applied_scale);
+    applied_scale = 1.0f;
 }

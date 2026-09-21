@@ -64,12 +64,8 @@ namespace zelda64 {
     // Queue a value to be written on the game's next frame.
     void set_player_stat(PlayerStat stat, int value);
 
-    // Multiplier applied to Brian's field/battle movement each frame.
-    void set_player_speed_scale(float scale);
-    float get_player_speed_scale();
-
     // Master switch for the cheats tab. With it off nothing on the tab
-    // writes to the game: stat edits, the speed scale, queued warps and
+    // writes to the game: stat edits, queued warps and
     // item grants are all dropped, while the live readouts keep updating.
     void set_cheats_enabled(bool enabled);
     bool cheats_enabled();

@@ -13,29 +13,30 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div>Mode</div>
+                                <div>Randomizer</div>
                             </label>
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Game</div></div>
+                                        <div class="config-debug__select-label"><div>Mode</div></div>
                                         <select data-value="rnd_mode" id="rnd_mode_select" style="nav-up: #tab_randomizer">
-                                            <option value="0">Vanilla</option>
-                                            <option value="1">Randomizer</option>
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="rnd_mode == 1">
                                         <div class="config-debug__select-label"><div>Seed</div></div>
                                         <input type="text" id="rnd_seed_input" data-value="rnd_seed" maxlength="32" />
                                     </div>
                                 </div>
-                                <div class="config-debug__option-trigger">
+                                <div class="config-debug__option-trigger" data-if="rnd_mode == 1">
                                     <button class="icon-button icon-button--success" onclick="rnd_new_seed">
                                         <svg src="icons/Arrow.svg" />
                                     </button>
                                 </div>
                             </div>
                         </div>
+                        <div data-if="rnd_mode == 1">
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
                                 <div>Presets</div>
@@ -719,6 +720,7 @@
                             <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Port of Merrow by Hangedman. Settings save as you change them and take effect the next time the game is launched; a spoiler log is written next to the settings files.</div>
                             </label>
+                        </div>
                         </div>
                     </div>
                 </div>

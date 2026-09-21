@@ -52,13 +52,14 @@ source is checked out next to it at `D:\Games\reference\merrow` for reference.
   ("to Larapool", "from submap 1"). Counts come from the map table so nothing
   out of range can be chosen. `src/game/map_table.cpp`.
 - **Brian's stats**: HP/MP/max/agility/defense/four elements, live sliders.
-- **Movement speed**: 100–150%, per-step displacement clamped to 3 units so
-  the position-based wall test can't be skipped (walls ~3.5 thick).
+- Movement speed (100–150%) was a cheat here until 2026-09-21; it became the
+  Enhancements tab's Faster walking (fixed 140%), see "Faster walking" below.
 - Game-side code is `src/game/debug.cpp`, hooked once per frame at
   `func_80026658` (`quest64_cheats_frame`).
 
 ### Randomizer tab (F6 / launcher button) — in-app port of Merrow (Stage 1)
-- Vanilla / Randomizer mode, seed, Merrow's data-only options. Patch is
+- On/Off toggle (was a Vanilla/Randomizer select; the rest of the tab is
+  hidden while off), seed, Merrow's data-only options. Patch is
   applied to the in-memory ROM at boot (`on_init_callback`), ROM on disk is
   never touched. `src/game/randomizer/`; tables generated from Merrow's
   DataStore.cs by `tools/convert_merrow_datastore.pl`.
@@ -247,6 +248,23 @@ cheats frame hook.
   duplicate two bytes later) is set to 1 in the ROM, and Brian's max HP is held
   at 1 each frame so it also applies to a save already in progress. HP is only
   ever lowered, never raised, so a death in progress is not undone.
+- **Faster walking** (2026-09-21, replaces the 0x8000541C/0x80005638 target
+  speed + friction version and the Movement speed cheat) — a fixed 1.4x
+  scale on the velocity every movement state hands to `func_80005748`
+  (player struct +0x18/+0x20 in a1), applied on entry and divided back out
+  before the routine's single `jr $ra` at 0x80005A08; step capped at 3
+  units (walls ~3.5). Not applied over Hard Mode.
+  - Why the restore matters: the cheat scaled in place. The walk handler
+    `func_8000534C` reads the stored velocity back for its 0.2 speed lerp,
+    so `m' = 1.4(0.8m + 0.4)` diverged and sat on the 3-unit cap ("140%"
+    was 150% with snappier acceleration), and the skid decayed 0.68 x 1.4
+    = 0.95 a frame instead of 0.68 — the over-long slide.
+  - The movement model, for reference: stick released in the walk state ->
+    velocity x 0.9 (D_800710B8) once, state 4, counter 8; `func_80003F98`
+    then moves and multiplies by 0.68 (D_80070F50) each frame until the
+    counter hits 0 and zeroes it. Vanilla coasts ~7 units; scaled ~10, the
+    same 8 frames, which is also what Hard Mode's 2.75 pace gives. Merrow's
+    Celtland Drift is the joke version: it raises D_80070F50 above 1.
 
 #### JP Buffs + Debuffs: what was found, and why it is not done
 
