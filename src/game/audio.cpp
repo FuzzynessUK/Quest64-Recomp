@@ -118,7 +118,7 @@ const Options& zelda64::audio::active_options() {
     return active;
 }
 
-void zelda64::audio::apply_at_boot(uint8_t*) {
+void zelda64::audio::apply_at_boot(uint8_t* rdram) {
     const Options& options = active_options();
     std::iota(bgm_remap.begin(), bgm_remap.end(), 0);
     std::iota(sfx_remap.begin(), sfx_remap.end(), 0);
@@ -130,13 +130,20 @@ void zelda64::audio::apply_at_boot(uint8_t*) {
 
     if (options.music_shuffle != MusicShuffle::Off) {
         // Reads back whatever the earlier boot patches left, so this stacks
-        // on top of them rather than replacing them.
+        // on top of them rather than replacing them. The table is in the
+        // boot segment (ROM 0x1000.., 1MB), which has already been copied to
+        // RAM at 0x80000400 by now, so each byte goes to both: the ROM copy
+        // alone is never read again.
+        constexpr uint32_t boot_rom_start = 0x1000;
+        constexpr int32_t boot_ram_start = 0x80000400;
         std::span<const uint8_t> rom = recomp::get_rom();
         std::vector<uint8_t> patched(rom.begin(), rom.end());
         for (size_t i = 0; i * 2 + 1 < data::bgmdata.size(); i++) {
             uint32_t address = static_cast<uint32_t>(std::stoul(data::bgmdata[i * 2], nullptr, 16));
             if (address >= bgm_table_start && address < bgm_table_end && address < patched.size()) {
-                patched[address] = static_cast<uint8_t>(roll_track(rng));
+                uint8_t track = static_cast<uint8_t>(roll_track(rng));
+                patched[address] = track;
+                MEM_B(0, boot_ram_start + static_cast<int32_t>(address - boot_rom_start)) = static_cast<int8_t>(track);
             }
         }
         recomp::set_rom_contents(std::move(patched));

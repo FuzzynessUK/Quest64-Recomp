@@ -239,6 +239,11 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
 - The recomp never executes ROM code: ROM patches that change instructions do
   nothing; those need native hooks. Conversely, values the game keeps in RAM
   cannot be patched in the ROM at all and need `on_frame` or a hook.
+- **A boot-time ROM write inside the boot segment (ROM 0x1000..0x101000, RAM
+  0x80000400..) must also be written to RAM**: that segment is copied before
+  the boot patches run and the ROM copy is never read again. The randomizer's
+  `apply_at_boot` mirrors every such write; the audio module's map-music
+  table forgot to and the music shuffle silently did nothing (2026-09-21).
 - Hook functions named in `us.rev0.toml` are implicitly declared in the
   generated C; define them `extern "C"` and rerun N64Recomp.
 - **One hook per address.** Two features that need the same site go in one `text = "a(rdram, ctx); b(rdram, ctx);"`.
