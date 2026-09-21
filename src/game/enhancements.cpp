@@ -119,6 +119,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("jp_healing", o.jp_healing);
     get("exit_from_anywhere", o.exit_from_anywhere);
     get("longer_magic_barrier", o.longer_magic_barrier);
+    get("faster_walk", o.faster_walk);
     get("hard_mode", o.hard_mode);
     return o;
 }
@@ -136,6 +137,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["jp_healing"] = o.jp_healing;
     j["exit_from_anywhere"] = o.exit_from_anywhere;
     j["longer_magic_barrier"] = o.longer_magic_barrier;
+    j["faster_walk"] = o.faster_walk;
     j["hard_mode"] = o.hard_mode;
     std::ofstream out(options_path());
     out << j.dump(4);
@@ -230,4 +232,35 @@ void zelda64::enhancements::cast_exit() {
     // nothing at all. Queuing it instead would fire the warp the moment the
     // battle ended, which is worse than ignoring the press.
     zelda64::do_map_warp(map, 0, 0, false, true);
+}
+
+// Walk speed and stop friction (Options::faster_walk). Both sit in
+// func_8000534C. The target speed is `lui $at, 0x4000` (2.0) at 0x80005418,
+// consumed by the mtc1 after it; Hard Mode patches the same instruction, so
+// the two hooks share the site in us.rev0.toml. The friction is the double
+// D_800710B8 (0.9), loaded into $f0 at 0x80005604 and applied to the
+// velocity at 0x80005638 once the stick is neutral.
+namespace {
+    constexpr double vanilla_walk_speed = 2.0;
+    constexpr double fast_walk_speed = 2.75;      // 0x4030 as a float's high half
+    constexpr double vanilla_friction = 0.9;
+    // Multiplying the velocity by f each frame coasts speed * f / (1 - f)
+    // units: 18 in the vanilla game. The friction that coasts the same 18
+    // from the faster speed is 18 / (18 + speed), about 0.8675.
+    constexpr double vanilla_coast = vanilla_walk_speed * vanilla_friction / (1.0 - vanilla_friction);
+    constexpr double fast_friction = vanilla_coast / (vanilla_coast + fast_walk_speed);
+}
+
+extern "C" void quest64_enh_walk_speed(uint8_t*, recomp_context* ctx) {
+    if (!zelda64::enhancements::active_options().faster_walk) {
+        return;
+    }
+    ctx->r1 = S32(0x4030 << 16);
+}
+
+extern "C" void quest64_enh_walk_friction(uint8_t*, recomp_context* ctx) {
+    if (!zelda64::enhancements::active_options().faster_walk) {
+        return;
+    }
+    ctx->f0.d = fast_friction;
 }

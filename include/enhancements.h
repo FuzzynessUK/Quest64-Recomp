@@ -51,6 +51,15 @@ namespace zelda64::enhancements {
         // the two extra turns are added.
         bool longer_magic_barrier = false;
 
+        // Brian walks at Hard Mode's pace. The walk handler (func_8000534C)
+        // steers his speed toward a fixed 2.0 per frame; Hard Mode's one
+        // movement change is that constant becoming 2.75, and this does the
+        // same. On its own that also lengthens the coast after the stick is
+        // released (velocity decays by 0.9 a frame, so he slides 9x his
+        // speed), so the friction is lowered with it to keep the coast at
+        // the vanilla distance instead of 37% further.
+        bool faster_walk = false;
+
         // Hacks.
         //
 

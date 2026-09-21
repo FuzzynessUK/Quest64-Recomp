@@ -686,6 +686,7 @@ std::string enhancements_status() {
     bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko ||
         active.exit_from_anywhere != enhancements_context.edited.exit_from_anywhere ||
         active.jp_healing != enhancements_context.edited.jp_healing ||
+        active.faster_walk != enhancements_context.edited.faster_walk ||
         active.hard_mode != enhancements_context.edited.hard_mode;
     std::string status = std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
         ", Hard Mode " + (zelda64::hardmode::active() ? "on" : "off");
@@ -760,6 +761,13 @@ void make_enhancements_bindings(Rml::Context* context) {
         }
     );
 
+    constructor.BindFunc("enh_faster_walk",
+        [](Rml::Variant& out) { out = enhancements_context.edited.faster_walk ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.faster_walk = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
     constructor.BindFunc("enh_jp_healing",
         [](Rml::Variant& out) { out = enhancements_context.edited.jp_healing ? 1 : 0; },
         [](const Rml::Variant& in) {

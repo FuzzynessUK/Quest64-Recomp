@@ -50,12 +50,19 @@
                                             <option value="4">Bottom right</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Faster walking</div></div>
+                                        <select data-value="enh_faster_walk" id="enh_faster_walk_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. The Speedrun Timer starts when you leave the title screen and stops on the message that Mammon has been destroyed; pick where on the screen it sits. Exit from anywhere lets the control you bind to "Exit Spell" under Controls warp you to the start of the area without owning the spell or paying the MP; with it off the binding does nothing.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. The Speedrun Timer starts when you leave the title screen and stops on the message that Mammon has been destroyed; pick where on the screen it sits. Faster walking moves Brian at Hard Mode's pace (2.75 a frame instead of 2) and shortens the slide after you let go of the stick so he stops in the same distance as normal. Exit from anywhere lets the control you bind to "Exit Spell" under Controls warp you to the start of the area without owning the spell or paying the MP; with it off the binding does nothing.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">

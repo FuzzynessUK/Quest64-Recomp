@@ -221,8 +221,12 @@ text = "quest64_hardmode_hp_exp_t3(rdram, ctx);"
 before_vram = 0x80004578
 [[patches.hook]]
 func = "func_8000534C"
-text = "quest64_hardmode_walk_speed(rdram, ctx);"
+text = "quest64_hardmode_walk_speed(rdram, ctx); quest64_enh_walk_speed(rdram, ctx);"
 before_vram = 0x8000541C
+[[patches.hook]]
+func = "func_8000534C"
+text = "quest64_enh_walk_friction(rdram, ctx);"
+before_vram = 0x80005638
 [[patches.hook]]
 func = "func_80006BEC"
 text = "quest64_hardmode_hp_exp_t9(rdram, ctx);"
