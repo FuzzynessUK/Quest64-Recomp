@@ -229,6 +229,9 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
 - **Look in `Quest64Syms/*.toml` before reverse engineering anything.** Three
   separate features were solved by a named symbol that was there all along
   (`gBattleState`, `gInventory`, `gMsg_Shannon_Mammon_has_been_destroyed`).
+- **Brian's element bytes are Fire, Earth, Water, Wind** (+0x24..+0x27), the
+  spell table order, not the status screen's. Two features have now had Wind
+  and Water swapped; `stat_fields` in `debug.cpp` carries the warning.
 - **`gGameMode` is not a battle indicator.** A battle is running when bit 0 of
   `gBattleState` (0x8008C592) is set — `func_8001C5F4` tests exactly that.
 - `apply_map_warp` leaves a request **queued** when the game is not ready.
