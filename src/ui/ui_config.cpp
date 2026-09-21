@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <random>
 #include <type_traits>
 
@@ -1180,45 +1181,68 @@ void make_speedrun_bindings(Rml::Context* context) {
 
 // JP stat-up effect overlay. Like the timer, its own draw-only context that
 // stays up while the game runs. The game thread reports rises and Brian's
-// screen position (statfx.cpp); this side sprays particles at him and
-// moves them every frame, so they follow him if the camera moves.
+// screen position (statfx.cpp); this side lays a soft halo over him in the
+// stat's colour, swelling in and fading out, moved every frame so it stays
+// on him if the camera moves. The halo is one texture generated here (the
+// renderer only takes images handed to it in memory) and tinted with
+// image-color per stat.
 namespace {
-    struct Spark {
+    struct Glow {
         Rml::Element* element;
-        // Where on Brian it started: 0 = feet, 1 = head, plus a sideways
-        // jitter, both in dp; drift is dp a second.
-        float along;
-        float jitter_x;
-        float drift_x;
-        float drift_y;
         float age;
-        float life;
-        float size;
     };
 
     recompui::ContextId statfx_context;
-    std::vector<Spark> sparks;
-    std::mt19937 spark_rng{ std::random_device{}() };
+    std::vector<Glow> glows;
     std::chrono::steady_clock::time_point statfx_last_update{};
-    // The last place Brian was seen, kept while he is off screen so a burst
+    // The last place Brian was seen, kept while he is off screen so a halo
     // in progress does not jump.
     float statfx_feet_px[2] = { 0.0f, 0.0f };
     float statfx_head_px[2] = { 0.0f, 0.0f };
     bool statfx_seen = false;
 
-    constexpr int sparks_per_rise = 18;
+    constexpr const char* glow_texture = "?/statfx/glow";
+    constexpr int glow_texture_size = 128;
 
-    const char* spark_class(zelda64::statfx::Stat stat) {
+    // Seconds: swell in, hold, fade out.
+    constexpr float glow_in = 0.15f;
+    constexpr float glow_hold = 0.35f;
+    constexpr float glow_out = 0.65f;
+    constexpr float glow_life = glow_in + glow_hold + glow_out;
+    constexpr float glow_peak_opacity = 0.9f;
+    // The halo's diameter as a multiple of Brian's on-screen height, at the
+    // start and the end of its life.
+    constexpr float glow_scale_start = 1.4f;
+    constexpr float glow_scale_end = 1.9f;
+
+    const char* glow_class(zelda64::statfx::Stat stat) {
         switch (stat) {
-        case zelda64::statfx::Stat::HP: return "spark--hp";
-        case zelda64::statfx::Stat::MP: return "spark--mp";
-        case zelda64::statfx::Stat::Defense: return "spark--defense";
-        default: return "spark--agility";
+        case zelda64::statfx::Stat::HP: return "glow--hp";
+        case zelda64::statfx::Stat::MP: return "glow--mp";
+        case zelda64::statfx::Stat::Defense: return "glow--defense";
+        default: return "glow--agility";
         }
     }
 
-    float spark_random(float low, float high) {
-        return std::uniform_real_distribution<float>(low, high)(spark_rng);
+    // White with a smooth radial alpha falloff: solid-ish core, long soft
+    // edge, so the tint reads as a haze around him rather than a disc.
+    void make_glow_texture() {
+        std::vector<char> bytes(glow_texture_size * glow_texture_size * 4);
+        float half = glow_texture_size / 2.0f;
+        for (int y = 0; y < glow_texture_size; y++) {
+            for (int x = 0; x < glow_texture_size; x++) {
+                float dx = (x + 0.5f - half) / half;
+                float dy = (y + 0.5f - half) / half;
+                float r = std::sqrt(dx * dx + dy * dy);
+                float a = r >= 1.0f ? 0.0f : (1.0f - r) * (1.0f - r) * (1.0f + 2.0f * r);
+                size_t i = (static_cast<size_t>(y) * glow_texture_size + x) * 4;
+                bytes[i + 0] = static_cast<char>(255);
+                bytes[i + 1] = static_cast<char>(255);
+                bytes[i + 2] = static_cast<char>(255);
+                bytes[i + 3] = static_cast<char>(std::lround(a * 255.0f));
+            }
+        }
+        recompui::queue_image_from_bytes_rgba32(glow_texture, bytes, glow_texture_size, glow_texture_size);
     }
 
     // NDC to window pixels. The game projects at 4:3 and RT64 keeps that
@@ -1266,57 +1290,53 @@ void recompui::update_stat_effects() {
 
     for (const zelda64::statfx::Event& event : zelda64::statfx::take_events()) {
         if (!statfx_seen) {
-            // No projection yet: burst in the middle of the screen rather
+            // No projection yet: glow in the middle of the screen rather
             // than nowhere, so a broken projection is visible, not silent.
             statfx_feet_px[0] = statfx_head_px[0] = size.x / 2.0f;
             statfx_feet_px[1] = size.y / 2.0f + 60.0f * dp;
             statfx_head_px[1] = size.y / 2.0f - 60.0f * dp;
         }
-        for (int i = 0; i < sparks_per_rise; i++) {
-            Rml::ElementPtr made = document->CreateElement("div");
-            made->SetClass("spark", true);
-            made->SetClass(spark_class(event.stat), true);
-            Rml::Element* element = container->AppendChild(std::move(made));
-            sparks.push_back({
-                element,
-                spark_random(0.0f, 1.0f),
-                spark_random(-18.0f, 18.0f),
-                spark_random(-35.0f, 35.0f),
-                spark_random(-110.0f, -45.0f),
-                // Staggered so the burst twinkles rather than pops.
-                -spark_random(0.0f, 0.25f),
-                spark_random(0.55f, 0.95f),
-                spark_random(7.0f, 13.0f),
-            });
-        }
+        Rml::ElementPtr made = document->CreateElement("div");
+        made->SetClass("glow", true);
+        made->SetClass(glow_class(event.stat), true);
+        glows.push_back({ container->AppendChild(std::move(made)), 0.0f });
     }
 
-    for (size_t i = 0; i < sparks.size();) {
-        Spark& spark = sparks[i];
-        spark.age += dt;
-        if (spark.age >= spark.life) {
-            container->RemoveChild(spark.element);
-            sparks[i] = sparks.back();
-            sparks.pop_back();
+    // Brian's on-screen height, with a floor so a distant Brian still gets
+    // a visible halo.
+    float body_dx = statfx_head_px[0] - statfx_feet_px[0];
+    float body_dy = statfx_head_px[1] - statfx_feet_px[1];
+    float body = std::max(std::sqrt(body_dx * body_dx + body_dy * body_dy), 40.0f * dp);
+    float centre_x = (statfx_feet_px[0] + statfx_head_px[0]) / 2.0f;
+    float centre_y = (statfx_feet_px[1] + statfx_head_px[1]) / 2.0f;
+
+    for (size_t i = 0; i < glows.size();) {
+        Glow& glow = glows[i];
+        glow.age += dt;
+        if (glow.age >= glow_life) {
+            container->RemoveChild(glow.element);
+            glows[i] = glows.back();
+            glows.pop_back();
             continue;
         }
-        float t = std::max(spark.age, 0.0f);
-        float fraction = t / spark.life;
-        float x = statfx_feet_px[0] + (statfx_head_px[0] - statfx_feet_px[0]) * spark.along
-            + (spark.jitter_x + spark.drift_x * t) * dp;
-        float y = statfx_feet_px[1] + (statfx_head_px[1] - statfx_feet_px[1]) * spark.along
-            + spark.drift_y * t * dp;
-        float px_size = spark.size * (1.0f - 0.5f * fraction) * dp;
-        spark.element->SetProperty(Rml::PropertyId::Left, Rml::Property(x - px_size / 2.0f, Rml::Unit::PX));
-        spark.element->SetProperty(Rml::PropertyId::Top, Rml::Property(y - px_size / 2.0f, Rml::Unit::PX));
-        spark.element->SetProperty(Rml::PropertyId::Width, Rml::Property(px_size, Rml::Unit::PX));
-        spark.element->SetProperty(Rml::PropertyId::Height, Rml::Property(px_size, Rml::Unit::PX));
-        spark.element->SetProperty(Rml::PropertyId::BorderTopLeftRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
-        spark.element->SetProperty(Rml::PropertyId::BorderTopRightRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
-        spark.element->SetProperty(Rml::PropertyId::BorderBottomLeftRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
-        spark.element->SetProperty(Rml::PropertyId::BorderBottomRightRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
-        float opacity = spark.age < 0.0f ? 0.0f : 1.0f - fraction * fraction;
-        spark.element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(opacity, Rml::Unit::NUMBER));
+        float opacity;
+        if (glow.age < glow_in) {
+            opacity = glow_peak_opacity * (glow.age / glow_in);
+        }
+        else if (glow.age < glow_in + glow_hold) {
+            opacity = glow_peak_opacity;
+        }
+        else {
+            float f = (glow.age - glow_in - glow_hold) / glow_out;
+            opacity = glow_peak_opacity * (1.0f - f) * (1.0f - f);
+        }
+        float scale = glow_scale_start + (glow_scale_end - glow_scale_start) * (glow.age / glow_life);
+        float diameter = body * scale;
+        glow.element->SetProperty(Rml::PropertyId::Left, Rml::Property(centre_x - diameter / 2.0f, Rml::Unit::PX));
+        glow.element->SetProperty(Rml::PropertyId::Top, Rml::Property(centre_y - diameter / 2.0f, Rml::Unit::PX));
+        glow.element->SetProperty(Rml::PropertyId::Width, Rml::Property(diameter, Rml::Unit::PX));
+        glow.element->SetProperty(Rml::PropertyId::Height, Rml::Property(diameter, Rml::Unit::PX));
+        glow.element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(opacity, Rml::Unit::NUMBER));
         i++;
     }
 }
@@ -1382,6 +1402,7 @@ public:
         statfx_context = recompui::create_context(zelda64::get_asset_path("stat_effects.rml"));
         statfx_context.set_captures_input(false);
         statfx_context.set_captures_mouse(false);
+        make_glow_texture();
         recompui::update_mod_list(false);
         recompui::get_config_tabset()->AddEventListener(Rml::EventId::Tabchange, &config_tabset_listener);
     }
