@@ -1209,12 +1209,12 @@ namespace {
     constexpr float glow_hold = 0.15f;
     constexpr float glow_out = 0.5f;
     constexpr float glow_life = glow_in + glow_hold + glow_out;
-    constexpr float glow_peak_opacity = 1.0f;
+    constexpr float glow_peak_opacity = 0.6f;
     // The halo's diameter as a multiple of Brian's on-screen height: where
     // it starts, its full size, and what it shrinks to before it is gone.
-    constexpr float glow_scale_start = 1.6f;
-    constexpr float glow_scale_full = 3.4f;
-    constexpr float glow_scale_end = 2.4f;
+    constexpr float glow_scale_start = 1.3f;
+    constexpr float glow_scale_full = 2.4f;
+    constexpr float glow_scale_end = 1.8f;
 
     const char* glow_class(zelda64::statfx::Stat stat) {
         switch (stat) {
@@ -1235,16 +1235,15 @@ namespace {
             for (int x = 0; x < glow_texture_size; x++) {
                 float dx = (x + 0.5f - half) / half;
                 float dy = (y + 0.5f - half) / half;
-                float r = std::sqrt(dx * dx + dy * dy);
-                constexpr float core = 0.3f;        // solid centre
-                constexpr float core_blend = 0.08f; // softening past it
-                constexpr float haze = 0.8f;        // the rest, at most
-                float t = std::min(std::max((r - core) / (1.0f - core), 0.0f), 1.0f);
-                float a = haze * (1.0f - t) * (1.0f - t) * (1.0f + 2.0f * t);
-                if (r < core + core_blend) {
-                    float b = std::max((r - core) / core_blend, 0.0f);
-                    a = 1.0f + (a - 1.0f) * b;
-                }
+                // Eltale's glow is a soft hexagonal billboard, so the
+                // distance is hexagonal (the largest projection onto the
+                // three axes 60 degrees apart), with a smooth falloff and no
+                // solid core so Brian stays visible through it.
+                constexpr float sqrt3_2 = 0.8660254f;
+                float r = std::max({ std::fabs(dy), std::fabs(dy * 0.5f + dx * sqrt3_2), std::fabs(dy * 0.5f - dx * sqrt3_2) });
+                float t = std::min(r, 1.0f);
+                float a = (1.0f - t) * (1.0f - t) * (1.0f + 2.0f * t);
+                a = std::pow(a, 1.3f);
                 size_t i = (static_cast<size_t>(y) * glow_texture_size + x) * 4;
                 bytes[i + 0] = static_cast<char>(255);
                 bytes[i + 1] = static_cast<char>(255);
