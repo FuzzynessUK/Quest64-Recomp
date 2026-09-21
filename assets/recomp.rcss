@@ -2597,3 +2597,10 @@ button {
   white-space: nowrap;
   cursor: pointer;
 }
+
+.hud-box--notice {
+  drag: none;
+  border-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(120, 180, 255, 0.35);
+  cursor: default;
+}

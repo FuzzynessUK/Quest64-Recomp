@@ -1563,7 +1563,7 @@ namespace {
     constexpr float hud_hp_w = 66.0f;
     constexpr float hud_hp_h = 37.0f;
     constexpr float hud_sp_anchor_y = 197.0f;
-    constexpr float hud_sp_w = 91.0f;
+    constexpr float hud_sp_w = 108.0f;
     constexpr float hud_sp_h = 17.0f;
     constexpr float frame_h = 240.0f;
     constexpr float frame_w_43 = 320.0f;
@@ -1689,6 +1689,32 @@ void recompui::update_hud_preview() {
         element->SetProperty(Rml::PropertyId::Top, Rml::Property(y * dp_per_px, Rml::Unit::DP));
         element->SetProperty(Rml::PropertyId::Width, Rml::Property(box.w * dp_per_px, Rml::Unit::DP));
         element->SetProperty(Rml::PropertyId::Height, Rml::Property(box.h * dp_per_px, Rml::Unit::DP));
+    }
+
+    // The notification marker: where the stack's first line sits for the
+    // chosen position (Notifications > Position), in the overlay's 1080p
+    // reference dp scaled to the preview. Display only.
+    Rml::Element* notice = document->GetElementById("hud_notice_box");
+    if (notice != nullptr) {
+        const zelda64::enhancements::Options& e = enhancements_context.edited;
+        constexpr float overlay_h = 1080.0f;          // the overlay's reference height in dp
+        constexpr float line_w = 300.0f, line_h = 44.0f, margin = 16.0f;
+        float overlay_w = overlay_h * fw / frame_h;   // the window in overlay dp
+        int position = std::clamp(e.notify_position, 0, 8);
+        int col = position % 3;                       // left, middle, right
+        int row = position / 3;                       // top, middle, bottom
+        float ox = col == 0 ? margin : col == 1 ? (overlay_w - line_w) / 2.0f : overlay_w - margin - line_w;
+        float oy = row == 0 ? margin : row == 1 ? overlay_h * 0.4f : overlay_h - margin - line_h;
+        // Top-left shares its column with the timer when that is top-left too.
+        if (position == 0 && e.speedrun_timer && e.timer_position == 0) {
+            oy += 58.0f;
+        }
+        float to_preview = preview_h_dp / overlay_h;
+        notice->SetProperty("display", e.notifications ? "block" : "none");
+        notice->SetProperty(Rml::PropertyId::Left, Rml::Property(ox * to_preview, Rml::Unit::DP));
+        notice->SetProperty(Rml::PropertyId::Top, Rml::Property(oy * to_preview, Rml::Unit::DP));
+        notice->SetProperty(Rml::PropertyId::Width, Rml::Property(line_w * to_preview, Rml::Unit::DP));
+        notice->SetProperty(Rml::PropertyId::Height, Rml::Property(line_h * to_preview, Rml::Unit::DP));
     }
 }
 

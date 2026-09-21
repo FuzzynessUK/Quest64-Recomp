@@ -13,6 +13,28 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
+                                <div>HUD</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper" style="align-items: flex-start;">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Layout</div><div class="config-tip-text">The box is your window and the lighter part the 4:3 picture. Drag the HP/MP block and the four spirits to where you want them on screen; each default button puts one back where the game draws it. The Notifications box shows where messages appear (set under Notifications). Applies straight away.</div></div>
+                                        <div id="hud_preview" class="hud-preview">
+                                            <div id="hud_area" class="hud-area"></div>
+                                            <div id="hud_hp_box" class="hud-box">HP/MP</div>
+                                            <div id="hud_sp_box" class="hud-box">Spirits</div>
+                                            <div id="hud_notice_box" class="hud-box hud-box--notice">Notifications</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="hud_reset_hp">HP/MP default</button>
+                                    <button class="button" onclick="hud_reset_sp">Spirits default</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
                                 <div>Notifications</div>
                             </label>
                             <div class="config-debug__option-split">
@@ -129,27 +151,6 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div>HUD</div>
-                            </label>
-                            <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">
-                                    <div class="config-debug__select-wrapper" style="align-items: flex-start;">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Layout</div><div class="config-tip-text">The box is your window and the lighter part the 4:3 picture. Drag the HP/MP block and the four spirits to where you want them on screen; each default button puts one back where the game draws it. Applies straight away.</div></div>
-                                        <div id="hud_preview" class="hud-preview">
-                                            <div id="hud_area" class="hud-area"></div>
-                                            <div id="hud_hp_box" class="hud-box">HP/MP</div>
-                                            <div id="hud_sp_box" class="hud-box">Spirits</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="config-debug__option-trigger">
-                                    <button class="button" onclick="hud_reset_hp">HP/MP default</button>
-                                    <button class="button" onclick="hud_reset_sp">Spirits default</button>
                                 </div>
                             </div>
                         </div>

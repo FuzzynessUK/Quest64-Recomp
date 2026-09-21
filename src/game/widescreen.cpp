@@ -82,7 +82,7 @@ namespace {
     };
     HudBlock hud_hp;
     HudBlock hud_spirits;
-    constexpr int hud_max_x = 100;
+    constexpr int hud_max_x = 160;   // the fourth gem's digits reach x 107; three-digit HP goes wider
     constexpr int hud_hp_anchor_y = 24;
     constexpr int hud_sp_anchor_y = 197;
 
