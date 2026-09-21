@@ -26,6 +26,20 @@
                                     </div>
                                     <div data-if="enh_notifications == 1">
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Position</div><div class="config-tip-text">Where the messages sit on screen. Top left shares its column with the Speedrun Timer when that is top left too. Applies straight away.</div></div>
+                                        <select data-value="enh_notify_position" id="enh_notify_position_select">
+                                            <option value="0">Top left</option>
+                                            <option value="1">Top middle</option>
+                                            <option value="2">Top right</option>
+                                            <option value="3">Left</option>
+                                            <option value="4">Right</option>
+                                            <option value="5">Middle</option>
+                                            <option value="6">Bottom left</option>
+                                            <option value="7">Bottom middle</option>
+                                            <option value="8">Bottom right</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Never expire</div><div class="config-tip-text">Messages stay on screen instead of fading after three seconds; the oldest is pushed out when the maximum is reached. Applies straight away.</div></div>
                                         <select data-value="enh_notify_never_expire" id="enh_notify_never_expire_select">
                                             <option value="0">Off</option>

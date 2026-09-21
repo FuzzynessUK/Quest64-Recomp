@@ -871,6 +871,13 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed(false);
         }
     );
+    constructor.BindFunc("enh_notify_position",
+        [](Rml::Variant& out) { out = enhancements_context.edited.notify_position; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.notify_position = std::clamp(in.Get<int>(), 0, 8);
+            enhancements_option_changed(false);
+        }
+    );
     constructor.BindFunc("enh_notify_max",
         [](Rml::Variant& out) { out = enhancements_context.edited.notify_max; },
         [](const Rml::Variant& in) {
@@ -1427,28 +1434,88 @@ void recompui::update_notifications() {
         recompui::show_context(speedrun_context, "");
     }
     Rml::ElementDocument* document = speedrun_context.get_document();
-    Rml::Element* container = document ? document->GetElementById("notifications") : nullptr;
-    if (container == nullptr) {
+    Rml::Element* column = document ? document->GetElementById("notifications") : nullptr;
+    Rml::Element* floating = document ? document->GetElementById("notifications_float") : nullptr;
+    if (column == nullptr || floating == nullptr) {
         return;
     }
 
-    // These three are read live from the tab's edited copy, so they take
-    // effect as they are changed.
+    // These are read live from the tab's edited copy, so they take effect
+    // as they are changed.
     const zelda64::enhancements::Options& live = enhancements_context.edited;
+    int position = std::clamp(live.notify_position, 0, 8);
+
+    // Top left is the column under the timer; anywhere else is the floating
+    // box, pinned to its edge or corner with the lines aligned to match.
+    // Vertical middles use a fixed 40% since the box's height is not known
+    // until it is laid out.
+    Rml::Element* container = position == 0 ? column : floating;
+    {
+        static const char* const edges[9][3] = {
+            //  top / bottom      left / right      text-align
+            { "top: 16dp",       "left: 16dp",     "left" },
+            { "top: 16dp",       "left: 50%",      "center" },
+            { "top: 16dp",       "right: 16dp",    "right" },
+            { "top: 40%",        "left: 16dp",     "left" },
+            { "top: 40%",        "right: 16dp",    "right" },
+            { "top: 40%",        "left: 50%",      "center" },
+            { "bottom: 16dp",    "left: 16dp",     "left" },
+            { "bottom: 16dp",    "left: 50%",      "center" },
+            { "bottom: 16dp",    "right: 16dp",    "right" },
+        };
+        static int applied = -1;
+        if (applied != position) {
+            applied = position;
+            floating->RemoveProperty("top");
+            floating->RemoveProperty("bottom");
+            floating->RemoveProperty("left");
+            floating->RemoveProperty("right");
+            floating->RemoveProperty("margin-left");
+            if (position != 0) {
+                std::string v = edges[position][0];
+                floating->SetProperty(v.substr(0, v.find(':')), v.substr(v.find(':') + 2));
+                v = edges[position][1];
+                floating->SetProperty(v.substr(0, v.find(':')), v.substr(v.find(':') + 2));
+                if (std::string(edges[position][1]) == "left: 50%") {
+                    floating->SetProperty("margin-left", "-350dp");   // half the 700dp box
+                }
+                floating->SetProperty("text-align", edges[position][2]);
+            }
+            // Carry whatever is showing over to the new container.
+            for (Notice& notice : notices) {
+                Rml::Element* row = notice.element->GetParentNode();
+                if (row != nullptr && row->GetParentNode() != container) {
+                    Rml::ElementPtr moved = row->GetParentNode()->RemoveChild(row);
+                    container->AppendChild(std::move(moved));
+                }
+            }
+        }
+    }
+
     auto now = std::chrono::steady_clock::now();
-    auto drop_front = [&]() {
-        container->RemoveChild(notices.front().element);
-        notices.erase(notices.begin());
+    auto remove_notice = [&](size_t i) {
+        Rml::Element* row = notices[i].element->GetParentNode();
+        if (row != nullptr && row->GetParentNode() != nullptr) {
+            row->GetParentNode()->RemoveChild(row);
+        }
+        notices.erase(notices.begin() + i);
     };
+    auto drop_front = [&]() { remove_notice(0); };
 
     for (std::string& text : zelda64::notify::take()) {
         if (!live.notifications) {
             continue;
         }
+        // A row per message so each line's box hugs its text and follows
+        // the container's alignment.
+        Rml::ElementPtr row = document->CreateElement("div");
+        row->SetClass("notice-row", true);
         Rml::ElementPtr made = document->CreateElement("div");
         made->SetClass("notice", true);
         made->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
-        notices.push_back({ container->AppendChild(std::move(made)), now });
+        Rml::Element* element = row->AppendChild(std::move(made));
+        container->AppendChild(std::move(row));
+        notices.push_back({ element, now });
     }
     if (!live.notifications) {
         while (!notices.empty()) {
@@ -1469,8 +1536,7 @@ void recompui::update_notifications() {
             continue;
         }
         if (age >= notice_hold + notice_fade) {
-            container->RemoveChild(notices[i].element);
-            notices.erase(notices.begin() + i);
+            remove_notice(i);
             continue;
         }
         float opacity = age < notice_hold ? 1.0f : 1.0f - (age - notice_hold) / notice_fade;

@@ -26,10 +26,23 @@
 				display: block;
 				width: auto;
 			}
-			.notice
+			/* The stack anywhere but top-left: positioned and aligned from
+			   ui_config.cpp for the chosen corner or edge. */
+			#notifications_float
+			{
+				position: absolute;
+				display: block;
+				width: 700dp;
+			}
+			.notice-row
 			{
 				display: block;
+				width: 100%;
 				margin-bottom: 6dp;
+			}
+			.notice
+			{
+				display: inline-block;
 				font-family: "latolatin";
 				font-size: 28dp;
 				font-weight: bold;
@@ -71,6 +84,7 @@
 				</div>
 				<div id="notifications"></div>
 			</div>
+			<div id="notifications_float"></div>
 			<div data-if="timer_visible">
 			<div data-if="timer_position != 0"
 			     class="speedrun-timer"

@@ -80,6 +80,10 @@ namespace zelda64::enhancements {
         bool notifications = true;
         bool notify_never_expire = false;
         int notify_max = 5;
+        // Where the stack sits: 0 top left, 1 top middle, 2 top right,
+        // 3 left, 4 right, 5 middle, 6 bottom left, 7 bottom middle,
+        // 8 bottom right. Top left shares a column with the timer.
+        int notify_position = 0;
 
         // Hacks.
         //
