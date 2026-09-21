@@ -268,3 +268,11 @@
     background-color: rgba(120, 180, 255, 0.35);
     cursor: default;
 }
+
+// The Play button on a custom music track row (audio.rml).
+.aud-play {
+  padding: 6dp 12dp;
+  margin-left: 8dp;
+  font-size: 14dp;
+  line-height: 14dp;
+}

@@ -1042,10 +1042,22 @@ void refresh_music_library() {
     }
 }
 
-void audio_option_changed() {
+// Saves; `relaunch` shows the "applies when next launched" line. The
+// custom track choices apply live (below), the shuffles at boot.
+void audio_option_changed(bool relaunch = true) {
     zelda64::audio::save_options(audio_context.edited);
-    audio_context.changed = true;
-    audio_context.model_handle.DirtyVariable("aud_changed");
+    if (relaunch) {
+        audio_context.changed = true;
+        audio_context.model_handle.DirtyVariable("aud_changed");
+    }
+}
+
+// Hands the running game the tracks as the menu has them: the choices in
+// Custom mode, the game's own otherwise.
+void push_tracks_live() {
+    const auto& e = audio_context.edited;
+    static const std::map<int, std::string> none;
+    zelda64::audio::apply_tracks_live(e.custom_music == zelda64::audio::CustomMusic::Custom ? e.custom_tracks : none);
 }
 
 void make_audio_bindings(Rml::Context* context) {
@@ -1068,9 +1080,13 @@ void make_audio_bindings(Rml::Context* context) {
         [](const Rml::Variant& in) {
             int value = std::clamp(in.Get<int>(), 0, 3);
             auto& e = audio_context.edited;
+            bool was_shuffle = e.music_shuffle != zelda64::audio::MusicShuffle::Off;
             e.custom_music = value == 3 ? zelda64::audio::CustomMusic::Custom : zelda64::audio::CustomMusic::Off;
             e.music_shuffle = value == 3 ? zelda64::audio::MusicShuffle::Off : static_cast<zelda64::audio::MusicShuffle>(value);
-            audio_option_changed();
+            // Off <-> Custom is live; the shuffles are drawn at boot.
+            bool shuffle_now = e.music_shuffle != zelda64::audio::MusicShuffle::Off;
+            audio_option_changed(was_shuffle || shuffle_now);
+            push_tracks_live();
         }
     );
     constructor.BindFunc("aud_sfx_shuffle",
@@ -1122,7 +1138,8 @@ void make_audio_bindings(Rml::Context* context) {
                 else {
                     tracks[track] = after;
                 }
-                audio_option_changed();
+                audio_option_changed(false);
+                push_tracks_live();
             });
     }
 
@@ -1970,18 +1987,38 @@ public:
                         audio_context.edited.custom_tracks[track] = audio_context.library[pick(rng)];
                     }
                 }
-                audio_option_changed();
+                audio_option_changed(false);
+                push_tracks_live();
                 audio_context.model_handle.DirtyAllVariables();
             });
         recompui::register_event(listener, "aud_music_clear_all",
             [](const std::string& param, Rml::Event& event) {
                 audio_context.edited.custom_tracks.clear();
-                audio_option_changed();
+                audio_option_changed(false);
+                push_tracks_live();
                 audio_context.model_handle.DirtyAllVariables();
             });
         recompui::register_event(listener, "aud_music_rescan",
             [](const std::string& param, Rml::Event& event) {
                 refresh_music_library();
+            });
+        // The Play button on a track row: "aud_play_track:13". Plays what
+        // that track is set to right now; Stop goes back to what was on.
+        recompui::register_event(listener, "aud_play_track",
+            [](const std::string& param, Rml::Event& event) {
+                std::string digits = param;
+                if (!digits.empty() && digits[0] == ':') {
+                    digits.erase(0, 1);
+                }
+                char* end = nullptr;
+                long track = std::strtol(digits.c_str(), &end, 10);
+                if (end != digits.c_str() && track >= 0 && track < zelda64::audio::game_track_count) {
+                    zelda64::audio::preview_track(static_cast<int>(track));
+                }
+            });
+        recompui::register_event(listener, "aud_stop_preview",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::audio::preview_track(-1);
             });
         recompui::register_event(listener, "hud_reset_hp",
             [](const std::string& param, Rml::Event& event) {

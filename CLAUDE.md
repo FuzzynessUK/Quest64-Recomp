@@ -275,7 +275,16 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   type-to-program guess; Quest 64's bank was classified by envelope:
   sustain 0 1 2 3 4 5 6 10 11 15 19 20 21 22 23 28, decay 7 8 12 13 14 16
   17 18 25 27, bass 26 (multi-sampled at keys 36/48/60), kit 9, one-shot
-  24. `cseq_writer.cpp` is the format writer, `midi.cpp` the MIDI reader
+  24. Live (2026-09-22): the whole library is placed at boot whenever the
+  folder has files (plus 4 MB slack, written into later via a const_cast
+  of `get_rom().data()` - the buffer never reallocates), and a track's
+  choice is an 8-byte write to the RAM copy of the sequence table
+  (`[0x800538F0]`, entries { ROM address, len }; base = entry 0 minus its
+  file offset), queued from the UI and done in `audio::on_frame`. Play on
+  a row mimics UpdateBGM (byte 0x8008FCC1 + bit 0 of 0x8008FCC2); the
+  same track already requested is stopped (-1) one frame first. Stop goes
+  back to the track that was on before the first Play.
+  `cseq_writer.cpp` is the format writer, `midi.cpp` the MIDI reader
   (supersedes `mid2cseq.pl`, kept). `main.cpp` validates every written
   file with a walker before saving it. Untested so far: packs using small
   notes, dynamic layers (0x98), runseq, and bends beyond two semitones

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <numeric>
 #include <random>
 #include <span>
@@ -134,94 +135,187 @@ namespace {
         v[at + 3] = static_cast<uint8_t>(value);
     }
 
-    // Which library file each track gets this session: the menu's choices
-    // (a name that is no longer in the folder is reported and left vanilla).
-    std::map<int, std::string> plan_custom_music(const Options& options, const std::vector<std::string>& library,
-                                                 std::ofstream& log) {
+    // ---- the library in the ROM, and live changes
+    //
+    // At boot every file in the folder is appended to the ROM copy (the
+    // free tail first, then the ROM grows; a slack of a few MB is added so
+    // files dropped in later can be placed while the game runs - the DMA
+    // reader indexes the buffer with no size check, and a fixed-size buffer
+    // is safe to write into from another thread). Which file a track plays
+    // is then only the sequence bank's entry for it: at boot in the ROM
+    // copy, and later in the RAM copy of the table that func_80025040 made
+    // (pointer at 0x800538F0, entries { ROM address, length } after
+    // alSeqFileNew), read by func_800252D8 every time a track starts. So
+    // the menu's choices apply to the next play with an 8-byte write,
+    // done on the game thread in on_frame.
+    constexpr int32_t seq_table_pointer = 0x800538F0;
+    constexpr size_t rom_slack = 4 * 1024 * 1024;
+    constexpr int32_t bgm_request_track = 0x8008FCC1;
+    constexpr int32_t bgm_request_flags = 0x8008FCC2;
+
+    struct Placed {
+        uint32_t rom;   // position in the ROM copy
+        uint32_t len;
+    };
+    std::map<std::string, Placed> placed;
+    std::array<Placed, zelda64::audio::game_track_count> original_entry{};
+    uint32_t rom_cursor = 0;
+    size_t rom_capacity = 0;
+    bool library_in_rom = false;
+    std::ofstream live_log;
+
+    std::mutex live_mutex;
+    std::map<int, std::string> pending_entries;   // track -> name, "" for the game's own
+    bool pending_all = false;
+    int pending_preview = -2;                     // -2 nothing, -1 stop, else a track
+    int preview_return = -2;                      // the track to go back to, -2 none
+
+    // Loads a file's bytes into the ROM copy at the cursor. `rom` is the
+    // buffer to write (the boot copy, or the live buffer).
+    bool place_file(uint8_t* rom, size_t capacity, const std::string& name, std::ostream& log) {
+        if (placed.count(name)) {
+            return placed[name].len != 0;
+        }
+        std::ifstream in(zelda64::audio::library_folder() / (name + ".seq"), std::ios::binary);
+        std::vector<uint8_t> seq((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        if (seq.size() < seq_header_size + 2 || seq.size() > seq_buffer_size) {
+            log << "  " << name << ".seq: skipped, " << seq.size() << " bytes (a sequence is between "
+                << (seq_header_size + 2) << " and " << seq_buffer_size << ")\n";
+            placed[name] = { 0, 0 };
+            return false;
+        }
+        for (int t = 0; t < 16; t++) {
+            uint32_t offset = read_u32(seq, t * 4);
+            if (offset != 0 && (offset < seq_header_size || offset >= seq.size())) {
+                log << "  " << name << ".seq: skipped, a track offset points outside the file\n";
+                placed[name] = { 0, 0 };
+                return false;
+            }
+        }
+        uint32_t padded = (static_cast<uint32_t>(seq.size()) + 15) & ~static_cast<uint32_t>(15);
+        if (rom_cursor + padded > capacity) {
+            log << "  " << name << ".seq: no room left in the ROM; relaunch to make room\n";
+            return false;
+        }
+        std::copy(seq.begin(), seq.end(), rom + rom_cursor);
+        placed[name] = { rom_cursor, static_cast<uint32_t>(seq.size()) };
+        log << "  " << name << ".seq: " << seq.size() << " bytes at ROM 0x" << std::hex << rom_cursor << std::dec << "\n";
+        rom_cursor += padded;
+        return true;
+    }
+
+    // Which library file each track gets: the menu's choices (a name that
+    // is not in the folder is reported and left as the game's own).
+    std::map<int, std::string> plan_custom_music(const Options& options, std::ostream& log) {
         std::map<int, std::string> plan;
-        if (options.custom_music == CustomMusic::Custom) {
-            for (const auto& [track, name] : options.custom_tracks) {
-                if (track < 0 || track >= zelda64::audio::game_track_count || name.empty()) {
-                    continue;
-                }
-                if (std::find(library.begin(), library.end(), name) == library.end()) {
-                    log << "  track " << track << " (" << zelda64::audio::track_label(track) << "): \"" << name
-                        << ".seq\" is not in the folder, left as the game's own\n";
-                    continue;
-                }
+        if (options.custom_music != CustomMusic::Custom) {
+            return plan;
+        }
+        for (const auto& [track, name] : options.custom_tracks) {
+            if (track < 0 || track >= zelda64::audio::game_track_count || name.empty()) {
+                continue;
+            }
+            auto it = placed.find(name);
+            if (it == placed.end()) {
+                log << "  track " << track << " (" << zelda64::audio::track_label(track) << "): \"" << name
+                    << ".seq\" is not in the folder, left as the game's own\n";
+                continue;
+            }
+            if (it->second.len != 0) {
                 plan[track] = name;
             }
         }
         return plan;
     }
 
-    // Appends each chosen file to the ROM copy once and points every track
-    // that uses it at that copy.
+    // Boot: the whole library into the ROM copy, the chosen entries set.
     void apply_custom_music(std::vector<uint8_t>& patched, const Options& options) {
         std::filesystem::path folder = zelda64::audio::library_folder();
-        std::ofstream log(zelda64::get_app_folder_path() / "custom_music.txt");
+        live_log.open(zelda64::get_app_folder_path() / "custom_music.txt");
+        std::ostream& log = live_log;
         log << "Custom music folder: " << folder.string() << "\n";
         std::vector<std::string> library = zelda64::audio::library_files();
         log << "  " << library.size() << " file(s) in the library\n";
-        std::map<int, std::string> plan = plan_custom_music(options, library, log);
-        session_songs.clear();
 
         uint32_t count = (static_cast<uint32_t>(patched[seq_bank_start + 2]) << 8) | patched[seq_bank_start + 3];
-        uint32_t cursor = rom_free_start;
-        std::map<std::string, std::pair<uint32_t, uint32_t>> placed;   // name -> ROM offset, length
-        for (const auto& [track, name] : plan) {
-            if (static_cast<uint32_t>(track) >= count) {
-                continue;
-            }
-            auto it = placed.find(name);
-            if (it == placed.end()) {
-                std::ifstream in(folder / (name + ".seq"), std::ios::binary);
-                std::vector<uint8_t> seq((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-                if (seq.size() < seq_header_size + 2 || seq.size() > seq_buffer_size) {
-                    log << "  " << name << ".seq: skipped, " << seq.size() << " bytes (a sequence is between "
-                        << (seq_header_size + 2) << " and " << seq_buffer_size << ")\n";
-                    placed[name] = { 0, 0 };
-                    continue;
-                }
-                bool sane = true;
-                for (int t = 0; t < 16; t++) {
-                    uint32_t offset = read_u32(seq, t * 4);
-                    if (offset != 0 && (offset < seq_header_size || offset >= seq.size())) {
-                        sane = false;
-                    }
-                }
-                if (!sane) {
-                    log << "  " << name << ".seq: skipped, a track offset points outside the file\n";
-                    placed[name] = { 0, 0 };
-                    continue;
-                }
-                uint32_t padded = (static_cast<uint32_t>(seq.size()) + 15) & ~static_cast<uint32_t>(15);
-                if (cursor + padded > patched.size()) {
-                    // The DMA reader indexes the ROM copy with no size
-                    // check, so the ROM simply grows (in 1MB steps) once the
-                    // free tail is used up.
-                    patched.resize(((cursor + padded + 0xFFFFF) / 0x100000) * 0x100000, 0xFF);
-                    log << "  ROM grown to " << patched.size() << " bytes\n";
-                }
-                std::copy(seq.begin(), seq.end(), patched.begin() + cursor);
-                it = placed.emplace(name, std::make_pair(cursor, static_cast<uint32_t>(seq.size()))).first;
-                log << "  " << name << ".seq: " << seq.size() << " bytes at ROM 0x" << std::hex << cursor << std::dec << "\n";
-                cursor += padded;
-            }
-            if (it->second.second == 0) {
-                continue;
-            }
+        for (int track = 0; track < zelda64::audio::game_track_count && static_cast<uint32_t>(track) < count; track++) {
             uint32_t entry = seq_bank_start + 4 + static_cast<uint32_t>(track) * 8;
-            write_u32(patched, entry, it->second.first - seq_bank_start);
-            write_u32(patched, entry + 4, it->second.second);
+            original_entry[track] = { read_u32(patched, entry), read_u32(patched, entry + 4) };
+        }
+
+        // Room for every file plus slack, in whole MB past the free tail.
+        size_t need = 0;
+        std::error_code ec;
+        for (const std::string& name : library) {
+            need += (static_cast<size_t>(std::filesystem::file_size(folder / (name + ".seq"), ec)) + 15) & ~static_cast<size_t>(15);
+        }
+        rom_cursor = rom_free_start;
+        size_t wanted = rom_free_start + need + rom_slack;
+        if (wanted > patched.size()) {
+            patched.resize(((wanted + 0xFFFFF) / 0x100000) * 0x100000, 0xFF);
+            log << "  ROM grown to " << patched.size() << " bytes\n";
+        }
+        rom_capacity = patched.size();
+        for (const std::string& name : library) {
+            place_file(patched.data(), rom_capacity, name, log);
+        }
+        library_in_rom = true;
+
+        std::map<int, std::string> plan = plan_custom_music(options, log);
+        session_songs.clear();
+        for (const auto& [track, name] : plan) {
+            uint32_t entry = seq_bank_start + 4 + static_cast<uint32_t>(track) * 8;
+            write_u32(patched, entry, placed[name].rom - seq_bank_start);
+            write_u32(patched, entry + 4, placed[name].len);
             log << "  track " << track << " (" << zelda64::audio::track_label(track) << ") <- " << name << "\n";
             session_songs[track] = name;
         }
         if (plan.empty()) {
-            log << "  nothing replaced\n";
+            log << "  nothing replaced at boot\n";
         }
+        log.flush();
     }
 
+    // Game thread: the RAM table entry for one track.
+    void write_live_entry(uint8_t* rdram, int track, const std::string& name) {
+        int32_t table = static_cast<int32_t>(MEM_W(0, seq_table_pointer));
+        if (table == 0 || track < 0 || track >= zelda64::audio::game_track_count) {
+            return;
+        }
+        // The table holds ROM addresses: entry 0's, less its file offset,
+        // is the base the game added.
+        uint32_t base = static_cast<uint32_t>(MEM_W(0, table + 4)) - original_entry[0].rom;
+        Placed target = original_entry[track];
+        if (!name.empty()) {
+            std::span<const uint8_t> rom = recomp::get_rom();
+            if (!place_file(const_cast<uint8_t*>(rom.data()), rom.size(), name, live_log)) {
+                live_log.flush();
+                return;
+            }
+            target = placed[name];
+            target.rom -= seq_bank_start;
+        }
+        MEM_W(0, table + 4 + track * 8) = base + target.rom;
+        MEM_W(0, table + 8 + track * 8) = target.len;
+        if (name.empty()) {
+            session_songs.erase(track);
+        }
+        else {
+            session_songs[track] = name;
+        }
+        live_log << "  live: track " << track << " (" << zelda64::audio::track_label(track) << ") <- "
+                 << (name.empty() ? "the game's own" : name) << "\n";
+        live_log.flush();
+    }
+
+    // Game thread: UpdateBGM's own writes (0x800267B8): the request byte
+    // and the pending bit, consumed by func_80026658 next frame. The game
+    // ignores a request for the track already requested, so a restart of
+    // the same track goes through a stop first.
+    void request_track(uint8_t* rdram, int track) {
+        MEM_B(0, bgm_request_track) = static_cast<int8_t>(track);
+        MEM_H(0, bgm_request_flags) = static_cast<int16_t>(MEM_HU(0, bgm_request_flags) | 1);
+    }
     // The 44 sequences: who plays each (map music table rows at ROM
     // 0x054700 for the areas; the by-number callers for the events: boss
     // pick 0x8001CA28 gives 0 or 0x29 for Mammon, battle 0xD, title 0x1B,
@@ -403,7 +497,9 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
     const Options& options = active_options();
     std::iota(bgm_remap.begin(), bgm_remap.end(), 0);
     std::iota(sfx_remap.begin(), sfx_remap.end(), 0);
-    bool custom_music = options.custom_music != CustomMusic::Off;
+    // The library is placed whenever the folder has files, so the menu can
+    // switch tracks to it live in any mode.
+    bool custom_music = !library_files().empty();
     if (options.music_shuffle == MusicShuffle::Off && !options.sfx_shuffle && !custom_music) {
         return;
     }
@@ -503,7 +599,63 @@ std::string zelda64::audio::song_name(int track) {
     return track_label(track);
 }
 
+void zelda64::audio::apply_tracks_live(const std::map<int, std::string>& tracks) {
+    std::lock_guard lock(live_mutex);
+    pending_entries.clear();
+    for (int track = 0; track < game_track_count; track++) {
+        auto it = tracks.find(track);
+        pending_entries[track] = it != tracks.end() ? it->second : std::string();
+    }
+    pending_all = true;
+}
+
+void zelda64::audio::preview_track(int track) {
+    std::lock_guard lock(live_mutex);
+    pending_preview = track < 0 ? -1 : track;
+}
+
+bool zelda64::audio::library_loaded() {
+    return library_in_rom;
+}
+
 void zelda64::audio::on_frame(uint8_t* rdram) {
+    // The menu's live changes: table entries, then a preview request.
+    if (library_in_rom) {
+        std::map<int, std::string> entries;
+        int preview = -2;
+        {
+            std::lock_guard lock(live_mutex);
+            if (pending_all) {
+                entries.swap(pending_entries);
+                pending_all = false;
+            }
+            preview = pending_preview;
+            pending_preview = -2;
+        }
+        for (const auto& [track, name] : entries) {
+            write_live_entry(rdram, track, name);
+        }
+        int requested = static_cast<int8_t>(MEM_B(0, bgm_request_track));
+        if (preview >= 0) {
+            if (preview_return == -2) {
+                preview_return = static_cast<int8_t>(MEM_B(0, bgm_current_track));
+            }
+            if (requested == preview) {
+                // The track already requested: stop this frame, start next.
+                request_track(rdram, -1);
+                std::lock_guard lock(live_mutex);
+                pending_preview = preview;
+            }
+            else {
+                request_track(rdram, preview);
+            }
+        }
+        else if (preview == -1 && preview_return != -2) {
+            request_track(rdram, preview_return);
+            preview_return = -2;
+        }
+    }
+
     // "Show song name" (Layout tab): a line whenever the main player
     // starts a track.
     int track = static_cast<int8_t>(MEM_B(0, bgm_current_track));

@@ -2604,3 +2604,10 @@ button {
   background-color: rgba(120, 180, 255, 0.35);
   cursor: default;
 }
+
+.aud-play {
+  padding: 6dp 12dp;
+  margin-left: 8dp;
+  font-size: 14dp;
+  line-height: 14dp;
+}

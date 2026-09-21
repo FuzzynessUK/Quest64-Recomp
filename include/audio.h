@@ -71,6 +71,16 @@ namespace zelda64::audio {
     // custom music replaced it, else the game's own label.
     std::string song_name(int track);
 
+    // Live changes from the menu, applied on the game thread next frame.
+    // The library was placed in the ROM at boot (when the folder had any
+    // files), so a track can be pointed at any of its files, or back at the
+    // game's own, without a relaunch; a file added since is read in then.
+    void apply_tracks_live(const std::map<int, std::string>& tracks);
+    // Start a track from the menu (the way UpdateBGM would); -1 goes back
+    // to what was playing before the first preview.
+    void preview_track(int track);
+    bool library_loaded();
+
     // The library folder and the file names (no extension) in it, sorted.
     std::filesystem::path library_folder();
     std::vector<std::string> library_files();
