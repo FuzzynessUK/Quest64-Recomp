@@ -59,7 +59,11 @@ const Options& zelda64::easierquest::preset() {
         Options o;
         o.mode = Mode::Randomizer;
         o.seed = "Easier Quest";
-        // Nothing moves: the lists are left alone.
+        // Vanilla apart from the list below: Options defaults have the spell
+        // shuffle and hinted names on, and every list shuffled.
+        o.spell_shuffle = false;
+        o.hinted_spell_names = false;
+        o.boss_rewards_shuffler = false;
         o.chests = ListMode::Off;
         o.drops = ListMode::Off;
         o.gifts = ListMode::Off;

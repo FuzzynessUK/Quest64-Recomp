@@ -964,6 +964,20 @@ namespace {
             add_hex("667260", "000000060000000100000001");
 
             if (!options.spell_shuffle) {
+                // Extra Healing on its own. Merrow only offers it inside the
+                // shuffle, where the shuffle map is what carries Healing
+                // Lv1's data into Weakness Lv1's slot (its "W1"; the tooltip
+                // saying Soul Search Lv1 is wrong), so that one slot is
+                // written here the way the shuffle loop below would.
+                if (options.extra_healing) {
+                    constexpr int weakness_lv1 = 19;
+                    constexpr int healing_lv1 = 32;
+                    uint32_t base = std::stoul(spells[(weakness_lv1 * 4) + 2]);
+                    add(base + 3, hex_to_bytes(spells[(healing_lv1 * 4) + 3].substr(6, 2)));
+                    add(base + 11, hex_to_bytes(spells[(healing_lv1 * 4) + 3].substr(22)));
+                    add_hex(data::mendingdata[0], data::mendingdata[2]);
+                    log("Extra Healing: Weakness Lv1 is Mending Lv1, a second Healing Lv1.");
+                }
                 return;
             }
 

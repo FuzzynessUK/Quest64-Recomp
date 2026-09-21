@@ -114,7 +114,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Extra healing</div><div class="config-tip-text">Replaces Soul Search Lv1 with a second copy of Healing Lv1, called Mending Lv1, always in a different element from Healing. With Early healing on, Vampire's Touch is moved to a third element as well.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Extra healing</div><div class="config-tip-text">Weakness Lv1 becomes Mending Lv1, a second copy of Healing Lv1 (with the spell shuffle on it lands in a different element from Healing; with Early healing on, Vampire's Touch becomes a third source too).</div></div>
                                         <select data-value="rnd_extra_healing" id="rnd_extra_healing_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
