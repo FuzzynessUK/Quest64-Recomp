@@ -952,6 +952,13 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    constructor.BindFunc("enh_song_notice",
+        [](Rml::Variant& out) { out = enhancements_context.edited.song_notice ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.song_notice = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
     constructor.BindFunc("enh_spell_notice",
         [](Rml::Variant& out) { out = enhancements_context.edited.spell_notice ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1022,9 +1029,18 @@ struct AudioContext {
     Rml::DataModelHandle model_handle;
     zelda64::audio::Options edited;
     bool changed = false;
+    // The custom_music folder's files, for the per-track pickers.
+    std::vector<std::string> library;
 };
 
 AudioContext audio_context;
+
+void refresh_music_library() {
+    audio_context.library = zelda64::audio::library_files();
+    if (audio_context.model_handle) {
+        audio_context.model_handle.DirtyAllVariables();
+    }
+}
 
 void audio_option_changed() {
     zelda64::audio::save_options(audio_context.edited);
@@ -1057,12 +1073,57 @@ void make_audio_bindings(Rml::Context* context) {
         }
     );
     constructor.BindFunc("aud_custom_music",
-        [](Rml::Variant& out) { out = audio_context.edited.custom_music ? 1 : 0; },
+        [](Rml::Variant& out) { out = static_cast<int>(audio_context.edited.custom_music); },
         [](const Rml::Variant& in) {
-            audio_context.edited.custom_music = in.Get<int>() != 0;
+            audio_context.edited.custom_music = static_cast<zelda64::audio::CustomMusic>(std::clamp(in.Get<int>(), 0, 2));
             audio_option_changed();
         }
     );
+    // Custom mode's per-track pickers: value 0 is the game's own track,
+    // i + 1 the i-th library file. Saved by name, so the folder can change
+    // order without moving choices.
+    constructor.RegisterArray<std::vector<std::string>>();
+    audio_context.library = zelda64::audio::library_files();
+    constructor.Bind("aud_library", &audio_context.library);
+    constructor.BindFunc("aud_library_count", [](Rml::Variant& out) { out = static_cast<int>(audio_context.library.size()); });
+    static std::string track_names[zelda64::audio::game_track_count];
+    for (int track = 0; track < zelda64::audio::game_track_count; track++) {
+        track_names[track] = "aud_track_" + std::to_string(track);
+        constructor.BindFunc(track_names[track],
+            [track](Rml::Variant& out) {
+                auto it = audio_context.edited.custom_tracks.find(track);
+                int value = 0;
+                if (it != audio_context.edited.custom_tracks.end()) {
+                    auto pos = std::find(audio_context.library.begin(), audio_context.library.end(), it->second);
+                    if (pos != audio_context.library.end()) {
+                        value = static_cast<int>(pos - audio_context.library.begin()) + 1;
+                    }
+                }
+                out = value;
+            },
+            [track](const Rml::Variant& in) {
+                int value = in.Get<int>();
+                auto& tracks = audio_context.edited.custom_tracks;
+                std::string before;
+                if (auto it = tracks.find(track); it != tracks.end()) {
+                    before = it->second;
+                }
+                std::string after;
+                if (value >= 1 && value <= static_cast<int>(audio_context.library.size())) {
+                    after = audio_context.library[value - 1];
+                }
+                if (after == before) {
+                    return;   // the select reporting its own value on load
+                }
+                if (after.empty()) {
+                    tracks.erase(track);
+                }
+                else {
+                    tracks[track] = after;
+                }
+                audio_option_changed();
+            });
+    }
 
     audio_context.model_handle = constructor.GetModelHandle();
 }
@@ -1895,6 +1956,32 @@ public:
         recompui::attach_hud_preview();
     }
     void register_events(recompui::UiEventListenerInstancer& listener) override {
+        recompui::register_event(listener, "aud_music_random_all",
+            [](const std::string& param, Rml::Event& event) {
+                refresh_music_library();
+                if (audio_context.library.empty()) {
+                    return;
+                }
+                std::mt19937 rng{ std::random_device{}() };
+                std::uniform_int_distribution<size_t> pick(0, audio_context.library.size() - 1);
+                for (int track = 0; track < zelda64::audio::game_track_count; track++) {
+                    if (!zelda64::audio::track_is_jingle(track)) {
+                        audio_context.edited.custom_tracks[track] = audio_context.library[pick(rng)];
+                    }
+                }
+                audio_option_changed();
+                audio_context.model_handle.DirtyAllVariables();
+            });
+        recompui::register_event(listener, "aud_music_clear_all",
+            [](const std::string& param, Rml::Event& event) {
+                audio_context.edited.custom_tracks.clear();
+                audio_option_changed();
+                audio_context.model_handle.DirtyAllVariables();
+            });
+        recompui::register_event(listener, "aud_music_rescan",
+            [](const std::string& param, Rml::Event& event) {
+                refresh_music_library();
+            });
         recompui::register_event(listener, "hud_reset_hp",
             [](const std::string& param, Rml::Event& event) {
                 enhancements_context.edited.hud_hp_custom = false;

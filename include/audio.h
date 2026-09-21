@@ -2,6 +2,10 @@
 #define __AUDIO_H__
 
 #include <cstdint>
+#include <filesystem>
+#include <map>
+#include <string>
+#include <vector>
 
 // The Audio tab: settings that change what the game plays rather than how
 // loud it is (volumes are the Sound tab, in the general config). Stored in
@@ -21,6 +25,12 @@ namespace zelda64::audio {
         All,
     };
 
+    enum class CustomMusic {
+        Off,
+        Shuffle,
+        Custom,
+    };
+
     struct Options {
         MusicShuffle music_shuffle = MusicShuffle::Off;
         // A random permutation of the 70 sound effects, applied where every
@@ -29,16 +39,41 @@ namespace zelda64::audio {
         // cut three seconds after it starts, so a looping ambience that
         // lands on a common effect cannot run on.
         bool sfx_shuffle = false;
-        // Replacement music: every `track_NN.seq` in `<exe dir>/custom_music`
-        // replaces track NN (decimal, the number the map music table and
-        // the play requests use) for the session. A file is a compact
-        // sequence in the game's own format - tools/mid2cseq.pl writes one
-        // from a MIDI - and is appended to the free tail of the ROM at
-        // boot, with the sequence bank's entry pointed at it, so the game
-        // DMAs it like any other track. What was loaded, and what was
-        // rejected and why, goes to custom_music.txt beside the settings.
-        bool custom_music = false;
+        // Replacement music. `<exe dir>/custom_music` is a library of
+        // `.seq` files (compact sequences in the game's own format;
+        // tools/mid2cseq.pl writes one from a MIDI), named freely. Shuffle
+        // gives every looping track a random file from the library each
+        // launch; Custom plays the file chosen for each track in
+        // `custom_tracks`. A chosen file is appended to the ROM at boot
+        // (the free tail from 0xF94348, growing the ROM past 16MB if the
+        // library needs it) and the sequence bank's entry pointed at it,
+        // so the game DMAs it like any other track. What was loaded, and
+        // what was rejected and why, goes to custom_music.txt beside the
+        // settings.
+        CustomMusic custom_music = CustomMusic::Off;
+        // Track number -> library file name without `.seq`.
+        std::map<int, std::string> custom_tracks;
     };
+
+    // The game's 44 sequences, by the number the map music table and the
+    // play requests use, with the place or event each is heard.
+    constexpr int game_track_count = 44;
+    const char* track_label(int track);
+    // The short one-shot jingles (level up, death, victory); the shuffle
+    // leaves them alone, since a looping song on the jingle player would
+    // never end.
+    bool track_is_jingle(int track);
+    // The order the menu lists the tracks in: events first, then areas in
+    // story order, then the rest.
+    const int* track_menu_order();
+
+    // What plays as a track this session: the library file's name where
+    // custom music replaced it, else the game's own label.
+    std::string song_name(int track);
+
+    // The library folder and the file names (no extension) in it, sorted.
+    std::filesystem::path library_folder();
+    std::vector<std::string> library_files();
 
     // Options as saved on disk; a missing file gives defaults.
     Options load_options();

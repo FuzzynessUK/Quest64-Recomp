@@ -1,26 +1,28 @@
 Custom Music
 ============
 
-With "Custom Music" switched on in the Audio tab, every file in this folder
-named track_NN.seq replaces the game's music track NN for that session.
-Track numbers (decimal):
+This folder is a music library. Put .seq files here (any name; the name is
+what the menu shows), then in the game's Audio tab set Custom Music to:
 
-   2  Melrode            13  Battle             21  Holy Plains
-  15  Melrode Monastery  25  Dondoran           27  Title screen
-  30  Death jingle       43  Victory fanfare
+  Shuffle  every looping track gets a random file from here, a new draw
+           each launch;
+  Custom   pick a file for each track in the list that appears (with
+           Randomise all / Clear all / Rescan folder buttons).
 
-The full list is the map music table in the source (DOCS/HANDOFF.md).
+Changes take effect when the game is next launched. Layout > Notifications
+> Show song name announces each track as it starts.
 
 A .seq file is a sequence in the game's own compact format (an N64
 "compressed MIDI"). tools/mid2cseq.pl in the source tree writes one from a
 standard MIDI file:
 
-    perl tools/mid2cseq.pl song.mid custom_music/track_21.seq --prog 0=21,1=23,2=0
+    perl tools/mid2cseq.pl song.mid "custom_music/My Song.seq" --prog 0=21,1=23,2=0
 
 --prog pins MIDI channels to the game's instrument programs (0-28; 9 is
 the drum kit). A file may be at most 32768 bytes. The game log
 custom_music.txt (next to the settings, in %LOCALAPPDATA%\Quest64Recompiled)
 says what was loaded or why a file was skipped.
 
-track_15.seq shipped with the game is the Pokemon Gold/Silver gym leader battle
-theme (from a MIDI sequenced by Joao "Johnnyz" Buaes), an experiment.
+"Pokemon GS - Gym Leader Battle.seq" shipped with the game is the gym
+leader theme from Pokemon Gold/Silver (MIDI sequenced by Joao "Johnnyz"
+Buaes), an experiment.

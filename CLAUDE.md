@@ -54,9 +54,13 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     applied in a hook on `func_80025B8C`, the routine every effect ends in
     (direct, queued through `func_800268D4`, or the title overlay's own
     calls) with the id in a0.
-  - *Custom Music* (2026-09-21, experiment, awaiting play-test): every
-    `<exe dir>/custom_music/track_NN.seq` replaces track NN. At boot the
-    file is appended to the ROM's free tail (0xF94348 onward is 0xFF) and
+  - *Custom Music* (2026-09-21, play-tested once as the track_NN.seq
+    version): `<exe dir>/custom_music` is a library of `.seq` files. Off /
+    Shuffle (every looping track draws a random file per launch; jingles
+    28,29,30,43 skipped) / Custom (a picker per track, 44 rows generated
+    from `track_labels[]` in `audio.cpp`, saved by file name in
+    `custom_tracks`; Randomise all / Clear all / Rescan buttons). At boot
+    each chosen file is appended to the ROM's free tail (0xF94348 onward is 0xFF) and
     the sequence bank's entry rewritten: the bank is an ALSeqFile at ROM
     0xEBABD0 (u16 rev, u16 count = 44, then u32 offset from the bank
     start + u32 len), DMA'd into RAM by `func_80025040` at init and read
@@ -71,10 +75,17 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     itself, not from after it as in stock libultra; `FE FE` = literal).
     The instrument bank (ROM 0xE7E800) has 29 programs, no percussion
     bank: program 9 is a GM-keyed drum kit. The battle theme uses 21
-    (lead), 0, 18, 25, 23, 19, 7, 9. The sample `tools/custom_music/track_15.seq`, deployed to the game folder (Melrode
+    (lead), 0, 18, 25, 23, 19, 7, 9. The sample `tools/custom_music/Pokemon GS - Gym Leader Battle.seq`, deployed to the game folder (was track 15, Melrode
     Monastery, the first thing heard) is the Pokémon G/S gym leader theme
     from a MIDI, pinned `--prog 0=21,1=23,2=0`; the Darunia's Joy `.ootrs`
     is OoT bytecode, a different format, so it was not used directly.
+    The DMA reader (`pi.cpp do_rom_read`) has no size check, so the ROM
+    copy grows past 16MB when the tail runs out. Track labels: map table
+    rows for areas; boss pick 0x8001CA28 gives track 0 (boss) or 0x29
+    (Mammon). **Show song name** (Layout > Notifications, `song_notice`):
+    `audio::on_frame` watches the byte 0x8008FCC0 that `func_80026658`
+    sets right before starting a track and posts "Now playing: ..." with
+    `song_name()` (library name or label).
 - **JP Stat Up Effect** (2026-09-21, awaiting play-test) — the Eltale
   Monsters colour burst on a stat rise, which the US ROM has no routine for
   (HANDOFF "JP stat-gain effect"), drawn by us instead. `src/game/statfx.cpp`

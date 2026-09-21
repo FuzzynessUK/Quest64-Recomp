@@ -101,6 +101,13 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show song name</div><div class="config-tip-text">"Now playing: ..." appears whenever the music changes: the area or event the game's own track belongs to, or the file name of a custom song from the Audio tab.</div></div>
+                                        <select data-value="enh_song_notice" id="enh_song_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Speedrun Timer</div><div class="config-tip-text">Shows a run timer on screen. It starts when you leave the title screen and stops on the message that Mammon has been destroyed. Pick where on the screen it sits; messages that share the spot line up under it. Applies straight away.</div></div>
                                         <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
                                             <option value="0">Off</option>

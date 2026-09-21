@@ -87,6 +87,10 @@ namespace zelda64::enhancements {
         // (include/itemnotice.h).
         bool item_notice = false;
 
+        // "Now playing: <song>" whenever the main music player starts a
+        // track (zelda64::audio::on_frame; custom music by file name).
+        bool song_notice = false;
+
         // The notification stack itself (all three above). Off hides and
         // silences them; never_expire keeps messages until pushed out;
         // notify_max is how many show at once (1-10). All live.

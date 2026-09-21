@@ -11,6 +11,8 @@
 #include <vector>
 
 #include "audio.h"
+#include "enhancements.h"
+#include "notify.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
 #include "zelda_support.h"
@@ -19,6 +21,7 @@
 #include "recomp.h"
 
 namespace data = merrow::data;
+using zelda64::audio::CustomMusic;
 using zelda64::audio::MusicShuffle;
 using zelda64::audio::Options;
 
@@ -55,6 +58,14 @@ namespace {
 
     // Per-session tables, built at boot; identity until then.
     std::array<int8_t, track_count> bgm_remap{};
+    // Track -> library file name for the tracks custom music replaced.
+    std::map<int, std::string> session_songs;
+
+    // The track the main BGM player is on: func_80026658 copies each
+    // request here (0x8002673C, a byte; -1 when stopped) right before it
+    // loads and starts the sequence, so a change is a start.
+    constexpr int32_t bgm_current_track = 0x8008FCC0;
+    int last_seen_track = -2;
     std::array<int8_t, sfx_count> sfx_remap{};
 
     // With the shuffle on, a looping ambience (a waterfall, say) can land on
@@ -123,74 +134,195 @@ namespace {
         v[at + 3] = static_cast<uint8_t>(value);
     }
 
-    // Reads `<exe dir>/custom_music/track_NN.seq` files into the ROM copy.
-    void apply_custom_music(std::vector<uint8_t>& patched) {
-        std::filesystem::path folder = std::filesystem::absolute(zelda64::get_program_path() / "custom_music");
+    // Which library file each track gets this session: Shuffle draws one
+    // per looping track, Custom takes the menu's choices (a name that is
+    // no longer in the folder is reported and left vanilla).
+    std::map<int, std::string> plan_custom_music(const Options& options, const std::vector<std::string>& library,
+                                                 std::mt19937& rng, std::ofstream& log) {
+        std::map<int, std::string> plan;
+        if (options.custom_music == CustomMusic::Shuffle) {
+            if (library.empty()) {
+                log << "  shuffle: the library is empty, nothing replaced\n";
+                return plan;
+            }
+            std::uniform_int_distribution<size_t> pick(0, library.size() - 1);
+            for (int track = 0; track < zelda64::audio::game_track_count; track++) {
+                if (!zelda64::audio::track_is_jingle(track)) {
+                    plan[track] = library[pick(rng)];
+                }
+            }
+        }
+        else if (options.custom_music == CustomMusic::Custom) {
+            for (const auto& [track, name] : options.custom_tracks) {
+                if (track < 0 || track >= zelda64::audio::game_track_count || name.empty()) {
+                    continue;
+                }
+                if (std::find(library.begin(), library.end(), name) == library.end()) {
+                    log << "  track " << track << " (" << zelda64::audio::track_label(track) << "): \"" << name
+                        << ".seq\" is not in the folder, left as the game's own\n";
+                    continue;
+                }
+                plan[track] = name;
+            }
+        }
+        return plan;
+    }
+
+    // Appends each chosen file to the ROM copy once and points every track
+    // that uses it at that copy.
+    void apply_custom_music(std::vector<uint8_t>& patched, const Options& options, std::mt19937& rng) {
+        std::filesystem::path folder = zelda64::audio::library_folder();
         std::ofstream log(zelda64::get_app_folder_path() / "custom_music.txt");
         log << "Custom music folder: " << folder.string() << "\n";
-        std::error_code ec;
-        if (!std::filesystem::is_directory(folder, ec)) {
-            log << "  folder not found; nothing replaced\n";
-            return;
-        }
+        std::vector<std::string> library = zelda64::audio::library_files();
+        log << "  " << library.size() << " file(s) in the library\n";
+        std::map<int, std::string> plan = plan_custom_music(options, library, rng, log);
+        session_songs.clear();
+
         uint32_t count = (static_cast<uint32_t>(patched[seq_bank_start + 2]) << 8) | patched[seq_bank_start + 3];
         uint32_t cursor = rom_free_start;
-        std::vector<std::filesystem::path> files;
-        for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
-            if (entry.is_regular_file()) {
-                files.push_back(entry.path());
-            }
-        }
-        std::sort(files.begin(), files.end());
-        for (const auto& path : files) {
-            std::string name = path.filename().string();
-            int track = -1;
-            if (name.size() > 10 && name.compare(0, 6, "track_") == 0 && name.compare(name.size() - 4, 4, ".seq") == 0) {
-                try {
-                    track = std::stoi(name.substr(6, name.size() - 10));
-                }
-                catch (std::exception&) {}
-            }
-            if (track < 0) {
-                log << "  " << name << ": skipped, not named track_NN.seq\n";
-                continue;
-            }
+        std::map<std::string, std::pair<uint32_t, uint32_t>> placed;   // name -> ROM offset, length
+        for (const auto& [track, name] : plan) {
             if (static_cast<uint32_t>(track) >= count) {
-                log << "  " << name << ": skipped, the bank has tracks 0-" << (count - 1) << "\n";
                 continue;
             }
-            std::ifstream in(path, std::ios::binary);
-            std::vector<uint8_t> seq((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            if (seq.size() < seq_header_size + 2 || seq.size() > seq_buffer_size) {
-                log << "  " << name << ": skipped, " << seq.size() << " bytes (a sequence is between "
-                    << (seq_header_size + 2) << " and " << seq_buffer_size << ")\n";
-                continue;
-            }
-            bool sane = true;
-            for (int t = 0; t < 16; t++) {
-                uint32_t offset = read_u32(seq, t * 4);
-                if (offset != 0 && (offset < seq_header_size || offset >= seq.size())) {
-                    sane = false;
+            auto it = placed.find(name);
+            if (it == placed.end()) {
+                std::ifstream in(folder / (name + ".seq"), std::ios::binary);
+                std::vector<uint8_t> seq((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                if (seq.size() < seq_header_size + 2 || seq.size() > seq_buffer_size) {
+                    log << "  " << name << ".seq: skipped, " << seq.size() << " bytes (a sequence is between "
+                        << (seq_header_size + 2) << " and " << seq_buffer_size << ")\n";
+                    placed[name] = { 0, 0 };
+                    continue;
                 }
+                bool sane = true;
+                for (int t = 0; t < 16; t++) {
+                    uint32_t offset = read_u32(seq, t * 4);
+                    if (offset != 0 && (offset < seq_header_size || offset >= seq.size())) {
+                        sane = false;
+                    }
+                }
+                if (!sane) {
+                    log << "  " << name << ".seq: skipped, a track offset points outside the file\n";
+                    placed[name] = { 0, 0 };
+                    continue;
+                }
+                uint32_t padded = (static_cast<uint32_t>(seq.size()) + 15) & ~static_cast<uint32_t>(15);
+                if (cursor + padded > patched.size()) {
+                    // The DMA reader indexes the ROM copy with no size
+                    // check, so the ROM simply grows (in 1MB steps) once the
+                    // free tail is used up.
+                    patched.resize(((cursor + padded + 0xFFFFF) / 0x100000) * 0x100000, 0xFF);
+                    log << "  ROM grown to " << patched.size() << " bytes\n";
+                }
+                std::copy(seq.begin(), seq.end(), patched.begin() + cursor);
+                it = placed.emplace(name, std::make_pair(cursor, static_cast<uint32_t>(seq.size()))).first;
+                log << "  " << name << ".seq: " << seq.size() << " bytes at ROM 0x" << std::hex << cursor << std::dec << "\n";
+                cursor += padded;
             }
-            if (!sane) {
-                log << "  " << name << ": skipped, a track offset points outside the file\n";
+            if (it->second.second == 0) {
                 continue;
             }
-            uint32_t padded = (static_cast<uint32_t>(seq.size()) + 15) & ~static_cast<uint32_t>(15);
-            if (cursor + padded > patched.size()) {
-                log << "  " << name << ": skipped, no ROM space left\n";
-                continue;
-            }
-            std::copy(seq.begin(), seq.end(), patched.begin() + cursor);
             uint32_t entry = seq_bank_start + 4 + static_cast<uint32_t>(track) * 8;
-            uint32_t len = static_cast<uint32_t>(seq.size());
-            write_u32(patched, entry, cursor - seq_bank_start);
-            write_u32(patched, entry + 4, len);
-            log << "  " << name << ": track " << track << " <- " << len << " bytes at ROM 0x" << std::hex << cursor << std::dec << "\n";
-            cursor += padded;
+            write_u32(patched, entry, it->second.first - seq_bank_start);
+            write_u32(patched, entry + 4, it->second.second);
+            log << "  track " << track << " (" << zelda64::audio::track_label(track) << ") <- " << name << "\n";
+            session_songs[track] = name;
+        }
+        if (plan.empty()) {
+            log << "  nothing replaced\n";
         }
     }
+
+    // The 44 sequences: who plays each (map music table rows at ROM
+    // 0x054700 for the areas; the by-number callers for the events: boss
+    // pick 0x8001CA28 gives 0 or 0x29 for Mammon, battle 0xD, title 0x1B,
+    // death 0x1E, credits 0x14, victory 0x2B on the jingle player). The
+    // unnamed ones loop but no table row or immediate reaches them.
+    const char* const track_labels[zelda64::audio::game_track_count] = {
+        "Boss battle",                                  // 0
+        "Baragoon Tunnel",                              // 1
+        "Melrode",                                      // 2
+        "Dondoran Castle",                              // 3
+        "Track 4",                                      // 4
+        "Shamwood",                                     // 5
+        "Hidden rooms and shrines",                     // 6
+        "Buildings (shops, inns, houses)",              // 7
+        "Limelin Castle",                               // 8
+        "Blue Cave (inner)",                            // 9
+        "Cull Hazard",                                  // 10
+        "Blue Cave (deep)",                             // 11
+        "Forests (inner paths)",                        // 12
+        "Battle",                                       // 13
+        "Nepty's arena",                                // 14
+        "Melrode Monastery",                            // 15
+        "Track 16",                                     // 16
+        "Track 17",                                     // 17
+        "Boil Hole",                                    // 18
+        "Track 19",                                     // 19
+        "Credits",                                      // 20
+        "Fields (Holy Plains, Dondoran Flats, West Carmagh, West Limelin)",   // 21
+        "Dindom Dries",                                 // 22
+        "Blue Cave",                                    // 23
+        "Forests (Connor, Glencoe, Windward)",          // 24
+        "Dondoran",                                     // 25
+        "Isle of Skye",                                 // 26
+        "Title screen",                                 // 27
+        "Jingle 28",                                    // 28
+        "Jingle 29",                                    // 29
+        "Death",                                        // 30
+        "Brannoch Castle",                              // 31
+        "Track 32",                                     // 32
+        "Churches, halls and Mammon's World",           // 33
+        "Larapool",                                     // 34
+        "Connor Forest",                                // 35
+        "Limelin",                                      // 36
+        "Normoon",                                      // 37
+        "Mammon's World (inner)",                       // 38
+        "Brannoch and Baragoon Moor",                   // 39
+        "Track 40",                                     // 40
+        "Mammon battle",                                // 41
+        "Track 42",                                     // 42
+        "Victory fanfare",                              // 43
+    };
+
+    const int track_menu_order_list[zelda64::audio::game_track_count] = {
+        27, 13, 0, 41, 43, 30, 20,
+        15, 2, 33, 7, 21, 25, 3, 35, 24, 12, 34, 23, 9, 11, 10, 37, 36, 8, 22, 18, 1, 39, 31, 26, 14, 5, 6, 38,
+        4, 16, 17, 19, 28, 29, 32, 40, 42,
+    };
+}
+
+const char* zelda64::audio::track_label(int track) {
+    return track >= 0 && track < game_track_count ? track_labels[track] : "";
+}
+
+bool zelda64::audio::track_is_jingle(int track) {
+    return track == 28 || track == 29 || track == 30 || track == 43;
+}
+
+const int* zelda64::audio::track_menu_order() {
+    return track_menu_order_list;
+}
+
+std::filesystem::path zelda64::audio::library_folder() {
+    return std::filesystem::absolute(zelda64::get_program_path() / "custom_music");
+}
+
+std::vector<std::string> zelda64::audio::library_files() {
+    std::vector<std::string> names;
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(library_folder(), ec)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".seq") {
+            names.push_back(entry.path().stem().string());
+        }
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+namespace {
 }
 
 Options zelda64::audio::load_options() {
@@ -226,7 +358,29 @@ Options zelda64::audio::load_options() {
         }
     }
     get("sfx_shuffle", o.sfx_shuffle);
-    get("custom_music", o.custom_music);
+    // custom_music was a bool for one build (track_NN.seq files); true
+    // becomes Custom, and the files are re-picked in the menu.
+    auto custom = j.find("custom_music");
+    if (custom != j.end()) {
+        if (custom->is_boolean()) {
+            o.custom_music = custom->get<bool>() ? CustomMusic::Custom : CustomMusic::Off;
+        }
+        else if (custom->is_number_integer()) {
+            o.custom_music = static_cast<CustomMusic>(std::clamp(custom->get<int>(), 0, 2));
+        }
+    }
+    auto tracks = j.find("custom_tracks");
+    if (tracks != j.end() && tracks->is_object()) {
+        for (const auto& [key, value] : tracks->items()) {
+            try {
+                int track = std::stoi(key);
+                if (value.is_string() && track >= 0 && track < zelda64::audio::game_track_count) {
+                    o.custom_tracks[track] = value.get<std::string>();
+                }
+            }
+            catch (std::exception&) {}
+        }
+    }
     return o;
 }
 
@@ -234,7 +388,14 @@ void zelda64::audio::save_options(const Options& o) {
     nlohmann::json j;
     j["music_shuffle"] = static_cast<int>(o.music_shuffle);
     j["sfx_shuffle"] = o.sfx_shuffle;
-    j["custom_music"] = o.custom_music;
+    j["custom_music"] = static_cast<int>(o.custom_music);
+    nlohmann::json tracks = nlohmann::json::object();
+    for (const auto& [track, name] : o.custom_tracks) {
+        if (!name.empty()) {
+            tracks[std::to_string(track)] = name;
+        }
+    }
+    j["custom_tracks"] = tracks;
     std::ofstream out(options_path());
     out << j.dump(4);
 }
@@ -251,13 +412,14 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
     const Options& options = active_options();
     std::iota(bgm_remap.begin(), bgm_remap.end(), 0);
     std::iota(sfx_remap.begin(), sfx_remap.end(), 0);
-    if (options.music_shuffle == MusicShuffle::Off && !options.sfx_shuffle && !options.custom_music) {
+    bool custom_music = options.custom_music != CustomMusic::Off;
+    if (options.music_shuffle == MusicShuffle::Off && !options.sfx_shuffle && !custom_music) {
         return;
     }
 
     std::mt19937 rng{ std::random_device{}() };
 
-    if (options.music_shuffle != MusicShuffle::Off || options.custom_music) {
+    if (options.music_shuffle != MusicShuffle::Off || custom_music) {
         // Reads back whatever the earlier boot patches left, so this stacks
         // on top of them rather than replacing them. The table is in the
         // boot segment (ROM 0x1000.., 1MB), which has already been copied to
@@ -268,8 +430,8 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
         constexpr int32_t boot_ram_start = 0x80000400;
         std::span<const uint8_t> rom = recomp::get_rom();
         std::vector<uint8_t> patched(rom.begin(), rom.end());
-        if (options.custom_music) {
-            apply_custom_music(patched);
+        if (custom_music) {
+            apply_custom_music(patched, options, rng);
         }
         for (size_t i = 0; options.music_shuffle != MusicShuffle::Off && i * 2 + 1 < data::bgmdata.size(); i++) {
             uint32_t address = static_cast<uint32_t>(std::stoul(data::bgmdata[i * 2], nullptr, 16));
@@ -342,7 +504,27 @@ extern "C" void quest64_audio_sfx(uint8_t*, recomp_context* ctx) {
 
 // Once per frame from the cheats frame hook: cut whatever has been going
 // for three seconds since it last started.
+std::string zelda64::audio::song_name(int track) {
+    auto it = session_songs.find(track);
+    if (it != session_songs.end()) {
+        return it->second;
+    }
+    return track_label(track);
+}
+
 void zelda64::audio::on_frame(uint8_t* rdram) {
+    // "Show song name" (Layout tab): a line whenever the main player
+    // starts a track.
+    int track = static_cast<int8_t>(MEM_B(0, bgm_current_track));
+    if (track != last_seen_track) {
+        bool announce = last_seen_track != -2 && track >= 0 && track < game_track_count
+            && zelda64::enhancements::active_options().song_notice;
+        last_seen_track = track;
+        if (announce) {
+            zelda64::notify::post("Now playing: " + song_name(track));
+        }
+    }
+
     if (!active_options().sfx_shuffle) {
         return;
     }
