@@ -275,6 +275,13 @@ cheats frame hook.
   saves never overwrite it), drags of it ignored and nothing dropped above
   it (librecomp indices are ours minus one). Runtime-toggleable so it can be
   flipped in-game for the next launch, as the old select allowed.
+- **Audio tab** (2026-09-21): Background Music shuffle moved here from the
+  randomizer's Cosmetics (own module `src/game/audio.cpp`, `audio.json`,
+  `audio_model`). It re-implements Merrow's roll (0-37 mapped over the
+  unused tracks 27-30) over `merrow::data::bgmdata` with an unseeded
+  `std::mt19937`, so it works with the randomizer off and differs every
+  launch. `ConfigTab` gained Enhancements and Audio; Debug's index was 7
+  (Enhancements' slot) before and is 9 now.
 - **Tooltips** (2026-09-21): see CLAUDE.md "Tooltips". Position is computed
   in px from `GetAbsoluteOffset` of the label and the `.config-debug`
   ancestor; `SetProperty` needs the `PropertyId` overload for a

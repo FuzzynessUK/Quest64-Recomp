@@ -1503,20 +1503,6 @@ namespace {
                 log("Spell palettes randomized.");
             }
 
-            if (options.music_shuffle) {
-                // 73 track slots. The usable tracks are 0-26 and 31-41, so a
-                // roll of 0-37 skips the unused four in the middle.
-                for (size_t i = 0; i * 2 + 1 < data::bgmdata.size(); i++) {
-                    int track = rng.next(38);
-                    if (track >= 27) {
-                        track += 4;
-                    }
-                    char value[4];
-                    snprintf(value, sizeof(value), "%02X", track);
-                    add_hex(data::bgmdata[i * 2], value);
-                }
-                log("Background music randomized.");
-            }
         }
 
 
@@ -1960,7 +1946,6 @@ static nlohmann::json options_to_json(const Options& o) {
     j["cloak_palette"] = o.cloak_palette;
     j["brian_palette"] = o.brian_palette;
     j["spell_palette"] = o.spell_palette;
-    j["music_shuffle"] = o.music_shuffle;
     return j;
 }
 
@@ -2058,7 +2043,6 @@ static Options options_from_json(const nlohmann::json& j) {
     get("cloak_palette", o.cloak_palette);
     get("brian_palette", o.brian_palette);
     get("spell_palette", o.spell_palette);
-    get("music_shuffle", o.music_shuffle);
 
     o.encounter_rate = std::clamp(o.encounter_rate, 0, 4);
     o.text_palette = std::clamp(o.text_palette, 0, 5);

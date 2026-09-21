@@ -9,6 +9,7 @@
 #include "zelda_debug.h"
 #include "zelda_game.h"
 #include "randomizer.h"
+#include "audio.h"
 #include "enhancements.h"
 #include "speedrun.h"
 #include "zelda_render.h"
@@ -46,8 +47,12 @@ int recompui::config_tab_to_index(recompui::ConfigTab tab) {
         return 5;
     case recompui::ConfigTab::Randomizer:
         return 6;
-    case recompui::ConfigTab::Debug:
+    case recompui::ConfigTab::Enhancements:
         return 7;
+    case recompui::ConfigTab::Audio:
+        return 8;
+    case recompui::ConfigTab::Debug:
+        return 9;
     default:
         assert(false && "Unknown config tab.");
         return 0;
@@ -887,6 +892,43 @@ void make_enhancements_bindings(Rml::Context* context) {
     enhancements_context.model_handle = constructor.GetModelHandle();
 }
 
+// Audio tab. Same shape as the enhancements tab: one settings file, read
+// once at boot, with the "next launch" line shown once something changed.
+struct AudioContext {
+    Rml::DataModelHandle model_handle;
+    zelda64::audio::Options edited;
+    bool changed = false;
+};
+
+AudioContext audio_context;
+
+void audio_option_changed() {
+    zelda64::audio::save_options(audio_context.edited);
+    audio_context.changed = true;
+    audio_context.model_handle.DirtyVariable("aud_changed");
+}
+
+void make_audio_bindings(Rml::Context* context) {
+    Rml::DataModelConstructor constructor = context->CreateDataModel("audio_model");
+    if (!constructor) {
+        throw std::runtime_error("Failed to make RmlUi data model for the audio menu");
+    }
+
+    audio_context.edited = zelda64::audio::load_options();
+
+    constructor.BindFunc("aud_changed", [](Rml::Variant& out) { out = audio_context.changed ? 1 : 0; });
+    bind_tooltip_events(constructor);
+    constructor.BindFunc("aud_music_shuffle",
+        [](Rml::Variant& out) { out = audio_context.edited.music_shuffle ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            audio_context.edited.music_shuffle = in.Get<int>() != 0;
+            audio_option_changed();
+        }
+    );
+
+    audio_context.model_handle = constructor.GetModelHandle();
+}
+
 void make_randomizer_bindings(Rml::Context* context) {
     using zelda64::randomizer::Options;
     Rml::DataModelConstructor constructor = context->CreateDataModel("randomizer_model");
@@ -984,7 +1026,6 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_cloak_palette", &Options::cloak_palette);
     bind_randomizer_field(constructor, "rnd_brian_palette", &Options::brian_palette);
     bind_randomizer_field(constructor, "rnd_spell_palette", &Options::spell_palette);
-    bind_randomizer_field(constructor, "rnd_music_shuffle", &Options::music_shuffle);
 
     randomizer_context.model_handle = constructor.GetModelHandle();
 }
@@ -1360,7 +1401,6 @@ public:
                 o.cloak_palette = false;
                 o.brian_palette = false;
                 o.spell_palette = false;
-                o.music_shuffle = false;
                 randomizer_option_changed();
                 randomizer_context.model_handle.DirtyAllVariables();
             });
@@ -1373,7 +1413,6 @@ public:
                 o.cloak_palette = true;
                 o.brian_palette = true;
                 o.spell_palette = true;
-                o.music_shuffle = true;
                 randomizer_option_changed();
                 randomizer_context.model_handle.DirtyAllVariables();
             });
@@ -1822,6 +1861,7 @@ public:
         make_enhancements_bindings(context);
         make_speedrun_bindings(context);
         make_randomizer_bindings(context);
+        make_audio_bindings(context);
     }
 };
 

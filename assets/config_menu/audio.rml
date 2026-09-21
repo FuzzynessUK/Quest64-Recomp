@@ -1,0 +1,36 @@
+<template name="config-menu__audio">
+    <head>
+    </head>
+    <body>
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option" data-if="aud_changed">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Changed settings apply when the game is next launched.</div>
+                            </label>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Music</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Background Music</div><div class="config-tip-text">Every area, town and event plays a track drawn at random, freshly shuffled on each launch. Some battle and boss music is hard-coded elsewhere and stays put. Works with or without the randomizer.</div></div>
+                                        <select data-value="aud_music_shuffle" id="aud_music_shuffle_select" style="nav-up: #tab_audio">
+                                            <option value="0">Off</option>
+                                            <option value="1">Shuffled</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

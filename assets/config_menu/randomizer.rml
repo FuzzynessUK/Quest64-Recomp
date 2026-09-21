@@ -697,13 +697,6 @@
                                             <option value="1">Random</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Background music</div></div>
-                                        <select data-value="rnd_music_shuffle" id="rnd_music_shuffle_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">Shuffled</option>
-                                        </select>
-                                    </div>
                                 </div>
                                 <div class="config-debug__option-trigger">
                                     <button class="button" onclick="rnd_cosmetics_default">All default</button>

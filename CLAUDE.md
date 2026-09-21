@@ -34,6 +34,13 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   (below). A "Changed settings apply when the game is next launched" line
   appears only once something on the tab has been changed; the Randomizer
   tab does the same.
+- **Audio tab** (2026-09-21) — one option so far, Background Music
+  (Off/Shuffled): Merrow's music shuffle moved out of the randomizer so it
+  works in any mode, freshly drawn each launch from `std::random_device`.
+  `src/game/audio.cpp`, `include/audio.h`, settings in `audio.json`,
+  applied last in `quest64_on_init`. The randomizer no longer has a
+  `music_shuffle` option at all. The "Sound" tab (volumes) is the
+  template's and is separate.
 - **Hard Mode** — Landmine36's hack (the .rup is embedded and applied at
   boot, its payload recompiled, its code patches redone as native hooks; own
   save folder; overrides the randomizer). Switched from the **Mods tab**,
@@ -50,7 +57,9 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   is never clipped, below the label or above it in the lower half. The
   Randomizer texts are Merrow's own tooltips, reworded to our option names;
   starting stats and cosmetics have none on request.
-- **Reset** — a button on General and a bindable "Reset Game" control. It
+- **Reset** — a button on General and a bindable "Reset Game" control.
+- Tab order (`config_menu.rml` and `config_tab_to_index`): General, Controls,
+  Graphics, Sound, Mods, Cheats, Randomizer, Enhancements, Audio, Debug. It
   relaunches the application, because ultramodern can start a game but has no
   way to tear a running one down.
 

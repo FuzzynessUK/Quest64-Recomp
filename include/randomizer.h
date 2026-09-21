@@ -104,7 +104,6 @@ namespace zelda64::randomizer {
         bool cloak_palette = false;
         bool brian_palette = false;
         bool spell_palette = false;
-        bool music_shuffle = false;
 
         // Brian
         int start_hp = 50;
