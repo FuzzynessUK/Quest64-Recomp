@@ -751,6 +751,25 @@ void bind_randomizer_field(Rml::DataModelConstructor& constructor, const char* n
 
 // Enhancements tab. Same shape as the randomizer tab: every control writes
 // straight back to its own settings file, which the game reads once at boot.
+// The HUD layout preview's two draggable blocks (defined further down with
+// the preview code; declared here for the tab's bindings).
+struct HudBox {
+    const char* id;
+    bool* custom;
+    float* x;
+    float* y;
+    float anchor_y;
+    float w;
+    float h;
+    bool dragging = false;
+    float drag_mouse[2] = { 0.0f, 0.0f };
+    float drag_origin[2] = { 0.0f, 0.0f };
+};
+extern HudBox hud_boxes[2];
+void hud_box_position(const HudBox& box, float& x, float& y);
+void push_hud_layout();
+void dirty_timer_position();
+
 struct EnhancementsContext {
     Rml::DataModelHandle model_handle;
     zelda64::enhancements::Options edited;
@@ -859,6 +878,37 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    // HUD X/Y fields (Layout tab): the block's position in frame pixels,
+    // shown as the default place while the block is not custom; typing a
+    // number places it there. Same numbers the drag preview uses.
+    auto bind_hud_field = [&constructor](const char* name, int box, bool is_y) {
+        constructor.BindFunc(name,
+            [box, is_y](Rml::Variant& out) {
+                float x, y;
+                hud_box_position(hud_boxes[box], x, y);
+                out = std::to_string(static_cast<int>(std::lround(is_y ? y : x)));
+            },
+            [box, is_y](const Rml::Variant& in) {
+                std::string text = in.Get<std::string>();
+                char* end = nullptr;
+                long value = std::strtol(text.c_str(), &end, 10);
+                if (end == text.c_str()) {
+                    return;   // nothing numeric yet
+                }
+                HudBox& b = hud_boxes[box];
+                float x, y;
+                hud_box_position(b, x, y);
+                *b.custom = true;
+                *b.x = is_y ? x : static_cast<float>(value);
+                *b.y = is_y ? static_cast<float>(value) : y;
+                push_hud_layout();
+                enhancements_option_changed(false);
+            });
+    };
+    bind_hud_field("enh_hud_hp_x", 0, false);
+    bind_hud_field("enh_hud_hp_y", 0, true);
+    bind_hud_field("enh_hud_sp_x", 1, false);
+    bind_hud_field("enh_hud_sp_y", 1, true);
     constructor.BindFunc("enh_remove_borders",
         [](Rml::Variant& out) { out = enhancements_context.edited.remove_borders ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -957,7 +1007,9 @@ void make_enhancements_bindings(Rml::Context* context) {
             if (value != 0) {
                 enhancements_context.edited.timer_position = value - 1;
             }
-            enhancements_option_changed();
+            // Live: the overlay reads the edited copy.
+            enhancements_option_changed(false);
+            dirty_timer_position();
         }
     );
 
@@ -1172,6 +1224,12 @@ struct SpeedrunContext {
 };
 
 SpeedrunContext speedrun_context_state;
+
+void dirty_timer_position() {
+    if (speedrun_context_state.model_handle) {
+        speedrun_context_state.model_handle.DirtyVariable("timer_position");
+    }
+}
 recompui::ContextId speedrun_context;
 
 recompui::ContextId recompui::get_speedrun_context_id() {
@@ -1196,7 +1254,7 @@ void recompui::update_speedrun_model() {
 
     // Nothing before the game is actually running, so the boot menu stays
     // clean. Put the overlay back if anything hid it, such as a menu closing.
-    bool wanted = zelda64::enhancements::active_options().speedrun_timer
+    bool wanted = enhancements_context.edited.speedrun_timer
         && enhancements_context.edited.notifications
         && ultramodern::is_game_started();
     if (wanted) {
@@ -1240,7 +1298,7 @@ void make_speedrun_bindings(Rml::Context* context) {
     constructor.BindFunc("timer_finished",
         [](Rml::Variant& out) { out = speedrun_context_state.shown_finished; });
     constructor.BindFunc("timer_position",
-        [](Rml::Variant& out) { out = zelda64::enhancements::active_options().timer_position; });
+        [](Rml::Variant& out) { out = enhancements_context.edited.timer_position; });
 
     speedrun_context_state.model_handle = constructor.GetModelHandle();
 }
@@ -1473,9 +1531,15 @@ void recompui::update_notifications() {
             { "bottom: 16dp",    "left: 50%",      "center" },
             { "bottom: 16dp",    "right: 16dp",    "right" },
         };
+        // The timer's six positions in the stack's numbering, so a shared
+        // corner pushes the stack past the timer (its height plus a gap).
+        static const int timer_as_notify[6] = { 0, 2, 6, 8, 1, 7 };
+        bool timer_here = live.speedrun_timer
+            && timer_as_notify[std::clamp(live.timer_position, 0, 5)] == position;
+        int wanted_layout = position + (timer_here ? 16 : 0);
         static int applied = -1;
-        if (applied != position) {
-            applied = position;
+        if (applied != wanted_layout) {
+            applied = wanted_layout;
             floating->RemoveProperty("top");
             floating->RemoveProperty("bottom");
             floating->RemoveProperty("left");
@@ -1483,6 +1547,9 @@ void recompui::update_notifications() {
             floating->RemoveProperty("margin-left");
             if (position != 0) {
                 std::string v = edges[position][0];
+                if (timer_here && (position <= 2 || position >= 6)) {
+                    v = position <= 2 ? "top: 74dp" : "bottom: 74dp";
+                }
                 floating->SetProperty(v.substr(0, v.find(':')), v.substr(v.find(':') + 2));
                 v = edges[position][1];
                 floating->SetProperty(v.substr(0, v.find(':')), v.substr(v.find(':') + 2));
@@ -1579,22 +1646,12 @@ namespace {
     constexpr float frame_w_43 = 320.0f;
     constexpr float preview_h_dp = 180.0f;
 
-    struct HudBox {
-        const char* id;
-        bool* custom;
-        float* x;
-        float* y;
-        float anchor_y;
-        float w;
-        float h;
-        bool dragging = false;
-        float drag_mouse[2] = { 0.0f, 0.0f };
-        float drag_origin[2] = { 0.0f, 0.0f };
-    };
-    HudBox hud_boxes[2] = {
-        { "hud_hp_box", &enhancements_context.edited.hud_hp_custom, &enhancements_context.edited.hud_hp_x, &enhancements_context.edited.hud_hp_y, hud_hp_anchor_y, hud_hp_w, hud_hp_h },
-        { "hud_sp_box", &enhancements_context.edited.hud_sp_custom, &enhancements_context.edited.hud_sp_x, &enhancements_context.edited.hud_sp_y, hud_sp_anchor_y, hud_sp_w, hud_sp_h },
-    };
+}
+HudBox hud_boxes[2] = {
+    { "hud_hp_box", &enhancements_context.edited.hud_hp_custom, &enhancements_context.edited.hud_hp_x, &enhancements_context.edited.hud_hp_y, hud_hp_anchor_y, hud_hp_w, hud_hp_h },
+    { "hud_sp_box", &enhancements_context.edited.hud_sp_custom, &enhancements_context.edited.hud_sp_x, &enhancements_context.edited.hud_sp_y, hud_sp_anchor_y, hud_sp_w, hud_sp_h },
+};
+namespace {
 
     // The window as frame pixels wide (240 tall).
     float frame_width() {
@@ -1606,22 +1663,24 @@ namespace {
         return frame_h * static_cast<float>(w) / static_cast<float>(h);
     }
 
-    void push_hud_layout() {
-        const zelda64::enhancements::Options& e = enhancements_context.edited;
-        zelda64::renderer::set_hud_layout(e.hud_hp_custom, e.hud_hp_x, e.hud_hp_y, e.hud_sp_custom, e.hud_sp_x, e.hud_sp_y);
-    }
+}
+void push_hud_layout() {
+    const zelda64::enhancements::Options& e = enhancements_context.edited;
+    zelda64::renderer::set_hud_layout(e.hud_hp_custom, e.hud_hp_x, e.hud_hp_y, e.hud_sp_custom, e.hud_sp_x, e.hud_sp_y);
+}
 
-    // Where a box sits, in frame pixels from the window's left edge.
-    void hud_box_position(const HudBox& box, float& x, float& y) {
-        if (*box.custom) {
-            x = *box.x;
-            y = *box.y;
-        }
-        else {
-            x = (frame_width() - frame_w_43) / 2.0f;
-            y = box.anchor_y;
-        }
+// Where a box sits, in frame pixels from the window's left edge.
+void hud_box_position(const HudBox& box, float& x, float& y) {
+    if (*box.custom) {
+        x = *box.x;
+        y = *box.y;
     }
+    else {
+        x = (frame_width() - frame_w_43) / 2.0f;
+        y = box.anchor_y;
+    }
+}
+namespace {
 
     class HudDragListener : public Rml::EventListener {
         void ProcessEvent(Rml::Event& event) override {
@@ -1667,6 +1726,9 @@ namespace {
             if (event.GetId() == Rml::EventId::Dragend) {
                 box->dragging = false;
                 enhancements_option_changed(false);
+                for (const char* name : { "enh_hud_hp_x", "enh_hud_hp_y", "enh_hud_sp_x", "enh_hud_sp_y" }) {
+                    enhancements_context.model_handle.DirtyVariable(name);
+                }
             }
         }
     };
@@ -1681,6 +1743,23 @@ void recompui::update_hud_preview() {
     Rml::Element* area = document ? document->GetElementById("hud_area") : nullptr;
     if (preview == nullptr || area == nullptr) {
         return;
+    }
+    // The X/Y fields show the default position while a block is not
+    // custom, and that depends on the window; refresh them when it moves.
+    {
+        static int shown[4] = { -1, -1, -1, -1 };
+        static const char* const names[4] = { "enh_hud_hp_x", "enh_hud_hp_y", "enh_hud_sp_x", "enh_hud_sp_y" };
+        for (int b = 0; b < 2; b++) {
+            float x, y;
+            hud_box_position(hud_boxes[b], x, y);
+            int now[2] = { static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)) };
+            for (int k = 0; k < 2; k++) {
+                if (shown[b * 2 + k] != now[k] && !hud_boxes[b].dragging && enhancements_context.model_handle) {
+                    shown[b * 2 + k] = now[k];
+                    enhancements_context.model_handle.DirtyVariable(names[b * 2 + k]);
+                }
+            }
+        }
     }
     float fw = frame_width();
     float dp_per_px = preview_h_dp / frame_h;
@@ -1715,9 +1794,10 @@ void recompui::update_hud_preview() {
         int row = position / 3;                       // top, middle, bottom
         float ox = col == 0 ? margin : col == 1 ? (overlay_w - line_w) / 2.0f : overlay_w - margin - line_w;
         float oy = row == 0 ? margin : row == 1 ? overlay_h * 0.4f : overlay_h - margin - line_h;
-        // Top-left shares its column with the timer when that is top-left too.
-        if (position == 0 && e.speedrun_timer && e.timer_position == 0) {
-            oy += 58.0f;
+        // Wherever the timer shares the spot, the stack sits past it.
+        static const int timer_as_notify[6] = { 0, 2, 6, 8, 1, 7 };
+        if (e.speedrun_timer && timer_as_notify[std::clamp(e.timer_position, 0, 5)] == position) {
+            oy += row == 2 ? -58.0f : 58.0f;
         }
         float to_preview = preview_h_dp / overlay_h;
         notice->SetProperty("display", e.notifications ? "block" : "none");

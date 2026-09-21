@@ -28,6 +28,16 @@
                                             <div id="hud_notice_box" class="hud-box hud-box--notice">Notifications</div>
                                         </div>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>HP/MP X / Y</div><div class="config-tip-text">The HP/MP block's position in the game's pixels: X from the window's left edge, Y from the top (the picture is 240 tall). Typing a number moves it; the drag box and these agree.</div></div>
+                                        <input type="text" id="enh_hud_hp_x_input" data-value="enh_hud_hp_x" maxlength="5" style="margin-right: 8dp;" />
+                                        <input type="text" id="enh_hud_hp_y_input" data-value="enh_hud_hp_y" maxlength="5" />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Spirits X / Y</div><div class="config-tip-text">The four spirits' position in the game's pixels: X from the window's left edge, Y from the top (the picture is 240 tall). Typing a number moves them; the drag box and these agree.</div></div>
+                                        <input type="text" id="enh_hud_sp_x_input" data-value="enh_hud_sp_x" maxlength="5" style="margin-right: 8dp;" />
+                                        <input type="text" id="enh_hud_sp_y_input" data-value="enh_hud_sp_y" maxlength="5" />
+                                    </div>
                                 </div>
                                 <div class="config-debug__option-trigger">
                                     <button class="button" onclick="hud_reset_hp">HP/MP default</button>
@@ -97,7 +107,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Speedrun Timer</div><div class="config-tip-text">Shows a run timer on screen. It starts when you leave the title screen and stops on the message that Mammon has been destroyed. Pick where on the screen it sits.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Speedrun Timer</div><div class="config-tip-text">Shows a run timer on screen. It starts when you leave the title screen and stops on the message that Mammon has been destroyed. Pick where on the screen it sits; messages that share the spot line up under it. Applies straight away.</div></div>
                                         <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
                                             <option value="0">Off</option>
                                             <option value="1">Top left</option>
