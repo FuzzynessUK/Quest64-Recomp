@@ -1209,7 +1209,7 @@ namespace {
     constexpr float glow_hold = 0.15f;
     constexpr float glow_out = 0.5f;
     constexpr float glow_life = glow_in + glow_hold + glow_out;
-    constexpr float glow_peak_opacity = 0.9f;
+    constexpr float glow_peak_opacity = 1.0f;
     // The halo's diameter as a multiple of Brian's on-screen height: where
     // it starts, its full size, and what it shrinks to before it is gone.
     constexpr float glow_scale_start = 1.6f;

@@ -74,6 +74,8 @@ namespace {
     // D_8008FCC6, as the game does it.
     constexpr int stat_up_sfx = 0x35;
     constexpr int stat_up_sfx_delay = 4;
+    // The game asks for 0xFF; this chime is played at 80% of that.
+    constexpr unsigned stat_up_sfx_request = 0xCC;
     constexpr int32_t sfx_queue = 0x8008FCC8;
     constexpr int sfx_queue_slots = 16;
     constexpr int32_t sfx_volume_table = 0x80053CAC;
@@ -85,7 +87,7 @@ namespace {
             if (MEM_BU(0, entry) != 0) {
                 continue;
             }
-            uint32_t volume = (MEM_BU(0, sfx_volume_table + id) * 0xFFu * MEM_BU(0, sfx_master_volume)) >> 16;
+            uint32_t volume = (MEM_BU(0, sfx_volume_table + id) * stat_up_sfx_request * MEM_BU(0, sfx_master_volume)) >> 16;
             MEM_B(0, entry) = static_cast<int8_t>(delay);
             MEM_B(1, entry) = static_cast<int8_t>(id);
             MEM_B(2, entry) = static_cast<int8_t>(volume);
