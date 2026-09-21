@@ -1,0 +1,40 @@
+<rml>
+	<head>
+		<title>Stat Effects</title>
+		<link type="text/rcss" href="rml.rcss"/>
+		<link type="text/rcss" href="recomp.rcss"/>
+		<style>
+			body
+			{
+				width: 100%;
+				height: 100%;
+			}
+			#statfx
+			{
+				position: absolute;
+				display: block;
+				left: 0;
+				top: 0;
+				width: 100%;
+				height: 100%;
+			}
+			/* One particle of the JP stat-up burst. Position, size and opacity
+			   are driven from ui_config.cpp every frame; the colour is per stat. */
+			.spark
+			{
+				position: absolute;
+				display: block;
+				width: 10dp;
+				height: 10dp;
+				border-radius: 5dp;
+			}
+			.spark--hp      { background-color: #ff5a5a; }
+			.spark--mp      { background-color: #5a8cff; }
+			.spark--defense { background-color: #ffe25a; }
+			.spark--agility { background-color: #5aee7a; }
+		</style>
+	</head>
+	<body>
+		<div id="statfx"></div>
+	</body>
+</rml>

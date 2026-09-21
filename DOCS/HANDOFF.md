@@ -524,6 +524,19 @@ then triggering it from the stat-up site in `func_80002F60` with a colour
 per stat. `patches/` already compiles MIPS into this build, so the .nrm mod
 format is not required: it is the same capability with extra packaging.
 
+**Done another way (2026-09-21):** the effect is drawn by the UI overlay
+rather than the game (see CLAUDE.md "JP Stat Up Effect"): detection in
+`src/game/statfx.cpp`, particles in `recompui::update_stat_effects`. What
+made it cheap is that the camera is one call site: `func_80012Cxx` builds
+the projection with guPerspectiveF(mf 0x80086E48, fovy 0x80086EC8, aspect
+4/3, near 0x80086ECC, far 0x80086ED0) and the view with
+guLookAtReflectF(mf 0x80086E88, eye 0x80086DCC.., at 0x80086DD8..), and
+those float matrices stay in RAM, so projecting a world point is two
+row-vector multiplies. Brian's object is gPlayerData1 0x8007BACC (the
+state-handler dispatcher at 0x80003778 indexes the table at 0x8004C230 by
+the u16 state at 0x8007BAB8 and passes a0 = 0x8007BACC, a1 = 0x8007BAB8).
+The MIPS transcription above is still the way to get the *exact* JP look.
+
 ### Merrow branding: deliberately not ported (decided 2026-09-19)
 
 Merrow replaces the title-screen logo and can stamp the seed digits over the

@@ -79,6 +79,8 @@ namespace recompui {
     // sits on top of the game without swallowing anything.
     ContextId get_speedrun_context_id();
     void update_speedrun_model();
+    // The JP stat-up burst: spawns and moves its particles. Every frame.
+    void update_stat_effects();
     void show_speedrun_overlay();
     int config_tab_to_index(ConfigTab tab);
     Rml::ElementTabSet* get_config_tabset();

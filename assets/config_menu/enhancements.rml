@@ -32,6 +32,13 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>JP Stat Up Effect</div><div class="config-tip-text">A burst of colour over Brian whenever one of his stats goes up, as in the Japanese release: red for HP, blue for MP, yellow for defense, green for agility. The US game has no effect at all; this one is drawn over the picture, so it follows Brian on screen.</div></div>
+                                        <select data-value="enh_stat_up_effect" id="enh_stat_up_effect_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Exit from anywhere</div><div class="config-tip-text">The control you bind to "Exit Spell" under Controls warps you to the start of the area without owning the spell or paying its MP. It does nothing during a battle, a menu or a transition, and with this off the binding does nothing at all.</div></div>
                                         <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
                                             <option value="0">Off</option>

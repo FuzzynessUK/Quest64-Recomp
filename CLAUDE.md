@@ -26,9 +26,9 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   Lost Keys (both rulesets), Shannon hints, the cosmetic palettes, Merrow's
   table/stat shuffles, and our own **Enemy Randomizer** (below).
 - **Enhancements tab** — two groups:
-  - *Quality of Life*: JP Healing Amounts, JP Magic barrier (+2 turns), Exit
-    from anywhere, Speedrun Timer (one select: Off + six screen positions),
-    Faster walking.
+  - *Quality of Life*: JP Healing Amounts, JP Magic barrier (+2 turns), JP
+    Stat Up Effect, Exit from anywhere, Speedrun Timer (one select: Off +
+    six screen positions), Faster walking.
   - *Fun*: One Hit KO, N64 Mode.
   No description paragraphs: every option label has a hover tooltip instead
   (below). A "Changed settings apply when the game is next launched" line
@@ -51,6 +51,23 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     applied in a hook on `func_80025B8C`, the routine every effect ends in
     (direct, queued through `func_800268D4`, or the title overlay's own
     calls) with the id in a0.
+- **JP Stat Up Effect** (2026-09-21, awaiting play-test) — the Eltale
+  Monsters colour burst on a stat rise, which the US ROM has no routine for
+  (HANDOFF "JP stat-gain effect"), drawn by us instead. `src/game/statfx.cpp`
+  (game thread, from the cheats frame hook): watches max HP/MP, DEF, AGI in
+  gPlayerMainData, treats a rise of 1..30 while in the field with a map
+  loaded as an event, and every frame projects Brian (gPlayerData1
+  0x8007BACC +0/4/8, plus 22 units for his head) through the game's own
+  float camera matrices (view 0x80086E88, projection 0x80086E48, the
+  outputs of the only guLookAtReflectF/guPerspectiveF call site,
+  func_80012Cxx; libultra row-vector convention, clip = v*V*P). The UI
+  thread (`recompui::update_stat_effects` in `ui_config.cpp`, called next to
+  the timer update in `ui_state.cpp`) owns a draw-only context on
+  `assets/stat_effects.rml` and sprays 18 `.spark` divs per rise between
+  feet and head, drifting up and fading over about 0.8 s, repositioned every
+  frame so they follow Brian. NDC to window: the 4:3 image is the full
+  window height, centred. Brian's height (22) and the burst numbers are
+  guesses to tune on sight.
 - **Tab bar**: ten tabs no longer fit at header size, so the config menu's
   tabs are 26dp and the row starts 48dp down, clear of the quit/close
   buttons (`Tabs.scss`, mirrored in `recomp.rcss`).

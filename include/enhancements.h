@@ -60,6 +60,12 @@ namespace zelda64::enhancements {
         // Mode, which sets its own walk speed.
         bool faster_walk = false;
 
+        // The Japanese release bursts a colour over Brian when a stat rises
+        // (red HP, blue MP, yellow defense, green agility); the US build has
+        // no such routine, so it is drawn by the UI overlay from what
+        // statfx.cpp reports each frame.
+        bool stat_up_effect = false;
+
         // Hacks.
         //
 

@@ -10,6 +10,7 @@
 #include "enhancements.h"
 #include "hardmode.h"
 #include "speedrun.h"
+#include "statfx.h"
 #include "librecomp/helpers.hpp"
 
 namespace {
@@ -262,6 +263,7 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     apply_pending_item(rdram);
     live_current_map.store(static_cast<int32_t>(MEM_W(0, gCurrentMap)));
     zelda64::enhancements::on_frame(rdram);
+    zelda64::statfx::on_frame(rdram);
     zelda64::hardmode::on_frame(rdram);
     zelda64::speedrun::update(false);
 }

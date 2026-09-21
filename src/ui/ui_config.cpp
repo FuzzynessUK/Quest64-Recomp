@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <random>
 #include <type_traits>
 
@@ -11,6 +12,7 @@
 #include "randomizer.h"
 #include "audio.h"
 #include "enhancements.h"
+#include "statfx.h"
 #include "speedrun.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
@@ -844,6 +846,13 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    constructor.BindFunc("enh_stat_up_effect",
+        [](Rml::Variant& out) { out = enhancements_context.edited.stat_up_effect ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.stat_up_effect = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
     constructor.BindFunc("enh_jp_healing",
         [](Rml::Variant& out) { out = enhancements_context.edited.jp_healing ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1169,6 +1178,145 @@ void make_speedrun_bindings(Rml::Context* context) {
     speedrun_context_state.model_handle = constructor.GetModelHandle();
 }
 
+// JP stat-up effect overlay. Like the timer, its own draw-only context that
+// stays up while the game runs. The game thread reports rises and Brian's
+// screen position (statfx.cpp); this side sprays particles at him and
+// moves them every frame, so they follow him if the camera moves.
+namespace {
+    struct Spark {
+        Rml::Element* element;
+        // Where on Brian it started: 0 = feet, 1 = head, plus a sideways
+        // jitter, both in dp; drift is dp a second.
+        float along;
+        float jitter_x;
+        float drift_x;
+        float drift_y;
+        float age;
+        float life;
+        float size;
+    };
+
+    recompui::ContextId statfx_context;
+    std::vector<Spark> sparks;
+    std::mt19937 spark_rng{ std::random_device{}() };
+    std::chrono::steady_clock::time_point statfx_last_update{};
+    // The last place Brian was seen, kept while he is off screen so a burst
+    // in progress does not jump.
+    float statfx_feet_px[2] = { 0.0f, 0.0f };
+    float statfx_head_px[2] = { 0.0f, 0.0f };
+    bool statfx_seen = false;
+
+    constexpr int sparks_per_rise = 18;
+
+    const char* spark_class(zelda64::statfx::Stat stat) {
+        switch (stat) {
+        case zelda64::statfx::Stat::HP: return "spark--hp";
+        case zelda64::statfx::Stat::MP: return "spark--mp";
+        case zelda64::statfx::Stat::Defense: return "spark--defense";
+        default: return "spark--agility";
+        }
+    }
+
+    float spark_random(float low, float high) {
+        return std::uniform_real_distribution<float>(low, high)(spark_rng);
+    }
+
+    // NDC to window pixels. The game projects at 4:3 and RT64 keeps that
+    // area the full window height, centred, whatever the window's shape.
+    void ndc_to_px(const Rml::Vector2i& size, float ndc_x, float ndc_y, float out[2]) {
+        float height = static_cast<float>(size.y);
+        out[0] = size.x / 2.0f + ndc_x * (height * 4.0f / 3.0f) / 2.0f;
+        out[1] = height / 2.0f - ndc_y * height / 2.0f;
+    }
+}
+
+void recompui::update_stat_effects() {
+    if (statfx_context == recompui::ContextId::null()) {
+        return;
+    }
+    bool wanted = zelda64::enhancements::active_options().stat_up_effect && ultramodern::is_game_started();
+    if (!wanted) {
+        return;
+    }
+    if (!recompui::is_context_shown(statfx_context)) {
+        recompui::show_context(statfx_context, "");
+    }
+
+    Rml::ElementDocument* document = statfx_context.get_document();
+    Rml::Element* container = document ? document->GetElementById("statfx") : nullptr;
+    if (container == nullptr) {
+        return;
+    }
+    Rml::Context* context = document->GetContext();
+    Rml::Vector2i size = context->GetDimensions();
+    float dp = context->GetDensityIndependentPixelRatio();
+
+    auto now = std::chrono::steady_clock::now();
+    float dt = statfx_last_update.time_since_epoch().count() == 0 ? 0.0f
+        : std::chrono::duration<float>(now - statfx_last_update).count();
+    statfx_last_update = now;
+    dt = std::min(dt, 0.1f);
+
+    zelda64::statfx::Anchor anchor = zelda64::statfx::anchor();
+    if (anchor.valid) {
+        ndc_to_px(size, anchor.feet_x, anchor.feet_y, statfx_feet_px);
+        ndc_to_px(size, anchor.head_x, anchor.head_y, statfx_head_px);
+        statfx_seen = true;
+    }
+
+    for (const zelda64::statfx::Event& event : zelda64::statfx::take_events()) {
+        if (!statfx_seen) {
+            continue;
+        }
+        for (int i = 0; i < sparks_per_rise; i++) {
+            Rml::ElementPtr made = document->CreateElement("div");
+            made->SetClass("spark", true);
+            made->SetClass(spark_class(event.stat), true);
+            Rml::Element* element = container->AppendChild(std::move(made));
+            sparks.push_back({
+                element,
+                spark_random(0.0f, 1.0f),
+                spark_random(-18.0f, 18.0f),
+                spark_random(-35.0f, 35.0f),
+                spark_random(-110.0f, -45.0f),
+                // Staggered so the burst twinkles rather than pops.
+                -spark_random(0.0f, 0.25f),
+                spark_random(0.55f, 0.95f),
+                spark_random(7.0f, 13.0f),
+            });
+        }
+    }
+
+    for (size_t i = 0; i < sparks.size();) {
+        Spark& spark = sparks[i];
+        spark.age += dt;
+        if (spark.age >= spark.life) {
+            container->RemoveChild(spark.element);
+            sparks[i] = sparks.back();
+            sparks.pop_back();
+            continue;
+        }
+        float t = std::max(spark.age, 0.0f);
+        float fraction = t / spark.life;
+        float x = statfx_feet_px[0] + (statfx_head_px[0] - statfx_feet_px[0]) * spark.along
+            + (spark.jitter_x + spark.drift_x * t) * dp;
+        float y = statfx_feet_px[1] + (statfx_head_px[1] - statfx_feet_px[1]) * spark.along
+            + spark.drift_y * t * dp;
+        float px_size = spark.size * (1.0f - 0.5f * fraction) * dp;
+        spark.element->SetProperty(Rml::PropertyId::Left, Rml::Property(x - px_size / 2.0f, Rml::Unit::PX));
+        spark.element->SetProperty(Rml::PropertyId::Top, Rml::Property(y - px_size / 2.0f, Rml::Unit::PX));
+        spark.element->SetProperty(Rml::PropertyId::Width, Rml::Property(px_size, Rml::Unit::PX));
+        spark.element->SetProperty(Rml::PropertyId::Height, Rml::Property(px_size, Rml::Unit::PX));
+        spark.element->SetProperty(Rml::PropertyId::BorderTopLeftRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
+        spark.element->SetProperty(Rml::PropertyId::BorderTopRightRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
+        spark.element->SetProperty(Rml::PropertyId::BorderBottomLeftRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
+        spark.element->SetProperty(Rml::PropertyId::BorderBottomRightRadius, Rml::Property(px_size / 2.0f, Rml::Unit::PX));
+        float opacity = spark.age < 0.0f ? 0.0f : 1.0f - fraction * fraction;
+        spark.element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(opacity, Rml::Unit::NUMBER));
+        i++;
+    }
+}
+
 recompui::ContextId config_context;
 
 recompui::ContextId recompui::get_config_context_id() {
@@ -1227,6 +1375,9 @@ public:
         // Draw only: the game keeps every button and the mouse.
         speedrun_context.set_captures_input(false);
         speedrun_context.set_captures_mouse(false);
+        statfx_context = recompui::create_context(zelda64::get_asset_path("stat_effects.rml"));
+        statfx_context.set_captures_input(false);
+        statfx_context.set_captures_mouse(false);
         recompui::update_mod_list(false);
         recompui::get_config_tabset()->AddEventListener(Rml::EventId::Tabchange, &config_tabset_listener);
     }
