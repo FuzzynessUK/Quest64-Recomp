@@ -14,9 +14,9 @@
 //     of the user's settings (randomizer::active_options() hands the preset
 //     out while this is active, so the native hooks agree with the ROM
 //     writes).
-//   - Experience tripled, combat and stat alike, by dividing the level
+//   - Experience doubled, combat and stat alike, by dividing the level
 //     requirement tables (0x80053ECC for HP/MP/AGI/DEF, 0x80053D3C for
-//     combat experience) by three, so the amounts the game hands out and
+//     combat experience) by two, so the amounts the game hands out and
 //     the status screen's percentages stay its own.
 //   - JP Healing Amounts and JP Magic Barrier: forced on in the
 //     enhancements' boot copy.

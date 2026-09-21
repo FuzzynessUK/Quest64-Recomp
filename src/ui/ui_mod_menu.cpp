@@ -53,7 +53,7 @@ static recomp::mods::ModDetails easier_quest_details() {
     details.description =
         "The vanilla game with a gentler curve: Extra Healing (Mending Lv1 in place of Soul Search Lv1), "
         "Guilty's element fixed to Earth, walking MP regen at its fastest, wings that stay in your bag "
-        "after use, experience tripled - combat experience and the hidden experience behind HP, MP, "
+        "after use, experience doubled - combat experience and the hidden experience behind HP, MP, "
         "agility and defense - plus the JP Healing Amounts and JP Magic Barrier enhancements.\n\n"
         "Takes effect the next time the game is launched (Reset on the General tab restarts now). "
         "It replaces the Randomizer's settings while it is on; Hard Mode takes priority if both are on.";

@@ -13,7 +13,7 @@ using zelda64::randomizer::Mode;
 using zelda64::randomizer::Options;
 
 namespace {
-    // Experience is tripled by dividing the level requirements, so the
+    // Experience is doubled by dividing the level requirements, so the
     // amounts the game hands out (monster EXP, the per-hit stat gains) and
     // the percentages the status screen shows stay the game's own:
     //
@@ -24,13 +24,13 @@ namespace {
     // - 0x80053D3C: 98 u32 entries, the combat experience each level needs
     //   (8, 10, 13, 17, 22, ...), read at 0x80007920; the level caps at 98.
     //
-    // Each entry becomes the nearest whole number to a third of itself,
-    // never below one.
+    // Each entry becomes the nearest whole number to half of itself, never
+    // below one.
     constexpr int32_t stat_exp_table = 0x80053ECC;
     constexpr int stat_exp_levels = 54;
     constexpr int32_t combat_exp_table = 0x80053D3C;
     constexpr int combat_exp_levels = 98;
-    constexpr int exp_multiplier = 3;
+    constexpr int exp_multiplier = 2;
 
     // The boot segment: ROM 0x1000.. is already in RAM at 0x80000400 when
     // the boot patches run, so anything in it is written to both.
