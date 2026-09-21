@@ -74,6 +74,13 @@ namespace zelda64::enhancements {
         // (include/itemnotice.h).
         bool item_notice = false;
 
+        // The notification stack itself (all three above). Off hides and
+        // silences them; never_expire keeps messages until pushed out;
+        // notify_max is how many show at once (1-10). All live.
+        bool notifications = true;
+        bool notify_never_expire = false;
+        int notify_max = 5;
+
         // Hacks.
         //
 

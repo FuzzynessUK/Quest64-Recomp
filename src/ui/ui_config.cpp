@@ -857,6 +857,27 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    constructor.BindFunc("enh_notifications",
+        [](Rml::Variant& out) { out = enhancements_context.edited.notifications ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.notifications = in.Get<int>() != 0;
+            enhancements_option_changed(false);
+        }
+    );
+    constructor.BindFunc("enh_notify_never_expire",
+        [](Rml::Variant& out) { out = enhancements_context.edited.notify_never_expire ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.notify_never_expire = in.Get<int>() != 0;
+            enhancements_option_changed(false);
+        }
+    );
+    constructor.BindFunc("enh_notify_max",
+        [](Rml::Variant& out) { out = enhancements_context.edited.notify_max; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.notify_max = std::clamp(in.Get<int>(), 1, 10);
+            enhancements_option_changed(false);
+        }
+    );
     constructor.BindFunc("enh_item_notice",
         [](Rml::Variant& out) { out = enhancements_context.edited.item_notice ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1159,6 +1180,7 @@ void recompui::update_speedrun_model() {
     // Nothing before the game is actually running, so the boot menu stays
     // clean. Put the overlay back if anything hid it, such as a menu closing.
     bool wanted = zelda64::enhancements::active_options().speedrun_timer
+        && enhancements_context.edited.notifications
         && ultramodern::is_game_started();
     if (wanted) {
         recompui::show_speedrun_overlay();
@@ -1410,16 +1432,42 @@ void recompui::update_notifications() {
         return;
     }
 
+    // These three are read live from the tab's edited copy, so they take
+    // effect as they are changed.
+    const zelda64::enhancements::Options& live = enhancements_context.edited;
     auto now = std::chrono::steady_clock::now();
+    auto drop_front = [&]() {
+        container->RemoveChild(notices.front().element);
+        notices.erase(notices.begin());
+    };
+
     for (std::string& text : zelda64::notify::take()) {
+        if (!live.notifications) {
+            continue;
+        }
         Rml::ElementPtr made = document->CreateElement("div");
         made->SetClass("notice", true);
         made->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
         notices.push_back({ container->AppendChild(std::move(made)), now });
     }
+    if (!live.notifications) {
+        while (!notices.empty()) {
+            drop_front();
+        }
+        return;
+    }
+    // Over the limit, the oldest go first.
+    while (notices.size() > static_cast<size_t>(std::clamp(live.notify_max, 1, 10))) {
+        drop_front();
+    }
 
     for (size_t i = 0; i < notices.size();) {
         float age = std::chrono::duration<float>(now - notices[i].shown_at).count();
+        if (live.notify_never_expire) {
+            notices[i].element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(1.0f, Rml::Unit::NUMBER));
+            i++;
+            continue;
+        }
         if (age >= notice_hold + notice_fade) {
             container->RemoveChild(notices[i].element);
             notices.erase(notices.begin() + i);

@@ -18,8 +18,35 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notifications</div><div class="config-tip-text">The on-screen messages in the top-left corner. Off hides the options below and shows nothing. Applies straight away.</div></div>
+                                        <select data-value="enh_notifications" id="enh_notifications_select" style="nav-up: #tab_enhancements">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div data-if="enh_notifications == 1">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Never expire</div><div class="config-tip-text">Messages stay on screen instead of fading after three seconds; the oldest is pushed out when the maximum is reached. Applies straight away.</div></div>
+                                        <select data-value="enh_notify_never_expire" id="enh_notify_never_expire_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Max messages: {{enh_notify_max}}</div><div class="config-tip-text">How many messages can be on screen at once; beyond that the oldest is pushed out. Applies straight away.</div></div>
+                                        <input
+                                            class="nav-vert"
+                                            id="enh_notify_max_input"
+                                            type="range"
+                                            data-value="enh_notify_max"
+                                            min="1"
+                                            max="10"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show spell learnt</div><div class="config-tip-text">The game says nothing when a spirit takes an element to a spell's unlock level. With this on, "You have learnt ..." appears top-left for three seconds for each spell as it unlocks, using the unlock levels in play (the randomizer's level options included).</div></div>
-                                        <select data-value="enh_spell_notice" id="enh_spell_notice_select" style="nav-up: #tab_enhancements">
+                                        <select data-value="enh_spell_notice" id="enh_spell_notice_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
@@ -42,6 +69,7 @@
                                             <option value="6">Bottom middle</option>
                                             <option value="4">Bottom right</option>
                                         </select>
+                                    </div>
                                     </div>
                                 </div>
                             </div>

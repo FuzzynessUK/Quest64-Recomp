@@ -126,6 +126,10 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("stat_up_effect", o.stat_up_effect);
     get("spell_notice", o.spell_notice);
     get("item_notice", o.item_notice);
+    get("notifications", o.notifications);
+    get("notify_never_expire", o.notify_never_expire);
+    get("notify_max", o.notify_max);
+    o.notify_max = std::clamp(o.notify_max, 1, 10);
     get("hard_mode", o.hard_mode);
     get("easier_quest", o.easier_quest);
     return o;
@@ -148,6 +152,9 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["stat_up_effect"] = o.stat_up_effect;
     j["spell_notice"] = o.spell_notice;
     j["item_notice"] = o.item_notice;
+    j["notifications"] = o.notifications;
+    j["notify_never_expire"] = o.notify_never_expire;
+    j["notify_max"] = o.notify_max;
     j["hard_mode"] = o.hard_mode;
     j["easier_quest"] = o.easier_quest;
     std::ofstream out(options_path());
