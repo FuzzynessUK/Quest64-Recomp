@@ -1210,16 +1210,11 @@ namespace {
     constexpr float glow_out = 0.5f;
     constexpr float glow_life = glow_in + glow_hold + glow_out;
     constexpr float glow_peak_opacity = 1.0f;
-    // The halo is an ellipse sitting low on him, as in Eltale: its width as
-    // a multiple of Brian's on-screen height - where it starts, its full
-    // size, and what it shrinks to before it is gone - its height as a
-    // fraction of that width, and where its centre sits between his feet
-    // (0) and head (1).
-    constexpr float glow_scale_start = 1.3f;
-    constexpr float glow_scale_full = 2.6f;
-    constexpr float glow_scale_end = 1.9f;
-    constexpr float glow_aspect = 0.55f;
-    constexpr float glow_centre_along = 0.3f;
+    // The halo's diameter as a multiple of Brian's on-screen height: where
+    // it starts, its full size, and what it shrinks to before it is gone.
+    constexpr float glow_scale_start = 1.6f;
+    constexpr float glow_scale_full = 3.4f;
+    constexpr float glow_scale_end = 2.4f;
 
     const char* glow_class(zelda64::statfx::Stat stat) {
         switch (stat) {
@@ -1322,8 +1317,8 @@ void recompui::update_stat_effects() {
     float body_dx = statfx_head_px[0] - statfx_feet_px[0];
     float body_dy = statfx_head_px[1] - statfx_feet_px[1];
     float body = std::max(std::sqrt(body_dx * body_dx + body_dy * body_dy), 40.0f * dp);
-    float centre_x = statfx_feet_px[0] + body_dx * glow_centre_along;
-    float centre_y = statfx_feet_px[1] + body_dy * glow_centre_along;
+    float centre_x = (statfx_feet_px[0] + statfx_head_px[0]) / 2.0f;
+    float centre_y = (statfx_feet_px[1] + statfx_head_px[1]) / 2.0f;
 
     for (size_t i = 0; i < glows.size();) {
         Glow& glow = glows[i];
@@ -1352,12 +1347,11 @@ void recompui::update_stat_effects() {
             opacity = glow_peak_opacity * (1.0f - f) * (1.0f - f);
             scale = glow_scale_full + (glow_scale_end - glow_scale_full) * f;
         }
-        float width = body * scale;
-        float height = width * glow_aspect;
-        glow.element->SetProperty(Rml::PropertyId::Left, Rml::Property(centre_x - width / 2.0f, Rml::Unit::PX));
-        glow.element->SetProperty(Rml::PropertyId::Top, Rml::Property(centre_y - height / 2.0f, Rml::Unit::PX));
-        glow.element->SetProperty(Rml::PropertyId::Width, Rml::Property(width, Rml::Unit::PX));
-        glow.element->SetProperty(Rml::PropertyId::Height, Rml::Property(height, Rml::Unit::PX));
+        float diameter = body * scale;
+        glow.element->SetProperty(Rml::PropertyId::Left, Rml::Property(centre_x - diameter / 2.0f, Rml::Unit::PX));
+        glow.element->SetProperty(Rml::PropertyId::Top, Rml::Property(centre_y - diameter / 2.0f, Rml::Unit::PX));
+        glow.element->SetProperty(Rml::PropertyId::Width, Rml::Property(diameter, Rml::Unit::PX));
+        glow.element->SetProperty(Rml::PropertyId::Height, Rml::Property(diameter, Rml::Unit::PX));
         glow.element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(opacity, Rml::Unit::NUMBER));
         i++;
     }
