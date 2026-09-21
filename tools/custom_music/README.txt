@@ -14,6 +14,8 @@ Converting music: q64music.exe next to the game
     q64music "song.ootrs"                converts a Darunia's Joy / OoT Randomizer pack
     q64music "song.mid"                  converts a standard MIDI file
     q64music "song.ootrs" -d custom_music   ... straight into this folder
+    q64music "C:Musicpacks"               a whole folder (subfolders too) into
+                                         this custom_music folder in one go
     q64music "song.ootrs" --list         shows the channels and instruments only
 
 Quest 64 has only its own 29 instruments (no names; 9 is the drum kit), so

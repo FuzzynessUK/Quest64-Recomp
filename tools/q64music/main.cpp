@@ -35,12 +35,14 @@ namespace {
         std::puts(
             "q64music - convert music for Quest 64: Recompiled's custom_music folder\n"
             "\n"
-            "  q64music <input> [options]\n"
+            "  q64music <input>... [options]\n"
             "\n"
             "  input        .ootrs (Darunia's Joy / OoTR music pack), .seq/.zseq/.aseq\n"
-            "               (OoT sequence bytecode), or .mid (standard MIDI)\n"
+            "               (OoT sequence bytecode), .mid (standard MIDI), or a folder:\n"
+            "               every such file in it and its subfolders is converted\n"
             "  -o <file>    output .seq (default: the song's name, next to the input)\n"
-            "  -d <folder>  output folder (with the default name)\n"
+            "  -d <folder>  output folder; for a folder input the default is the\n"
+            "               custom_music folder beside this exe, when there is one\n"
             "  --prog c=p,... pin channel c (0-15) to Quest 64 program p (0-28; 9 = drums)\n"
             "  --inst f:i=p   map OoT soundfont f, instrument i, to program p\n"
             "  --map <file>   a map file: lines of \"font instrument program\" (hex or\n"
@@ -204,21 +206,124 @@ namespace {
     }
 }
 
+namespace {
+    struct Settings {
+        fs::path output;      // -o: one file only
+        fs::path out_dir;
+        std::map<int, int> channel_program;
+        std::map<int, int> map_table;
+        bool once = false;
+        bool list = false;
+        bool verbose = false;
+        int transpose = 0;
+    };
+
+    bool convertible(const fs::path& path) {
+        std::string ext = lower(path.extension().string());
+        return ext == ".ootrs" || ext == ".zip" || ext == ".seq" || ext == ".zseq" || ext == ".aseq" || ext == ".mid" || ext == ".midi";
+    }
+
+    // One input file. Returns 0 on success, 2 for a file that failed the
+    // parse check, 3 for one over the game's size limit, 1 on any error.
+    int convert_one(const fs::path& input, const Settings& s) {
+        std::string ext = lower(input.extension().string());
+        cseq::Song song;
+        std::vector<std::string> warnings;
+        std::string name = input.stem().string();
+        oot::Report report;
+        bool is_oot = false;
+
+        if (ext == ".mid" || ext == ".midi") {
+            midi::Options mo;
+            mo.channel_program = s.channel_program;
+            mo.one_shot = s.once;
+            mo.transpose = s.transpose;
+            midi::convert(read_file(input), mo, song, warnings);
+        }
+        else {
+            is_oot = true;
+            Pack pack;
+            if (ext == ".ootrs" || ext == ".zip") {
+                pack = read_ootrs(input);
+                name = pack.name;
+                if (pack.has_soundfont) {
+                    warnings.push_back("the pack bundles its own soundfont, which cannot be used; instruments are mapped to the game's");
+                }
+            }
+            else {
+                pack.sequence = read_file(input);
+            }
+            oot::Options oo;
+            oo.channel_program = s.channel_program;
+            oo.instrument_program = s.map_table;
+            oo.font = pack.font;
+            oo.one_shot = s.once || pack.fanfare;
+            oo.verbose = s.verbose;
+            oot::convert(pack.sequence, oo, song, report);
+            warnings.insert(warnings.end(), report.warnings.begin(), report.warnings.end());
+            if (s.transpose != 0) {
+                for (int t = 0; t < 15; t++) {
+                    auto pinned = s.channel_program.find(t);
+                    bool drums = pinned != s.channel_program.end() && pinned->second == 9;
+                    for (cseq::Event& e : song.tracks[t].events) {
+                        if ((e.bytes[0] & 0xF0) == 0x90 && !drums) {
+                            e.bytes[1] = static_cast<uint8_t>(std::clamp(e.bytes[1] + s.transpose, 0, 127));
+                        }
+                    }
+                }
+            }
+        }
+
+        std::printf("%s\n", name.c_str());
+        if (is_oot) {
+            std::printf("  soundfont 0x%X, %s\n", report.channels.empty() ? 0 : report.channels[0].font,
+                        song.loop_start >= 0 ? "loops" : "plays once");
+            for (const oot::Report::ChannelUse& c : report.channels) {
+                std::printf("  channel %2d: font 0x%02X instrument %3d -> program %2d  (%d notes)%s\n",
+                            c.channel, c.font, c.instrument, c.program, c.notes,
+                            s.channel_program.count(c.channel) ? "  [pinned]" : c.instrument == 0x7F ? "  [drums]" : "");
+            }
+            if (report.loop_start >= 0) {
+                std::printf("  loop: ticks %lld to %lld (%.1f beats in, %.1f beats long)\n",
+                            static_cast<long long>(report.loop_start), static_cast<long long>(report.length),
+                            report.loop_start / 48.0, (report.length - report.loop_start) / 48.0);
+            }
+        }
+        for (const std::string& w : warnings) {
+            std::printf("  note: %s\n", w.c_str());
+        }
+        if (s.list) {
+            return 0;
+        }
+
+        std::vector<uint8_t> file = cseq::write(song);
+        std::string problem = validate(file);
+        if (!problem.empty()) {
+            std::printf("  ERROR: the written file does not parse: %s\n", problem.c_str());
+            return 2;
+        }
+        fs::path output = s.output;
+        if (output.empty()) {
+            fs::path dir = s.out_dir.empty() ? input.parent_path() : s.out_dir;
+            output = dir / fs::u8path(safe_name(name) + ".seq");
+        }
+        std::ofstream out(output, std::ios::binary);
+        if (!out) throw std::runtime_error("cannot write " + output.string());
+        out.write(reinterpret_cast<const char*>(file.data()), static_cast<std::streamsize>(file.size()));
+        std::printf("  -> %s\n  %s\n", output.string().c_str(), cseq::summary(song, file).c_str());
+        return file.size() > cseq::max_file_size ? 3 : 0;
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         usage();
         return 1;
     }
-    fs::path input;
-    fs::path output;
-    fs::path out_dir;
+    std::vector<fs::path> inputs;
     fs::path map_file;
-    std::map<int, int> channel_program;
     std::map<int, int> instrument_program;
-    bool once = false;
-    bool list = false;
-    bool verbose = false;
-    int transpose = 0;
+    Settings s;
     auto parse_pairs = [](const std::string& text, std::map<int, int>& table, bool font_inst) {
         std::istringstream items(text);
         std::string item;
@@ -244,114 +349,88 @@ int main(int argc, char** argv) {
                 if (i + 1 >= argc) throw std::runtime_error(a + " needs a value");
                 return argv[++i];
             };
-            if (a == "-o") output = fs::u8path(next());
-            else if (a == "-d") out_dir = fs::u8path(next());
-            else if (a == "--prog") parse_pairs(next(), channel_program, false);
+            if (a == "-o") s.output = fs::u8path(next());
+            else if (a == "-d") s.out_dir = fs::u8path(next());
+            else if (a == "--prog") parse_pairs(next(), s.channel_program, false);
             else if (a == "--inst") parse_pairs(next(), instrument_program, true);
             else if (a == "--map") map_file = fs::u8path(next());
-            else if (a == "--transpose") transpose = parse_int(next());
-            else if (a == "--once") once = true;
-            else if (a == "--list") list = true;
-            else if (a == "--verbose") verbose = true;
+            else if (a == "--transpose") s.transpose = parse_int(next());
+            else if (a == "--once") s.once = true;
+            else if (a == "--list") s.list = true;
+            else if (a == "--verbose") s.verbose = true;
             else if (a == "-h" || a == "--help") { usage(); return 0; }
             else if (!a.empty() && a[0] == '-') throw std::runtime_error("unknown option " + a);
-            else input = fs::u8path(a);
+            else inputs.push_back(fs::u8path(a));
         }
-        if (input.empty()) {
+        if (inputs.empty()) {
             usage();
             return 1;
         }
 
         // The default map beside the exe, then the named one on top.
-        std::map<int, int> map_table;
         fs::path exe_dir = fs::absolute(fs::u8path(argv[0])).parent_path();
-        load_map(exe_dir / "q64music.map", map_table, false);
-        if (!map_file.empty()) load_map(map_file, map_table, true);
-        for (const auto& [k, v] : instrument_program) map_table[k] = v;
+        load_map(exe_dir / "q64music.map", s.map_table, false);
+        if (!map_file.empty()) load_map(map_file, s.map_table, true);
+        for (const auto& [k, v] : instrument_program) s.map_table[k] = v;
 
-        std::string ext = lower(input.extension().string());
-        cseq::Song song;
-        std::vector<std::string> warnings;
-        std::string name = input.stem().string();
-        oot::Report report;
-        bool is_oot = false;
-
-        if (ext == ".mid" || ext == ".midi") {
-            midi::Options mo;
-            mo.channel_program = channel_program;
-            mo.one_shot = once;
-            mo.transpose = transpose;
-            midi::convert(read_file(input), mo, song, warnings);
-        }
-        else {
-            is_oot = true;
-            Pack pack;
-            if (ext == ".ootrs" || ext == ".zip") {
-                pack = read_ootrs(input);
-                name = pack.name;
-                if (pack.has_soundfont) {
-                    warnings.push_back("the pack bundles its own soundfont, which cannot be used; instruments are mapped to the game's");
-                }
-            }
-            else {
-                pack.sequence = read_file(input);
-            }
-            oot::Options oo;
-            oo.channel_program = channel_program;
-            oo.instrument_program = map_table;
-            oo.font = pack.font;
-            oo.one_shot = once || pack.fanfare;
-            oo.verbose = verbose;
-            oot::convert(pack.sequence, oo, song, report);
-            warnings.insert(warnings.end(), report.warnings.begin(), report.warnings.end());
-            if (transpose != 0) {
-                for (int t = 0; t < 15; t++) {
-                    for (cseq::Event& e : song.tracks[t].events) {
-                        if ((e.bytes[0] & 0xF0) == 0x90 && !(channel_program.count(t) ? channel_program[t] == 9 : false)) {
-                            e.bytes[1] = static_cast<uint8_t>(std::clamp(e.bytes[1] + transpose, 0, 127));
-                        }
+        // Folders are searched for anything convertible, subfolders too.
+        std::vector<fs::path> files;
+        bool any_folder = false;
+        for (const fs::path& in : inputs) {
+            std::error_code ec;
+            if (fs::is_directory(in, ec)) {
+                any_folder = true;
+                for (const auto& entry : fs::recursive_directory_iterator(in, ec)) {
+                    if (entry.is_regular_file() && convertible(entry.path())) {
+                        files.push_back(entry.path());
                     }
                 }
             }
-        }
-
-        std::printf("%s\n", name.c_str());
-        if (is_oot) {
-            std::printf("  soundfont 0x%X, %s\n", report.channels.empty() ? 0 : report.channels[0].font,
-                        song.loop_start >= 0 ? "loops" : "plays once");
-            for (const oot::Report::ChannelUse& c : report.channels) {
-                std::printf("  channel %2d: font 0x%02X instrument %3d -> program %2d  (%d notes)%s\n",
-                            c.channel, c.font, c.instrument, c.program, c.notes,
-                            channel_program.count(c.channel) ? "  [pinned]" : c.instrument == 0x7F ? "  [drums]" : "");
-            }
-            if (report.loop_start >= 0) {
-                std::printf("  loop: ticks %lld to %lld (%.1f beats in, %.1f beats long)\n",
-                            static_cast<long long>(report.loop_start), static_cast<long long>(report.length),
-                            report.loop_start / 48.0, (report.length - report.loop_start) / 48.0);
+            else {
+                files.push_back(in);
             }
         }
-        for (const std::string& w : warnings) {
-            std::printf("  note: %s\n", w.c_str());
+        std::sort(files.begin(), files.end());
+        if (files.empty()) {
+            std::printf("nothing to convert (looking for .ootrs, .seq, .zseq, .mid)\n");
+            return 1;
         }
-        if (list) {
-            return 0;
+        if (files.size() > 1 && !s.output.empty()) {
+            throw std::runtime_error("-o names one file; use -d for a folder of outputs");
+        }
+        // With the exe next to the game, converted files go straight into
+        // its custom_music folder unless told otherwise.
+        if (s.out_dir.empty() && s.output.empty()) {
+            std::error_code ec;
+            if (any_folder && fs::is_directory(exe_dir / "custom_music", ec)) {
+                s.out_dir = exe_dir / "custom_music";
+            }
+        }
+        if (!s.out_dir.empty()) {
+            std::error_code ec;
+            fs::create_directories(s.out_dir, ec);
         }
 
-        std::vector<uint8_t> file = cseq::write(song);
-        std::string problem = validate(file);
-        if (!problem.empty()) {
-            std::printf("  ERROR: the written file does not parse: %s\n", problem.c_str());
-            return 2;
+        int ok = 0;
+        int failed = 0;
+        int worst = 0;
+        for (const fs::path& file : files) {
+            int result;
+            try {
+                result = convert_one(file, s);
+            }
+            catch (std::exception& e) {
+                std::printf("%s\n  ERROR: %s\n", file.string().c_str(), e.what());
+                result = 1;
+            }
+            if (result == 0 || result == 3) ok++; else failed++;
+            worst = std::max(worst, result);
         }
-        if (output.empty()) {
-            fs::path dir = out_dir.empty() ? input.parent_path() : out_dir;
-            output = dir / fs::u8path(safe_name(name) + ".seq");
+        if (files.size() > 1) {
+            std::printf("\n%d converted, %d failed%s\n", ok, failed,
+                        s.out_dir.empty() ? "" : (", into " + s.out_dir.string()).c_str());
         }
-        std::ofstream out(output, std::ios::binary);
-        if (!out) throw std::runtime_error("cannot write " + output.string());
-        out.write(reinterpret_cast<const char*>(file.data()), static_cast<std::streamsize>(file.size()));
-        std::printf("  -> %s\n  %s\n", output.string().c_str(), cseq::summary(song, file).c_str());
-        return file.size() > cseq::max_file_size ? 3 : 0;
+        return worst;
     }
     catch (std::exception& e) {
         std::printf("error: %s\n", e.what());
