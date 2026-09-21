@@ -14,7 +14,7 @@
 #include "audio.h"
 #include "enhancements.h"
 #include "statfx.h"
-#include "spellnotice.h"
+#include "notify.h"
 #include "speedrun.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
@@ -1115,8 +1115,10 @@ void recompui::update_cheats_model() {
 }
 
 
-// Speedrun timer overlay. Its own context so it can stay up while the game is
-// running; it never captures input or the mouse, so it only draws.
+// Speedrun timer overlay: the notifications document (assets/notifications.rml),
+// which the timer shares with the notification stack. Its own context so it
+// can stay up while the game is running; it never captures input or the
+// mouse, so it only draws.
 struct SpeedrunContext {
     Rml::DataModelHandle model_handle;
     std::string shown_text;
@@ -1374,58 +1376,51 @@ void recompui::update_stat_effects() {
     }
 }
 
-// "You have learnt <spell>" overlay (Options::spell_notice). Its own
-// draw-only context like the timer; notices queue up and show one at a
-// time, held three seconds and faded over half a second.
+// Notification overlay (include/notify.h). Its own draw-only context like
+// the timer, up while the game runs. Each posted line becomes a .notice
+// appended under the ones showing, held and then faded on its own; when it
+// is removed the later ones close up.
 namespace {
-    recompui::ContextId notice_context;
-    std::vector<std::string> notice_queue;
-    std::chrono::steady_clock::time_point notice_shown_at{};
-    bool notice_showing = false;
+    struct Notice {
+        Rml::Element* element;
+        std::chrono::steady_clock::time_point shown_at;
+    };
+    std::vector<Notice> notices;
     constexpr float notice_hold = 3.0f;
     constexpr float notice_fade = 0.5f;
 }
 
-void recompui::update_spell_notice() {
-    if (notice_context == recompui::ContextId::null()) {
+void recompui::update_notifications() {
+    if (speedrun_context == recompui::ContextId::null() || !ultramodern::is_game_started()) {
         return;
     }
-    bool wanted = zelda64::enhancements::active_options().spell_notice && ultramodern::is_game_started();
-    if (!wanted) {
+    if (!recompui::is_context_shown(speedrun_context)) {
+        recompui::show_context(speedrun_context, "");
+    }
+    Rml::ElementDocument* document = speedrun_context.get_document();
+    Rml::Element* container = document ? document->GetElementById("notifications") : nullptr;
+    if (container == nullptr) {
         return;
-    }
-    if (!recompui::is_context_shown(notice_context)) {
-        recompui::show_context(notice_context, "");
-    }
-    Rml::ElementDocument* document = notice_context.get_document();
-    Rml::Element* element = document ? document->GetElementById("spell_notice") : nullptr;
-    if (element == nullptr) {
-        return;
-    }
-
-    for (std::string& text : zelda64::spellnotice::take_notices()) {
-        notice_queue.push_back(std::move(text));
     }
 
     auto now = std::chrono::steady_clock::now();
-    if (notice_showing) {
-        float age = std::chrono::duration<float>(now - notice_shown_at).count();
-        if (age >= notice_hold + notice_fade) {
-            notice_showing = false;
-            element->SetProperty("display", "none");
-        }
-        else {
-            float opacity = age < notice_hold ? 1.0f : 1.0f - (age - notice_hold) / notice_fade;
-            element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(opacity, Rml::Unit::NUMBER));
-        }
+    for (std::string& text : zelda64::notify::take()) {
+        Rml::ElementPtr made = document->CreateElement("div");
+        made->SetClass("notice", true);
+        made->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
+        notices.push_back({ container->AppendChild(std::move(made)), now });
     }
-    if (!notice_showing && !notice_queue.empty()) {
-        element->SetInnerRML(Rml::StringUtilities::EncodeRml(notice_queue.front()));
-        notice_queue.erase(notice_queue.begin());
-        element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(1.0f, Rml::Unit::NUMBER));
-        element->SetProperty("display", "block");
-        notice_shown_at = now;
-        notice_showing = true;
+
+    for (size_t i = 0; i < notices.size();) {
+        float age = std::chrono::duration<float>(now - notices[i].shown_at).count();
+        if (age >= notice_hold + notice_fade) {
+            container->RemoveChild(notices[i].element);
+            notices.erase(notices.begin() + i);
+            continue;
+        }
+        float opacity = age < notice_hold ? 1.0f : 1.0f - (age - notice_hold) / notice_fade;
+        notices[i].element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(opacity, Rml::Unit::NUMBER));
+        i++;
     }
 }
 
@@ -1483,16 +1478,14 @@ public:
     }
     void load_document() override {
 		config_context = recompui::create_context(zelda64::get_asset_path("config_menu.rml"));
-        speedrun_context = recompui::create_context(zelda64::get_asset_path("speedrun_timer.rml"));
+        // The timer and the notification stack share one overlay document.
+        speedrun_context = recompui::create_context(zelda64::get_asset_path("notifications.rml"));
         // Draw only: the game keeps every button and the mouse.
         speedrun_context.set_captures_input(false);
         speedrun_context.set_captures_mouse(false);
         statfx_context = recompui::create_context(zelda64::get_asset_path("stat_effects.rml"));
         statfx_context.set_captures_input(false);
         statfx_context.set_captures_mouse(false);
-        notice_context = recompui::create_context(zelda64::get_asset_path("spell_notice.rml"));
-        notice_context.set_captures_input(false);
-        notice_context.set_captures_mouse(false);
         make_glow_texture();
         recompui::update_mod_list(false);
         recompui::get_config_tabset()->AddEventListener(Rml::EventId::Tabchange, &config_tabset_listener);

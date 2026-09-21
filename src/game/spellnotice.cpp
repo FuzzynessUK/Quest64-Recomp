@@ -1,8 +1,8 @@
-#include <mutex>
 #include <span>
 #include <string>
 
 #include "spellnotice.h"
+#include "notify.h"
 #include "enhancements.h"
 #include "randomizer/merrow_data.h"
 #include "librecomp/game.hpp"
@@ -36,9 +36,6 @@ namespace {
 
     int previous[element_count] = {};
     bool primed = false;
-
-    std::mutex notices_mutex;
-    std::vector<std::string> notices;
 
     int element_index(const std::string& name) {
         if (name == "Fire") return 0;
@@ -84,8 +81,7 @@ void zelda64::spellnotice::on_frame(uint8_t* rdram) {
             }
             for (const Spell& spell : spells) {
                 if (spell.element == e && spell.level > previous[e] && spell.level <= current[e]) {
-                    std::lock_guard<std::mutex> lock(notices_mutex);
-                    notices.push_back("You have learnt " + spell.name);
+                    zelda64::notify::post("You have learnt " + spell.name);
                 }
             }
         }
@@ -94,11 +90,4 @@ void zelda64::spellnotice::on_frame(uint8_t* rdram) {
         previous[e] = current[e];
     }
     primed = true;
-}
-
-std::vector<std::string> zelda64::spellnotice::take_notices() {
-    std::lock_guard<std::mutex> lock(notices_mutex);
-    std::vector<std::string> out;
-    out.swap(notices);
-    return out;
 }

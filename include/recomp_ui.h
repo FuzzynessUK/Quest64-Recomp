@@ -81,8 +81,8 @@ namespace recompui {
     void update_speedrun_model();
     // The JP stat-up burst: spawns and moves its particles. Every frame.
     void update_stat_effects();
-    // "You have learnt <spell>": shows, holds and fades the notice. Every frame.
-    void update_spell_notice();
+    // The notification stack (include/notify.h): appends, holds and fades. Every frame.
+    void update_notifications();
     void show_speedrun_overlay();
     int config_tab_to_index(ConfigTab tab);
     Rml::ElementTabSet* get_config_tabset();
