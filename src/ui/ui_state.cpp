@@ -786,6 +786,7 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
         // The timer overlay is live while the game runs, not just in menus.
         recompui::update_speedrun_model();
         recompui::update_stat_effects();
+        recompui::update_spell_notice();
 
         int width = swap_chain_framebuffer->getWidth();
         int height = swap_chain_framebuffer->getHeight();

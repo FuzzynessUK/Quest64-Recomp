@@ -39,6 +39,13 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show spell learnt</div><div class="config-tip-text">The game says nothing when a spirit takes an element to a spell's unlock level. With this on, "You have learnt ..." appears top-left for three seconds for each spell as it unlocks, using the unlock levels in play (the randomizer's level options included).</div></div>
+                                        <select data-value="enh_spell_notice" id="enh_spell_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Exit from anywhere</div><div class="config-tip-text">The control you bind to "Exit Spell" under Controls warps you to the start of the area without owning the spell or paying its MP. It does nothing during a battle, a menu or a transition, and with this off the binding does nothing at all.</div></div>
                                         <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
                                             <option value="0">Off</option>

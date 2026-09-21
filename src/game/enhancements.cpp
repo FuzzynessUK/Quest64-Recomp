@@ -124,6 +124,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("longer_magic_barrier", o.longer_magic_barrier);
     get("faster_walk", o.faster_walk);
     get("stat_up_effect", o.stat_up_effect);
+    get("spell_notice", o.spell_notice);
     get("hard_mode", o.hard_mode);
     get("easier_quest", o.easier_quest);
     return o;
@@ -144,6 +145,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["longer_magic_barrier"] = o.longer_magic_barrier;
     j["faster_walk"] = o.faster_walk;
     j["stat_up_effect"] = o.stat_up_effect;
+    j["spell_notice"] = o.spell_notice;
     j["hard_mode"] = o.hard_mode;
     j["easier_quest"] = o.easier_quest;
     std::ofstream out(options_path());

@@ -14,6 +14,7 @@
 #include "audio.h"
 #include "enhancements.h"
 #include "statfx.h"
+#include "spellnotice.h"
 #include "speedrun.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
@@ -856,6 +857,13 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    constructor.BindFunc("enh_spell_notice",
+        [](Rml::Variant& out) { out = enhancements_context.edited.spell_notice ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.spell_notice = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
     constructor.BindFunc("enh_stat_up_effect",
         [](Rml::Variant& out) { out = enhancements_context.edited.stat_up_effect ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1366,6 +1374,61 @@ void recompui::update_stat_effects() {
     }
 }
 
+// "You have learnt <spell>" overlay (Options::spell_notice). Its own
+// draw-only context like the timer; notices queue up and show one at a
+// time, held three seconds and faded over half a second.
+namespace {
+    recompui::ContextId notice_context;
+    std::vector<std::string> notice_queue;
+    std::chrono::steady_clock::time_point notice_shown_at{};
+    bool notice_showing = false;
+    constexpr float notice_hold = 3.0f;
+    constexpr float notice_fade = 0.5f;
+}
+
+void recompui::update_spell_notice() {
+    if (notice_context == recompui::ContextId::null()) {
+        return;
+    }
+    bool wanted = zelda64::enhancements::active_options().spell_notice && ultramodern::is_game_started();
+    if (!wanted) {
+        return;
+    }
+    if (!recompui::is_context_shown(notice_context)) {
+        recompui::show_context(notice_context, "");
+    }
+    Rml::ElementDocument* document = notice_context.get_document();
+    Rml::Element* element = document ? document->GetElementById("spell_notice") : nullptr;
+    if (element == nullptr) {
+        return;
+    }
+
+    for (std::string& text : zelda64::spellnotice::take_notices()) {
+        notice_queue.push_back(std::move(text));
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    if (notice_showing) {
+        float age = std::chrono::duration<float>(now - notice_shown_at).count();
+        if (age >= notice_hold + notice_fade) {
+            notice_showing = false;
+            element->SetProperty("display", "none");
+        }
+        else {
+            float opacity = age < notice_hold ? 1.0f : 1.0f - (age - notice_hold) / notice_fade;
+            element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(opacity, Rml::Unit::NUMBER));
+        }
+    }
+    if (!notice_showing && !notice_queue.empty()) {
+        element->SetInnerRML(Rml::StringUtilities::EncodeRml(notice_queue.front()));
+        notice_queue.erase(notice_queue.begin());
+        element->SetProperty(Rml::PropertyId::Opacity, Rml::Property(1.0f, Rml::Unit::NUMBER));
+        element->SetProperty("display", "block");
+        notice_shown_at = now;
+        notice_showing = true;
+    }
+}
+
 recompui::ContextId config_context;
 
 recompui::ContextId recompui::get_config_context_id() {
@@ -1427,6 +1490,9 @@ public:
         statfx_context = recompui::create_context(zelda64::get_asset_path("stat_effects.rml"));
         statfx_context.set_captures_input(false);
         statfx_context.set_captures_mouse(false);
+        notice_context = recompui::create_context(zelda64::get_asset_path("spell_notice.rml"));
+        notice_context.set_captures_input(false);
+        notice_context.set_captures_mouse(false);
         make_glow_texture();
         recompui::update_mod_list(false);
         recompui::get_config_tabset()->AddEventListener(Rml::EventId::Tabchange, &config_tabset_listener);

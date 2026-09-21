@@ -66,6 +66,10 @@ namespace zelda64::enhancements {
         // statfx.cpp reports each frame.
         bool stat_up_effect = false;
 
+        // "You have learnt <spell>" top-left for three seconds when an
+        // element level reaches a spell's unlock level (include/spellnotice.h).
+        bool spell_notice = false;
+
         // Hacks.
         //
 

@@ -27,7 +27,10 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   table/stat shuffles, and our own **Enemy Randomizer** (below).
 - **Enhancements tab** — two groups:
   - *Quality of Life*: JP Healing Amounts, JP Magic barrier (+2 turns), JP
-    Stat Up Effect, Exit from anywhere, Speedrun Timer (one select: Off +
+    Stat Up Effect, Show spell learnt (`src/game/spellnotice.cpp`, overlay
+    `assets/spell_notice.rml`: watches the four element bytes and compares
+    against the unlock level halfword at each spell entry in the patched
+    ROM), Exit from anywhere, Speedrun Timer (one select: Off +
     six screen positions), Faster walking.
   - *Fun*: One Hit KO, N64 Mode.
   No description paragraphs: every option label has a hover tooltip instead
