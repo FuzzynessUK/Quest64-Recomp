@@ -1047,6 +1047,7 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_drop_limit_disabled", &Options::drop_limit_disabled);
     bind_randomizer_field(constructor, "rnd_wing_unlock_indoors", &Options::wing_unlock_indoors);
     bind_randomizer_field(constructor, "rnd_wing_unlock_skye", &Options::wing_unlock_skye);
+    bind_randomizer_field(constructor, "rnd_wings_never_expire", &Options::wings_never_expire);
     bind_randomizer_field(constructor, "rnd_text_palette", &Options::text_palette);
     bind_randomizer_field(constructor, "rnd_staff_palette", &Options::staff_palette);
     bind_randomizer_field(constructor, "rnd_cloak_palette", &Options::cloak_palette);

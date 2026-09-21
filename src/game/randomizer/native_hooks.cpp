@@ -302,4 +302,28 @@ void quest64_randomizer_enemy_scale_table(uint8_t* rdram, recomp_context* ctx) {
     }
 }
 
+// --- Wings never expire -----------------------------------------------------
+// func_80021524 at 0x800220DC, just after `jal func_800212E4` used the item
+// under the cursor: v0 non-zero means "consumed, take it out of the bag".
+// Answering zero for the six wings (item ids 14-19) keeps them.
+void quest64_randomizer_wings_never_expire(uint8_t* rdram, recomp_context* ctx) {
+    const Options& options = active_options();
+    if (!randomizing() || !options.wings_never_expire) {
+        return;
+    }
+    constexpr int32_t item_menu_page = 0x8008C760;
+    constexpr int32_t item_menu_cursor = 0x8008C764;
+    constexpr int32_t gInventory = 0x8008CF78;
+    constexpr int first_wing = 14;
+    constexpr int last_wing = 19;
+    int32_t index = static_cast<int32_t>(MEM_W(0, item_menu_page)) + static_cast<int32_t>(MEM_W(0, item_menu_cursor));
+    if (index < 0 || index >= 150) {
+        return;
+    }
+    int item = MEM_BU(0, gInventory + index);
+    if (item >= first_wing && item <= last_wing) {
+        ctx->r2 = 0;
+    }
+}
+
 }

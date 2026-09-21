@@ -96,6 +96,9 @@ namespace zelda64::randomizer {
         // Wings usable indoors / on the Isle of Skye.
         bool wing_unlock_indoors = false;
         bool wing_unlock_skye = false;
+        // Using a pair of wings does not take it out of the bag. A native
+        // hook (quest64_randomizer_wings_never_expire), not a ROM write.
+        bool wings_never_expire = false;
 
         // Cosmetics. Text palette: 0 off, 1 random, 2 red, 3 blue, 4 white,
         // 5 black. Unlike Merrow these roll off the seed, so a seed always

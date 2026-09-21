@@ -612,6 +612,13 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wings never expire</div><div class="config-tip-text">Using a pair of wings no longer takes it out of your bag, so one pair of each colour is all you ever need.</div></div>
+                                        <select data-value="rnd_wings_never_expire" id="rnd_wings_never_expire_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wings on Skye</div><div class="config-tip-text">Wings can be used on the Isle of Skye.</div></div>
                                         <select data-value="rnd_wing_unlock_skye" id="rnd_wing_unlock_skye_select">
                                             <option value="0">Off</option>

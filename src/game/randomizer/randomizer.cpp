@@ -1942,6 +1942,7 @@ static nlohmann::json options_to_json(const Options& o) {
     j["drop_limit_disabled"] = o.drop_limit_disabled;
     j["wing_unlock_indoors"] = o.wing_unlock_indoors;
     j["wing_unlock_skye"] = o.wing_unlock_skye;
+    j["wings_never_expire"] = o.wings_never_expire;
     j["text_palette"] = o.text_palette;
     j["staff_palette"] = o.staff_palette;
     j["cloak_palette"] = o.cloak_palette;
@@ -2039,6 +2040,7 @@ static Options options_from_json(const nlohmann::json& j) {
     get("drop_limit_disabled", o.drop_limit_disabled);
     get("wing_unlock_indoors", o.wing_unlock_indoors);
     get("wing_unlock_skye", o.wing_unlock_skye);
+    get("wings_never_expire", o.wings_never_expire);
     get("text_palette", o.text_palette);
     get("staff_palette", o.staff_palette);
     get("cloak_palette", o.cloak_palette);

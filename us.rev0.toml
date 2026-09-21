@@ -62,11 +62,12 @@ func = "func_80025B8C"
 text = "quest64_audio_sfx(rdram, ctx);"
 before_vram = 0x80025B8C
 
-# Easier Quest: wings stay in the bag. func_80021524 removes a used item when
-# its handler (func_800212E4) returned non-zero; this sits on the test.
+# Randomizer "Wings never expire" (also part of Easier Quest). func_80021524
+# removes a used item when its handler (func_800212E4) returned non-zero;
+# this sits on the test.
 [[patches.hook]]
 func = "func_80021524"
-text = "quest64_easier_wings(rdram, ctx);"
+text = "quest64_randomizer_wings_never_expire(rdram, ctx);"
 before_vram = 0x800220DC
 
 # Post-process each frame's display list for widescreen just before the
