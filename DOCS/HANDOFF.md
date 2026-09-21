@@ -249,7 +249,7 @@ cheats frame hook.
   at 1 each frame so it also applies to a save already in progress. HP is only
   ever lowered, never raised, so a death in progress is not undone.
 - **Faster walking** (2026-09-21, replaces the 0x8000541C/0x80005638 target
-  speed + friction version and the Movement speed cheat) — a fixed 1.4x
+  speed + friction version and the Movement speed cheat) — a fixed 1.5x
   scale on the velocity every movement state hands to `func_80005748`
   (player struct +0x18/+0x20 in a1), applied on entry and divided back out
   before the routine's single `jr $ra` at 0x80005A08; step capped at 3
@@ -262,9 +262,23 @@ cheats frame hook.
   - The movement model, for reference: stick released in the walk state ->
     velocity x 0.9 (D_800710B8) once, state 4, counter 8; `func_80003F98`
     then moves and multiplies by 0.68 (D_80070F50) each frame until the
-    counter hits 0 and zeroes it. Vanilla coasts ~7 units; scaled ~10, the
+    counter hits 0 and zeroes it. Vanilla coasts ~7 units; scaled ~11, the
     same 8 frames, which is also what Hard Mode's 2.75 pace gives. Merrow's
     Celtland Drift is the joke version: it raises D_80070F50 above 1.
+- **Hard Mode moved to the Mods tab** (2026-09-21): a built-in entry pinned
+  to the top of librecomp's mod list in `ui_mod_menu.cpp`. Its id
+  (`quest64-hard-mode`) is unknown to librecomp, which answers every query
+  about it with "no such mod" and does nothing on enable/reorder, so the
+  menu answers those itself: enabled state from
+  `recompui::is_hard_mode_enabled()`, toggle to `set_hard_mode_enabled()`
+  (both route through ui_config's edited Enhancements copy so the tab's
+  saves never overwrite it), drags of it ignored and nothing dropped above
+  it (librecomp indices are ours minus one). Runtime-toggleable so it can be
+  flipped in-game for the next launch, as the old select allowed.
+- **Tooltips** (2026-09-21): see CLAUDE.md "Tooltips". Position is computed
+  in px from `GetAbsoluteOffset` of the label and the `.config-debug`
+  ancestor; `SetProperty` needs the `PropertyId` overload for a
+  `Rml::Property` value (the string overload takes a string value).
 
 #### JP Buffs + Debuffs: what was found, and why it is not done
 

@@ -126,6 +126,11 @@ namespace recompui {
     void update_mod_list(bool scan_mods = true);
     void process_game_started();
 
+    // Hard Mode's switch, shown as the built-in entry at the top of the Mods
+    // tab. Stored with the other enhancements; applies on the next launch.
+    bool is_hard_mode_enabled();
+    void set_hard_mode_enabled(bool enabled);
+
     void apply_color_hack();
     void get_window_size(int& width, int& height);
     void set_cursor_visible(bool visible);

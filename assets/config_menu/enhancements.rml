@@ -6,9 +6,9 @@
             <div class="config__wrapper">
                 <div class="config-debug">
                     <div class="config-debug__scroll">
-                        <div class="config-debug-option">
+                        <div class="config-debug-option" data-if="enh_changed">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">{{enh_status}}</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Changed settings apply when the game is next launched.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
@@ -18,28 +18,28 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>JP Healing Amounts</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>JP Healing Amounts</div><div class="config-tip-text">Healing Lv2 restores 16 HP instead of 8, an exact match for the Japanese release (Eltale Monsters).</div></div>
                                         <select data-value="enh_jp_healing" id="enh_jp_healing_select" style="nav-up: #tab_enhancements">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>JP Magic barrier (+2 Turns)</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>JP Magic barrier (+2 Turns)</div><div class="config-tip-text">Magic Barrier holds two turns longer per cast, as in the Japanese release: the roll of attacks it absorbs is raised by two and kept between 3 and 6.</div></div>
                                         <select data-value="enh_longer_magic_barrier" id="enh_longer_magic_barrier_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Exit from anywhere</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Exit from anywhere</div><div class="config-tip-text">The control you bind to "Exit Spell" under Controls warps you to the start of the area without owning the spell or paying its MP. It does nothing during a battle, a menu or a transition, and with this off the binding does nothing at all.</div></div>
                                         <select data-value="enh_exit_from_anywhere" id="enh_exit_from_anywhere_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Speedrun Timer</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Speedrun Timer</div><div class="config-tip-text">Shows a run timer on screen. It starts when you leave the title screen and stops on the message that Mammon has been destroyed. Pick where on the screen it sits.</div></div>
                                         <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
                                             <option value="0">Off</option>
                                             <option value="1">Top left</option>
@@ -51,7 +51,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Faster walking</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Faster walking</div><div class="config-tip-text">Brian moves 50% faster. The game's own collision still runs on every step, and the slide after you let go of the stick lasts the same number of frames as normal. Does nothing on top of Hard Mode, which sets its own pace.</div></div>
                                         <select data-value="enh_faster_walk" id="enh_faster_walk_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
@@ -62,45 +62,19 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Healing Lv2 restores 16 instead of 8, an exact match for the Japanese release. The Speedrun Timer starts when you leave the title screen and stops on the message that Mammon has been destroyed; pick where on the screen it sits. Faster walking moves Brian 40% faster, the game's own collision and the slide after you let go of the stick included; it does nothing on top of Hard Mode, which sets its own pace. Exit from anywhere lets the control you bind to "Exit Spell" under Controls warp you to the start of the area without owning the spell or paying the MP; with it off the binding does nothing.</div>
-                            </label>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div>Hacks</div>
-                            </label>
-                            <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Hard Mode ({{enh_hard_mode_version}})</div></div>
-                                        <select data-value="enh_hard_mode" id="enh_hard_mode_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Hard Mode is Landmine36's Quest 64 Hard Mode hack: tougher monsters that get stronger again at night, stat caps raised to 999 and element levels to 99, reworked spells, new spirit locations, shops that take the Stones you earn, special items, boss rematches and more. Restart the game after changing it (Reset on the General tab). It uses its own save folder, so your normal saves are left alone, and it turns the Randomizer off while it is on.</div>
-                            </label>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
                                 <div>Fun</div>
                             </label>
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>One Hit KO</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>One Hit KO</div><div class="config-tip-text">Every monster and boss has 1 HP, and so does Brian: his max HP is held at 1, so the first hit ends it for either side. Also applies to a save already in progress.</div></div>
                                         <select data-value="enh_one_hit_ko" id="enh_one_hit_ko_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>N64 Mode</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>N64 Mode</div><div class="config-tip-text">Renders the way the console did: original resolution and aspect ratio, no anti-aliasing and the original HUD layout. Applies straight away, and switching it off puts your previous graphics settings back.</div></div>
                                         <select data-value="enh_n64_mode" id="enh_n64_mode_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
@@ -109,12 +83,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Settings save as you change them and take effect the next time the game is launched.</div>
-                            </label>
-                        </div>
                     </div>
+                    <div class="config-tip"></div>
                 </div>
             </div>
         </form>

@@ -10,7 +10,6 @@
 #include "zelda_game.h"
 #include "randomizer.h"
 #include "enhancements.h"
-#include "hardmode.h"
 #include "speedrun.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
@@ -609,6 +608,9 @@ struct RandomizerContext {
     std::string preset_name;
     bool preset_naming = false;
     std::string preset_message;
+    // Set once anything on the tab is changed; the "applies on next
+    // launch" line is shown while it is.
+    bool changed = false;
 };
 
 RandomizerContext randomizer_context;
@@ -637,13 +639,79 @@ std::string randomizer_presets_status() {
     return randomizer_context.preset_message;
 }
 
-std::string randomizer_status() {
-    return "This session: " + zelda64::randomizer::describe(zelda64::randomizer::active_options()) + ". Changes apply when the game is next launched.";
-}
-
 void randomizer_option_changed() {
     zelda64::randomizer::save_options(randomizer_context.edited);
-    randomizer_context.model_handle.DirtyVariable("rnd_status");
+    randomizer_context.changed = true;
+    randomizer_context.model_handle.DirtyVariable("rnd_changed");
+}
+
+// Hover tooltips for the debug-style tabs. Each option label carries its
+// text in a hidden child (.config-tip-text); on mouseover it is copied into
+// the tab's one floating .config-tip, which lives outside the scroll
+// container so the scroll clip never cuts it off. The tip hangs below the
+// label, or above it when the label is in the lower half of the panel.
+Rml::Element* find_tab_ancestor(Rml::Element* element) {
+    for (Rml::Element* e = element; e != nullptr; e = e->GetParentNode()) {
+        if (e->IsClassSet("config-debug")) {
+            return e;
+        }
+    }
+    return nullptr;
+}
+
+Rml::Element* find_child_by_class(Rml::Element* parent, const char* class_name) {
+    if (parent == nullptr) {
+        return nullptr;
+    }
+    for (int i = 0; i < parent->GetNumChildren(); i++) {
+        Rml::Element* child = parent->GetChild(i);
+        if (child->IsClassSet(class_name)) {
+            return child;
+        }
+    }
+    return nullptr;
+}
+
+void bind_tooltip_events(Rml::DataModelConstructor& constructor) {
+    constructor.BindEventCallback("show_tip",
+        [](Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList&) {
+            Rml::Element* label = event.GetCurrentElement();
+            Rml::Element* tab = find_tab_ancestor(label);
+            Rml::Element* text = find_child_by_class(label, "config-tip-text");
+            Rml::Element* tip = find_child_by_class(tab, "config-tip");
+            if (text == nullptr || tip == nullptr) {
+                return;
+            }
+            tip->SetInnerRML(text->GetInnerRML());
+
+            Rml::Vector2f tab_origin = tab->GetAbsoluteOffset(Rml::BoxArea::Padding);
+            Rml::Vector2f tab_size = tab->GetBox().GetSize(Rml::BoxArea::Padding);
+            Rml::Vector2f label_origin = label->GetAbsoluteOffset(Rml::BoxArea::Border) - tab_origin;
+            Rml::Vector2f label_size = label->GetBox().GetSize(Rml::BoxArea::Border);
+
+            tip->SetProperty(Rml::PropertyId::Left, Rml::Property(label_origin.x, Rml::Unit::PX));
+            if (label_origin.y + label_size.y / 2.0f < tab_size.y / 2.0f) {
+                tip->RemoveProperty("bottom");
+                tip->SetProperty(Rml::PropertyId::Top, Rml::Property(label_origin.y + label_size.y, Rml::Unit::PX));
+            }
+            else {
+                tip->RemoveProperty("top");
+                tip->SetProperty(Rml::PropertyId::Bottom, Rml::Property(tab_size.y - label_origin.y, Rml::Unit::PX));
+            }
+            tip->SetProperty("display", "block");
+        });
+    constructor.BindEventCallback("hide_tip",
+        [](Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList&) {
+            // mouseout bubbles up from the label's children while the pointer
+            // is still on the label; only the label's own counts.
+            if (event.GetCurrentElement() != event.GetTargetElement()) {
+                return;
+            }
+            Rml::Element* tip = find_child_by_class(find_tab_ancestor(event.GetCurrentElement()), "config-tip");
+            if (tip != nullptr) {
+                tip->SetProperty("display", "none");
+            }
+        });
 }
 
 template <typename T>
@@ -675,28 +743,32 @@ void bind_randomizer_field(Rml::DataModelConstructor& constructor, const char* n
 struct EnhancementsContext {
     Rml::DataModelHandle model_handle;
     zelda64::enhancements::Options edited;
+    // Set once an option that only applies at boot is changed; the
+    // "applies on next launch" line is shown while it is.
+    bool changed = false;
 };
 
 EnhancementsContext enhancements_context;
 
-std::string enhancements_status() {
-    const zelda64::enhancements::Options& active = zelda64::enhancements::active_options();
-    bool pending = active.one_hit_ko != enhancements_context.edited.one_hit_ko ||
-        active.exit_from_anywhere != enhancements_context.edited.exit_from_anywhere ||
-        active.jp_healing != enhancements_context.edited.jp_healing ||
-        active.faster_walk != enhancements_context.edited.faster_walk ||
-        active.hard_mode != enhancements_context.edited.hard_mode;
-    std::string status = std::string("This session: One Hit KO ") + (active.one_hit_ko ? "on" : "off") +
-        ", Hard Mode " + (zelda64::hardmode::active() ? "on" : "off");
-    if (active.hard_mode != enhancements_context.edited.hard_mode) {
-        status += ". Hard Mode changes on the next launch: use Reset on the General tab to restart now";
+void enhancements_option_changed(bool needs_relaunch = true) {
+    zelda64::enhancements::save_options(enhancements_context.edited);
+    if (needs_relaunch) {
+        enhancements_context.changed = true;
     }
-    return status + (pending ? ". Changed settings apply when the game is next launched." : ".");
+    if (enhancements_context.model_handle) {
+        enhancements_context.model_handle.DirtyVariable("enh_changed");
+    }
 }
 
-void enhancements_option_changed() {
-    zelda64::enhancements::save_options(enhancements_context.edited);
-    enhancements_context.model_handle.DirtyVariable("enh_status");
+// Hard Mode is switched from the Mods tab but lives in enhancements.json,
+// so the mod menu goes through the same edited copy the tab saves.
+bool recompui::is_hard_mode_enabled() {
+    return enhancements_context.edited.hard_mode;
+}
+
+void recompui::set_hard_mode_enabled(bool enabled) {
+    enhancements_context.edited.hard_mode = enabled;
+    enhancements_option_changed();
 }
 
 
@@ -742,7 +814,8 @@ void make_enhancements_bindings(Rml::Context* context) {
 
     enhancements_context.edited = zelda64::enhancements::load_options();
 
-    constructor.BindFunc("enh_status", [](Rml::Variant& out) { out = enhancements_status(); });
+    constructor.BindFunc("enh_changed", [](Rml::Variant& out) { out = enhancements_context.changed ? 1 : 0; });
+    bind_tooltip_events(constructor);
     constructor.BindFunc("enh_one_hit_ko",
         [](Rml::Variant& out) { out = enhancements_context.edited.one_hit_ko ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -789,7 +862,7 @@ void make_enhancements_bindings(Rml::Context* context) {
             if (on != enhancements_context.edited.n64_mode) {
                 apply_n64_mode(on);
                 enhancements_context.edited.n64_mode = on;
-                enhancements_option_changed();
+                enhancements_option_changed(false);
             }
         }
     );
@@ -810,14 +883,6 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
-    constructor.BindFunc("enh_hard_mode",
-        [](Rml::Variant& out) { out = enhancements_context.edited.hard_mode ? 1 : 0; },
-        [](const Rml::Variant& in) {
-            enhancements_context.edited.hard_mode = in.Get<int>() != 0;
-            enhancements_option_changed();
-        }
-    );
-    constructor.BindFunc("enh_hard_mode_version", [](Rml::Variant& out) { out = zelda64::hardmode::patch_version(); });
 
     enhancements_context.model_handle = constructor.GetModelHandle();
 }
@@ -831,7 +896,8 @@ void make_randomizer_bindings(Rml::Context* context) {
 
     randomizer_context.edited = zelda64::randomizer::load_options();
 
-    constructor.BindFunc("rnd_status", [](Rml::Variant& out) { out = randomizer_status(); });
+    constructor.BindFunc("rnd_changed", [](Rml::Variant& out) { out = randomizer_context.changed ? 1 : 0; });
+    bind_tooltip_events(constructor);
     constructor.BindFunc("rnd_presets", [](Rml::Variant& out) { out = randomizer_presets_status(); });
     constructor.RegisterArray<std::vector<std::string>>();
     refresh_preset_list();

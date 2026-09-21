@@ -3,9 +3,12 @@
 #include "recomp_ui.h"
 #include "zelda_support.h"
 #include "zelda_render.h"
+#include "hardmode.h"
 
 #include "librecomp/mods.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <string>
 
 #ifdef WIN32
@@ -22,7 +25,69 @@ static std::string generate_thumbnail_src_for_mod(const std::string &mod_id) {
     return "?/mods/" + mod_id + "/thumb";
 }
 
+// Hard Mode is not an installed mod - it is compiled in and switched from
+// enhancements.json - but it belongs on this tab, so it is shown as a
+// built-in entry pinned to the top of the list. Every call that would go
+// to librecomp with its id is answered here instead; librecomp itself
+// treats the unknown id as "no such mod" and does nothing.
+static const std::string hard_mode_mod_id = "quest64-hard-mode";
+
+static bool is_hard_mode_entry(const std::string &mod_id) {
+    return mod_id == hard_mode_mod_id;
+}
+
+static recomp::mods::ModDetails hard_mode_details() {
+    recomp::mods::ModDetails details{};
+    details.mod_id = hard_mode_mod_id;
+    details.display_name = "Hard Mode";
+    details.description =
+        "Landmine36's Quest 64 Hard Mode hack: tougher monsters that get stronger again at night, "
+        "stat caps raised to 999 and element levels to 99, reworked spells, new spirit locations, "
+        "shops that take the Stones you earn, special items, boss rematches and more.\n\n"
+        "Takes effect the next time the game is launched (Reset on the General tab restarts now). "
+        "It uses its own save folder, so your normal saves are left alone, and it turns the "
+        "Randomizer and Faster walking off while it is on.";
+    details.short_description = "Landmine36's Hard Mode hack, built in.";
+    details.authors = { "Landmine36" };
+    details.runtime_toggleable = true;
+    details.enabled_by_default = false;
+
+    // The patch header's version, e.g. "0.9.8.3A": three numbers and whatever
+    // follows them as the suffix.
+    std::string version = zelda64::hardmode::patch_version();
+    int parts[3] = { 0, 0, 0 };
+    size_t pos = 0;
+    for (int i = 0; i < 3 && pos < version.size(); i++) {
+        size_t end = pos;
+        while (end < version.size() && std::isdigit(static_cast<unsigned char>(version[end]))) {
+            end++;
+        }
+        if (end == pos) {
+            break;
+        }
+        parts[i] = std::stoi(version.substr(pos, end - pos));
+        pos = (end < version.size() && version[end] == '.') ? end + 1 : end;
+        if (i == 2) {
+            pos = end;
+        }
+    }
+    details.version.major = parts[0];
+    details.version.minor = parts[1];
+    details.version.patch = parts[2];
+    details.version.suffix = pos < version.size() ? version.substr(pos) : "";
+    return details;
+}
+
+static std::vector<recomp::mods::ModDetails> all_mod_details_with_hard_mode(const std::string &game_mod_id) {
+    std::vector<recomp::mods::ModDetails> details = recomp::mods::get_all_mod_details(game_mod_id);
+    details.insert(details.begin(), hard_mode_details());
+    return details;
+}
+
 static bool is_mod_enabled_or_auto(const std::string &mod_id) {
+    if (is_hard_mode_entry(mod_id)) {
+        return recompui::is_hard_mode_enabled();
+    }
     return recomp::mods::is_mod_enabled(mod_id) || recomp::mods::is_mod_auto_enabled(mod_id);
 }
 
@@ -254,7 +319,7 @@ void ModMenu::refresh_mods(bool scan_mods) {
     if (scan_mods) {
         recomp::mods::scan_mods();
     }
-    mod_details = recomp::mods::get_all_mod_details(game_mod_id);
+    mod_details = all_mod_details_with_hard_mode(game_mod_id);
     create_mod_list();
 }
 
@@ -290,6 +355,11 @@ void ModMenu::open_install_dialog() {
 
 void ModMenu::mod_toggled(bool enabled) {
     if (active_mod_index >= 0) {
+        if (is_hard_mode_entry(mod_details[active_mod_index].mod_id)) {
+            recompui::set_hard_mode_enabled(enabled);
+            mod_entry_buttons[active_mod_index]->set_mod_enabled(enabled);
+            return;
+        }
         recomp::mods::enable_mod(mod_details[active_mod_index].mod_id, enabled);
         
         // Refresh enabled status for all mods in case one of them got auto-enabled due to being a dependency.
@@ -350,6 +420,12 @@ void ModMenu::mod_selected(uint32_t mod_index) {
 void ModMenu::mod_dragged(uint32_t mod_index, EventDrag drag) {
     constexpr float spacer_height = modEntryHeight + modEntryPadding * 2.0f;
 
+    // The built-in entry stays where it is and nothing is dropped above it.
+    if (is_hard_mode_entry(mod_details[mod_index].mod_id)) {
+        return;
+    }
+    constexpr uint32_t first_movable_index = 1;
+
     switch (drag.phase) {
     case DragPhase::Start: {
         for (size_t i = 0; i < mod_entry_buttons.size(); i++) {
@@ -396,7 +472,7 @@ void ModMenu::mod_dragged(uint32_t mod_index, EventDrag drag) {
             }
         }
         
-        uint32_t new_index = low;
+        uint32_t new_index = std::max(low, first_movable_index);
         float delta_x = drag.x - mod_drag_start_coordinates[0];
         float delta_y = drag.y - mod_drag_start_coordinates[1];
         mod_entry_floating_view->set_left(mod_drag_view_coordinates[0] + delta_x, Unit::Px);
@@ -421,9 +497,10 @@ void ModMenu::mod_dragged(uint32_t mod_index, EventDrag drag) {
             mod_drag_target_index--;
         }
 
-        // Re-order the mods and update all the details on the menu.
-        recomp::mods::set_mod_index(game_mod_id, mod_details[mod_index].mod_id, mod_drag_target_index);
-        mod_details = recomp::mods::get_all_mod_details(game_mod_id);
+        // Re-order the mods and update all the details on the menu. librecomp's
+        // list does not have the built-in entry, so its indices sit one lower.
+        recomp::mods::set_mod_index(game_mod_id, mod_details[mod_index].mod_id, mod_drag_target_index - first_movable_index);
+        mod_details = all_mod_details_with_hard_mode(game_mod_id);
         for (size_t i = 0; i < mod_entry_buttons.size(); i++) {
             mod_entry_buttons[i]->set_mod_details(mod_details[i]);
             mod_entry_buttons[i]->set_mod_thumbnail(generate_thumbnail_src_for_mod(mod_details[i].mod_id));

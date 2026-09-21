@@ -2530,3 +2530,26 @@ button {
 .config-debug__select-wrapper input.text:hover, .config-debug__select-wrapper input.text:focus {
   border-color: rgba(255, 255, 255, 0.8);
 }
+.config-debug__select-wrapper .config-debug__select-label > .config-tip-text {
+  display: none;
+}
+
+.config-tip {
+  display: none;
+  position: absolute;
+  z-index: 10;
+  box-sizing: border-box;
+  max-width: 640dp;
+  padding: 12dp 16dp;
+  border-width: 1.1dp;
+  border-color: rgba(255, 255, 255, 0.5);
+  border-radius: 12dp;
+  background-color: rgba(20, 20, 24, 0.96);
+  color: #FFFFFF;
+  font-size: 18dp;
+  letter-spacing: 0dp;
+  line-height: 24dp;
+  text-transform: none;
+  white-space: normal;
+  pointer-events: none;
+}

@@ -249,14 +249,15 @@ void zelda64::enhancements::cast_exit() {
 // stick.) Every state moves through this call - the field walk
 // (func_8000534C), battle movement (func_80004E58) and the eight-frame skid
 // after the stick is released (func_80003F98, D_80070F50) - so the slide
-// keeps its vanilla frame count and covers 1.4x the distance, the same
+// keeps its vanilla frame count and covers 1.5x the distance, the same
 // shape as Hard Mode's 2.75 target speed gives. Hard Mode keeps its own
 // pace: the scale is not stacked on top of it.
 namespace {
-    constexpr float walk_speed_scale = 1.4f;
+    constexpr float walk_speed_scale = 1.5f;
     // Walls are about 3.5 units thick and the collision test is on position +
     // velocity rather than swept, so a single step must stay under that or
-    // Brian ends up on the far side. Vanilla walks 2 units a frame.
+    // Brian ends up on the far side. Vanilla walks 2 units a frame, so the
+    // 1.5x step sits exactly on the cap.
     constexpr float max_step_units = 3.0f;
 
     // Left by the entry hook for the exit hook: the struct that was scaled

@@ -51,11 +51,11 @@ namespace zelda64::enhancements {
         // the two extra turns are added.
         bool longer_magic_barrier = false;
 
-        // Brian moves 40% faster. The per-frame velocity every movement state
+        // Brian moves 50% faster. The per-frame velocity every movement state
         // hands to func_80005748 is scaled on the way in and restored on the
         // way out, so the game's own collision test still runs and nothing
         // the handlers read back next frame is changed. The slide after the
-        // stick is released keeps its vanilla eight frames and covers 1.4x
+        // stick is released keeps its vanilla eight frames and covers 1.5x
         // the distance, as Hard Mode's faster pace does. Not stacked on Hard
         // Mode, which sets its own walk speed.
         bool faster_walk = false;

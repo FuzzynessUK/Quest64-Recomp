@@ -20,19 +20,36 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   gates everything on the tab.
 - **Randomizer tab** — a port of Merrow (MIT). One On/Off toggle at the top;
   everything else on the tab is hidden (`data-if="rnd_mode == 1"`) while it
-  is off. Data-only options are ROM writes
+  is off. Note "Shuffle final Shannons" is Merrow's checkbox with Merrow's
+  meaning: **On excludes** the final two Shannons from the gift shuffle. Data-only options are ROM writes
   applied at boot; options that patch *code* are native hooks instead. Includes
   Lost Keys (both rulesets), Shannon hints, the cosmetic palettes, Merrow's
   table/stat shuffles, and our own **Enemy Randomizer** (below).
-- **Enhancements tab** — three groups, in this order:
+- **Enhancements tab** — two groups:
   - *Quality of Life*: JP Healing Amounts, JP Magic barrier (+2 turns), Exit
     from anywhere, Speedrun Timer (one select: Off + six screen positions),
     Faster walking.
-  - *Hacks*: Landmine36's Hard Mode as an on/off toggle (the .rup is embedded
-    and applied at boot, its payload recompiled, its code patches redone as
-    native hooks; own save folder; overrides the randomizer).
-  - *Fun*: One Hit KO, N64 Mode. No description paragraph under this group
-    (removed on request).
+  - *Fun*: One Hit KO, N64 Mode.
+  No description paragraphs: every option label has a hover tooltip instead
+  (below). A "Changed settings apply when the game is next launched" line
+  appears only once something on the tab has been changed; the Randomizer
+  tab does the same.
+- **Hard Mode** — Landmine36's hack (the .rup is embedded and applied at
+  boot, its payload recompiled, its code patches redone as native hooks; own
+  save folder; overrides the randomizer). Switched from the **Mods tab**,
+  where it is a built-in entry pinned to the top of the mod list
+  (`ui_mod_menu.cpp`, id `quest64-hard-mode`); the setting is still
+  `hard_mode` in `enhancements.json`, reached through
+  `recompui::is/set_hard_mode_enabled`. It was a Hacks group on Enhancements
+  until 2026-09-21.
+- **Tooltips** on the Randomizer and Enhancements tabs: a label carries
+  `data-event-mouseover="show_tip" data-event-mouseout="hide_tip"` and a
+  hidden `<div class="config-tip-text">`; `bind_tooltip_events` in
+  `ui_config.cpp` copies the text into the tab's one floating
+  `<div class="config-tip">`, which sits outside the scroll container so it
+  is never clipped, below the label or above it in the lower half. The
+  Randomizer texts are Merrow's own tooltips, reworded to our option names;
+  starting stats and cosmetics have none on request.
 - **Reset** — a button on General and a bindable "Reset Game" control. It
   relaunches the application, because ultramodern can start a game but has no
   way to tear a running one down.
@@ -77,14 +94,14 @@ Chronologically, newest last. All committed and pushed unless noted.
    `timer_position`), "Text improvements" label shrunk to 16dp because the
    word IMPROVEMENTS alone is wider than the 196dp label column.
 5. **Faster walking** (`89bd879`, reworked 2026-09-21) — now the mechanism the
-   old Movement speed cheat used, fixed at 140%: the velocity every movement
+   old Movement speed cheat used, fixed at 150% (3.0 a step, exactly the cap): the velocity every movement
    state hands to `func_80005748` (player struct +0x18/+0x20, a1) is scaled
    on entry and divided back before the routine's single `jr $ra` at
    0x80005A08, 3-unit step cap kept. The restore is the point: the cheat left
    the scaled value in the struct, the walk handler's 0.2 lerp read it back
    and ran away to the cap (so "140%" was really 150%), and the skid's
    0.68-a-frame decay became 0.95 — the long slide the user reported. With
-   the restore the slide keeps its vanilla 8 frames and covers 1.4x the
+   the restore the slide keeps its vanilla 8 frames and covers 1.5x the
    distance, like Hard Mode's 2.75 pace. Off under Hard Mode. The cheat and
    the 0x8000541C/0x80005638 walk hooks are gone. Awaiting play-test.
 

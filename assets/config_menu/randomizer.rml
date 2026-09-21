@@ -6,9 +6,9 @@
             <div class="config__wrapper">
                 <div class="config-debug">
                     <div class="config-debug__scroll">
-                        <div class="config-debug-option">
+                        <div class="config-debug-option" data-if="rnd_changed">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">{{rnd_status}}</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Changed settings apply when the game is next launched.</div>
                             </label>
                         </div>
                         <div class="config-debug-option">
@@ -86,98 +86,98 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Shuffle spells</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle spells</div><div class="config-tip-text">Shuffles the properties of all 60 spells among their slots: element, unlock level and menu position stay put, everything else moves. Combinations known to crash are avoided.</div></div>
                                         <select data-value="rnd_spell_shuffle" id="rnd_spell_shuffle_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Hinted spell names</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hinted spell names</div><div class="config-tip-text">Shuffled spells are renamed from a prefix and suffix taken from the original spell and the one whose properties it now has, so the name hints at what it does.</div></div>
                                         <select data-value="rnd_hinted_spell_names" id="rnd_hinted_spell_names_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Linear hint names</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Linear hint names</div><div class="config-tip-text">Hinted names always put the original spell first and the new one second, instead of choosing the order at random.</div></div>
                                         <select data-value="rnd_linear_spell_names" id="rnd_linear_spell_names_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Early healing</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Early healing</div><div class="config-tip-text">Guarantees Healing Lv1 is among the first three spells of one of the four elements, so it is found by element level 10 and always costs 2 MP.</div></div>
                                         <select data-value="rnd_early_healing" id="rnd_early_healing_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Extra healing</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Extra healing</div><div class="config-tip-text">Replaces Soul Search Lv1 with a second copy of Healing Lv1, called Mending Lv1, always in a different element from Healing. With Early healing on, Vampire's Touch is moved to a third element as well.</div></div>
                                         <select data-value="rnd_extra_healing" id="rnd_extra_healing_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Distribute powerful spells</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Distribute powerful spells</div><div class="config-tip-text">The four strongest combat spells (Avalanche, Magic Barrier, Water Pillar Lv3, Large Cutter) are dealt one to each element when shuffled, and tend towards the top of their element. Better for races.</div></div>
                                         <select data-value="rnd_distribute_spells" id="rnd_distribute_spells_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Spell combination fixes</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Spell combination fixes</div><div class="config-tip-text">Applies Merrow's fix-up data to shuffled spell combinations, so volatile combinations work and ones with effect or scaling problems look right.</div></div>
                                         <select data-value="rnd_spell_overrides" id="rnd_spell_overrides_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Spell damage rebalance</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Spell damage rebalance</div><div class="config-tip-text">Adjusts the damage of most spells: assorted weak spells become useful, the strongest are nerfed a little, and multi-level spells scale inversely so the precise low-level versions do slightly more per hit than the big ones.</div></div>
                                         <select data-value="rnd_spell_rebalance" id="rnd_spell_rebalance_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Bubble</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Bubble</div><div class="config-tip-text">Replaces Soul Search Lv1 with Nepty's bubble spell, giving Water an early ranged spell.</div></div>
                                         <select data-value="rnd_bubble" id="rnd_bubble_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>All spells at level 1</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>All spells at level 1</div><div class="config-tip-text">Every spell unlocks at element level 1.</div></div>
                                         <select data-value="rnd_level_1_spells" id="rnd_level_1_spells_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Status spells always hit</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Status spells always hit</div><div class="config-tip-text">Positive and negative status spells always pass their accuracy check.</div></div>
                                         <select data-value="rnd_max_accuracy" id="rnd_max_accuracy_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>All spells always hit</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>All spells always hit</div><div class="config-tip-text">Every spell has 100 accuracy, Escape and Extinction included. Offensive spells can still miss on the agility roll that follows the accuracy check.</div></div>
                                         <select data-value="rnd_max_accuracy_all" id="rnd_max_accuracy_all_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Soul Search</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Soul Search</div><div class="config-tip-text">Every spell has a chance to trigger the Soul Search effect on hit, revealing the enemy's details, and the magnifying-glass icon is made more compact. Each trigger also gives Brian a little MP experience, so MP grows quicker.</div></div>
                                         <select data-value="rnd_soul_search" id="rnd_soul_search_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Invalidity</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Invalidity</div><div class="config-tip-text">Boss spells lose their passive Invalidity effect, which strips buffs and debuffs and otherwise makes those spells mostly useless when they are shuffled to Brian.</div></div>
                                         <select data-value="rnd_invalidity" id="rnd_invalidity_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
@@ -193,7 +193,7 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Chests</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Chests</div><div class="config-tip-text">Vanilla leaves the chests alone. Shuffle moves the vanilla chest contents among the chests. Random rolls every chest from the whole item pool; whether gems and wings are in that pool is set by the two options below. Under Lost Keys this only fills the chests the key items and wings do not take.</div></div>
                                         <select data-value="rnd_chests" id="rnd_chests_select">
                                             <option value="0">Vanilla</option>
                                             <option value="1">Shuffle</option>
@@ -201,7 +201,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Monster drops</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Monster drops</div><div class="config-tip-text">What non-boss monsters drop. Shuffle moves the vanilla drops among the monsters, blanks included. Random rolls every monster from the item pool, with no blanks.</div></div>
                                         <select data-value="rnd_drops" id="rnd_drops_select">
                                             <option value="0">Vanilla</option>
                                             <option value="1">Shuffle</option>
@@ -209,7 +209,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Gifts</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Gifts</div><div class="config-tip-text">Items handed over by the gift-giving NPCs, the Shannons included. Shuffle moves the vanilla gifts among them; Random rolls each from the item pool. Softlock protection keeps the Eletale Book and Dark Gaol Key off the final two Shannons.</div></div>
                                         <select data-value="rnd_gifts" id="rnd_gifts_select">
                                             <option value="0">Vanilla</option>
                                             <option value="1">Shuffle</option>
@@ -217,7 +217,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Wingsmiths</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wingsmiths</div><div class="config-tip-text">Items handed over by the wingsmiths. Shuffle moves the wings among them; Random rolls each from the item pool, which can leave wings out of the game entirely.</div></div>
                                         <select data-value="rnd_wingsmiths" id="rnd_wingsmiths_select">
                                             <option value="0">Vanilla</option>
                                             <option value="1">Shuffle</option>
@@ -225,21 +225,21 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Shuffle final Shannons</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle final Shannons</div><div class="config-tip-text">On: the final two Shannons keep the Eletale Book and Dark Gaol Key and sit out the gift shuffle. Off: they take part, with softlock protection making sure neither of those two items ends up on them. Lost Keys always includes them.</div></div>
                                         <select data-value="rnd_shuffle_shannon" id="rnd_shuffle_shannon_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Wings from wingsmiths only</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wings from wingsmiths only</div><div class="config-tip-text">Keeps wings out of the Random item pool, so the only place a wing turns up is a wingsmith. Shuffle only moves items already in a list, and Lost Keys places wings itself.</div></div>
                                         <select data-value="rnd_wingsmith_wings_only" id="rnd_wingsmith_wings_only_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Boss Rewards Shuffler</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boss Rewards Shuffler</div><div class="config-tip-text">Lets the four Elemental Gems, the Eletale Book and the Dark Gaol Key move with everything else. Off keeps them out of the pool and in their vanilla places, so only ordinary items move. Lost Keys places them itself.</div></div>
                                         <select data-value="rnd_boss_rewards_shuffler" id="rnd_boss_rewards_shuffler_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
@@ -255,21 +255,21 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Enemy Randomizer</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Enemy Randomizer</div><div class="config-tip-text">Any of the game's six monster sets can appear in any area and the encounter packs are rerolled; then every monster's HP, ATK, DEF, AGI, EXP and Stones are rescaled from its home area to the area it is in (damage follows ATK), with a guard that keeps each area at least as hard as the one before. Replaces Shuffle enemy tables when on. The spoiler log lists each area's set and every monster's vanilla and scaled stats.</div></div>
                                         <select data-value="rnd_enemy_randomizer" id="rnd_enemy_randomizer_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Randomize stats</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomize stats</div><div class="config-tip-text">Every monster in each region gets new stats, rolled between the lowest and highest vanilla values of that stat in the region. Bosses are included at half the variance. Scale stats is applied afterwards.</div></div>
                                         <select data-value="rnd_monster_stats" id="rnd_monster_stats_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
-                                        <div class="config-debug__select-label"><div>Stat variance: {{rnd_variance}}</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Stat variance: {{rnd_variance}}</div><div class="config-tip-text">Widens the range Randomize stats rolls from, beyond the region's vanilla lowest and highest values. 0 keeps the vanilla range.</div></div>
                                         <input
                                             data-event-blur="set_cur_config_index(-1)"
                                             data-event-focus="set_cur_config_index(1)"
@@ -283,14 +283,14 @@
                                         />
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Scale stats</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Scale stats</div><div class="config-tip-text">Multiplies every monster stat by the percentage below. Stronger than variance, and applied after Randomize stats, so high values of both give extreme results.</div></div>
                                         <select data-value="rnd_monster_scale" id="rnd_monster_scale_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
-                                        <div class="config-debug__select-label"><div>Stat scale %: {{rnd_scale_percent}}</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Stat scale %: {{rnd_scale_percent}}</div><div class="config-tip-text">The multiplier used by Scale stats, from 50% to 150%.</div></div>
                                         <input
                                             data-event-blur="set_cur_config_index(-1)"
                                             data-event-focus="set_cur_config_index(1)"
@@ -304,14 +304,14 @@
                                         />
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>EXP follows stats</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>EXP follows stats</div><div class="config-tip-text">Recalculates the experience a monster gives from its base stat total, so randomized, scaled or reordered monsters pay out in line with their strength. Needs one of those options on to have any effect.</div></div>
                                         <select data-value="rnd_exp_by_bst" id="rnd_exp_by_bst_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
-                                        <div class="config-debug__select-label"><div>EXP boost (quarters): {{rnd_exp_boost}}</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>EXP boost (quarters): {{rnd_exp_boost}}</div><div class="config-tip-text">Scales combat experience after everything else, in quarters: 4 is vanilla, 8 is double, 0 gives no EXP at all. HP, MP, agility and defense experience are unaffected.</div></div>
                                         <input
                                             data-event-blur="set_cur_config_index(-1)"
                                             data-event-focus="set_cur_config_index(1)"
@@ -325,21 +325,21 @@
                                         />
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Shuffle boss order</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle boss order</div><div class="config-tip-text">Shuffles the order of the bosses other than Beigis and Mammon. Each keeps its stat ratios but is scaled to the level of the boss it replaces, and drops that boss's progression item.</div></div>
                                         <select data-value="rnd_boss_order" id="rnd_boss_order_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Random Guilty element</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Random Guilty element</div><div class="config-tip-text">Guilty's element is rolled instead of being Dark, which resists all magic.</div></div>
                                         <select data-value="rnd_boss_element" id="rnd_boss_element_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Shuffle enemy tables</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle enemy tables</div><div class="config-tip-text">Merrow's table shuffle: swaps which monster set each area draws from, with no regard for difficulty. The Enemy Randomizer replaces it when on.</div></div>
                                         <select data-value="rnd_enemy_tables" id="rnd_enemy_tables_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
@@ -347,11 +347,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Enemy Randomizer: any of the game's six monster sets can appear in any area and the encounter packs are rerolled; then every monster's HP, ATK, DEF, AGI, EXP and Stones are rescaled from its home area to the area it is in (damage follows ATK), with a guard that keeps each area at least as hard as the one before, so the game always gets harder as you go. Replaces "Shuffle enemy tables" when on. The spoiler log lists each area's set and every monster's vanilla and scaled stats.</div>
-                            </label>
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
@@ -425,133 +420,133 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Fast Monastery</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fast Monastery</div><div class="config-tip-text">The Grand Abbott's exit door drops you into the long hallway by the courtyard and church.</div></div>
                                         <select data-value="rnd_fast_monastery" id="rnd_fast_monastery_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Fast Blue Cave</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fast Blue Cave</div><div class="config-tip-text">Skips the two encounter-free bridges over the Crystal Valley.</div></div>
                                         <select data-value="rnd_fast_blue_cave" id="rnd_fast_blue_cave_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Fast Shamwood</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fast Shamwood</div><div class="config-tip-text">Leaving Shamwood puts you at the exit of Baragoon Tunnel.</div></div>
                                         <select data-value="rnd_fast_shamwood" id="rnd_fast_shamwood_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Fast Mammon's World</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fast Mammon's World</div><div class="config-tip-text">Skips both empty maze sections of Mammon's World.</div></div>
                                         <select data-value="rnd_fast_mammon" id="rnd_fast_mammon_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Unlock progression locks</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Unlock progression locks</div><div class="config-tip-text">Unlocks every progression lock: the gems, Book and Key are no longer needed for doors, boats, shortcuts and portals, and the Crystal Valley Postern opens too if that option is on.</div></div>
                                         <select data-value="rnd_unlock_doors" id="rnd_unlock_doors_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Gem-locked endgame</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Gem-locked endgame</div><div class="config-tip-text">Locks the four final doorways to the shrine on the Brannoch Castle roof, one per Elemental Gem in order. Overrides Unlock progression locks.</div></div>
                                         <select data-value="rnd_locked_endgame" id="rnd_locked_endgame_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Crystal Valley return</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Crystal Valley return</div><div class="config-tip-text">Adds a warp back to the Crystal Valley, hidden just outside the back entrance of the Larapool inn. It needs the Water Jewel to work.</div></div>
                                         <select data-value="rnd_crystal_return" id="rnd_crystal_return_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Brannoch return warp</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Brannoch return warp</div><div class="config-tip-text">Adds a warp back to Shamwood through the door of Jannat's house in Brannoch, the squat blue house near the inn. Mainly a backup for runs without Ivory Wings.</div></div>
                                         <select data-value="rnd_brannoch_return" id="rnd_brannoch_return_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Lock Mammon back door</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Lock Mammon back door</div><div class="config-tip-text">Locks the one door in Mammon's World that lets you loop backwards. It never lets you leave; it only confuses you and wastes your time.</div></div>
                                         <select data-value="rnd_mammon_door" id="rnd_mammon_door_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Restless NPCs</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Restless NPCs</div><div class="config-tip-text">Each NPC has a random chance of being made to wander. If a vital NPC walks out of reach, leave and re-enter the room to reset them.</div></div>
                                         <select data-value="rnd_restless_npcs" id="rnd_restless_npcs_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Max message speed</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Max message speed</div><div class="config-tip-text">Text boxes default to the fastest message speed.</div></div>
                                         <select data-value="rnd_max_message_speed" id="rnd_max_message_speed_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Lock HUD onscreen</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Lock HUD onscreen</div><div class="config-tip-text">The HUD stays on screen instead of sliding away. It may move off and back on once after a load.</div></div>
                                         <select data-value="rnd_hud_lock" id="rnd_hud_lock_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Celtland drift</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Celtland drift</div><div class="config-tip-text">Brian's skid deceleration is cut, so he slides much further after moving. Watch your step, and consider unlocking Wings indoors: you may need them.</div></div>
                                         <select data-value="rnd_celtland_drift" id="rnd_celtland_drift_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Base spells at level 2</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Base spells at level 2</div><div class="config-tip-text">The four basic elemental spells are not available from the start: each needs a point in its element first.</div></div>
                                         <select data-value="rnd_level_2_spells" id="rnd_level_2_spells_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Reveal hidden spirits</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Reveal hidden spirits</div><div class="config-tip-text">Moves the two spirits hidden inside objects, the return ship from Limelin to Dondoran and the Limelin Castle library, out into the open.</div></div>
                                         <select data-value="rnd_reveal_spirits" id="rnd_reveal_spirits_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Useful Dew Drop</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Useful Dew Drop</div><div class="config-tip-text">The Dew Drop also heals 20 HP.</div></div>
                                         <select data-value="rnd_better_dew_drop" id="rnd_better_dew_drop_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Ivory Wings</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Ivory Wings</div><div class="config-tip-text">Replaces the White Wings with Ivory Wings, which warp you to Shamwood. The Melrode wingsmith gives nothing; Lavaar in Shamwood hands them over instead, and shuffled wingsmiths treat Lavaar as their giver. Lost Keys turns this on.</div></div>
                                         <select data-value="rnd_ivory_wings" id="rnd_ivory_wings_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;"><div>Text improvements</div></div>
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Text improvements</div><div class="config-tip-text">Replaces some unclear menu text. Under Lost Keys, NPCs also get some explanatory text.</div></div>
                                         <select data-value="rnd_text_improvements" id="rnd_text_improvements_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Zoom out</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Zoom out</div><div class="config-tip-text">Raises the camera's maximum zoom distance, 1 to 4 steps beyond the default. Not a multiplier, just a range of stable values.</div></div>
                                         <select data-value="rnd_zoom_out" id="rnd_zoom_out_select">
                                             <option value="0">Off</option>
                                             <option value="1">1</option>
@@ -561,7 +556,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Encounter rate</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Encounter rate</div><div class="config-tip-text">How often the game checks for an encounter and the most steps it lets pass before forcing one. Halved and Doubled change both. Reduced lowers both, so fights are further apart but still regular; Increased checks more often with the same maximum, so fights are more frequent but no denser.</div></div>
                                         <select data-value="rnd_encounter_rate" id="rnd_encounter_rate_select">
                                             <option value="0">Halved</option>
                                             <option value="1">Reduced</option>
@@ -571,7 +566,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Walking MP regen</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Walking MP regen</div><div class="config-tip-text">How quickly MP comes back while walking outside battle, from off to fastest. Default is the vanilla rate.</div></div>
                                         <select data-value="rnd_mp_regain" id="rnd_mp_regain_select">
                                             <option value="7">Off</option>
                                             <option value="8">Slowest</option>
@@ -582,7 +577,7 @@
                                         </select>
                                     </div>
                                     <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
-                                        <div class="config-debug__select-label"><div>MP per staff hit: {{rnd_staff_hit_mp}}</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>MP per staff hit: {{rnd_staff_hit_mp}}</div><div class="config-tip-text">MP gained for each staff hit in battle. Vanilla is 1.</div></div>
                                         <input
                                             data-event-blur="set_cur_config_index(-1)"
                                             data-event-focus="set_cur_config_index(1)"
@@ -596,28 +591,28 @@
                                         />
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Element cap 99</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Element cap 99</div><div class="config-tip-text">Element levels go up to 99 instead of 50. No new spells come past 50, but spell and melee power keep rising, so single-element runs get easier.</div></div>
                                         <select data-value="rnd_element_uncap" id="rnd_element_uncap_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>No enemy drop limit</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>No enemy drop limit</div><div class="config-tip-text">Monsters keep dropping an item even when you already have one. Drop rates, chests, gifts and wingsmiths are unchanged.</div></div>
                                         <select data-value="rnd_drop_limit_disabled" id="rnd_drop_limit_disabled_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Wings indoors</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wings indoors</div><div class="config-tip-text">Wings can be used in every interior. Dungeons and houses share one flag, so they come together. Turn this on if the Book or Key can be found anywhere, or a late-game softlock is possible.</div></div>
                                         <select data-value="rnd_wing_unlock_indoors" id="rnd_wing_unlock_indoors_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Wings on Skye</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wings on Skye</div><div class="config-tip-text">Wings can be used on the Isle of Skye.</div></div>
                                         <select data-value="rnd_wing_unlock_skye" id="rnd_wing_unlock_skye_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
@@ -633,7 +628,7 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Mode</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Mode</div><div class="config-tip-text">A ruleset in which the Elemental Gems and the Wings each appear exactly once, scattered around the world. Progressive keeps each gem in its own region (Earth: Melrode to Solvaring; Wind: Dondoran Treasury to Zelse; Water: Dondoran Treasury to Nepty; Fire: Limelin to Brannoch; Book: Limelin to the Brannoch Castle roof). Open world draws them all from one pool with no doors locked. While it is on, chests, drops and gifts are shuffled at least, wingsmiths are left alone and Ivory Wings is on.</div></div>
                                         <select data-value="rnd_lost_keys" id="rnd_lost_keys_select">
                                             <option value="0">Off</option>
                                             <option value="1">Progressive</option>
@@ -641,14 +636,14 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Fire Book</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fire Book</div><div class="config-tip-text">The Book region overlaps the Fire region, as Water overlaps Wind, so the Eletale Book can also turn up in any Fire location. The Fire Ruby is unchanged. Needs Lost Keys.</div></div>
                                         <select data-value="rnd_fire_book" id="rnd_fire_book_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label"><div>Shannon hints</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shannon hints</div><div class="config-tip-text">Shannon gives hints to where the local progression item went, in Dondoran, Larapool, Normoon, Limelin and Brannoch. Needs Lost Keys.</div></div>
                                         <select data-value="rnd_shannon_hints" id="rnd_shannon_hints_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
@@ -718,11 +713,12 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Port of Merrow by Hangedman. Settings save as you change them and take effect the next time the game is launched; a spoiler log is written next to the settings files.</div>
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Port of Merrow by Hangedman. A spoiler log is written next to the settings files.</div>
                             </label>
                         </div>
                         </div>
                     </div>
+                    <div class="config-tip"></div>
                 </div>
             </div>
         </form>

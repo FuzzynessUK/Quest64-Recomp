@@ -198,3 +198,30 @@
         border-color: rgba(255, 255, 255, 0.8);
     }
 }
+
+// Hover tooltips on debug-style tabs. Each option label keeps its text in a
+// hidden child; ui_config.cpp copies it into the tab's one floating .config-tip,
+// which sits outside the scroll container so the scroll clip never cuts it.
+.config-debug__select-wrapper .config-debug__select-label > .config-tip-text {
+    display: none;
+}
+
+.config-tip {
+    display: none;
+    position: absolute;
+    z-index: 10;
+    box-sizing: border-box;
+    max-width: space(640);
+    padding: space(12) space(16);
+    border-width: 1.1dp;
+    border-color: rgba(255, 255, 255, 0.5);
+    border-radius: 12dp;
+    background-color: rgba(20, 20, 24, 0.96);
+    color: #FFFFFF;
+    font-size: 18dp;
+    letter-spacing: 0dp;
+    line-height: 24dp;
+    text-transform: none;
+    white-space: normal;
+    pointer-events: none;
+}
