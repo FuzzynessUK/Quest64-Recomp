@@ -60,6 +60,16 @@ namespace zelda64::enhancements {
         // Mode, which sets its own walk speed.
         bool faster_walk = false;
 
+        // HUD layout (the HUD group): the HP/MP block and the four spirits,
+        // dragged in the tab's preview. Frame pixels, x from the window's
+        // left edge; custom false is the game's own place. Applied live.
+        bool hud_hp_custom = false;
+        float hud_hp_x = 0.0f;
+        float hud_hp_y = 0.0f;
+        bool hud_sp_custom = false;
+        float hud_sp_x = 0.0f;
+        float hud_sp_y = 0.0f;
+
         // The Japanese release bursts a colour over Brian when a stat rises
         // (red HP, blue MP, yellow defense, green agility); the US build has
         // no such routine, so it is drawn by the UI overlay from what

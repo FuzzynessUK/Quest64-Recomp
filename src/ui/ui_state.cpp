@@ -781,6 +781,7 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
 
         if (recompui::is_context_shown(recompui::get_config_context_id())) {
             recompui::update_cheats_model();
+            recompui::update_hud_preview();
         }
 
         // The timer overlay is live while the game runs, not just in menus.

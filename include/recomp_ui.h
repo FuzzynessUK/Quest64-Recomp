@@ -83,6 +83,11 @@ namespace recompui {
     void update_stat_effects();
     // The notification stack (include/notify.h): appends, holds and fades. Every frame.
     void update_notifications();
+    // The HUD layout preview on the Enhancements tab: hooks its drag boxes
+    // once the document is loaded, and sizes/places them every frame the
+    // config menu is up.
+    void attach_hud_preview();
+    void update_hud_preview();
     void show_speedrun_overlay();
     int config_tab_to_index(ConfigTab tab);
     Rml::ElementTabSet* get_config_tabset();

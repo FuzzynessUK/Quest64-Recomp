@@ -1551,6 +1551,165 @@ recompui::ContextId recompui::get_config_context_id() {
 	return config_context;
 }
 
+// HUD layout (Enhancements > HUD). A preview box the shape of the window,
+// with the 4:3 picture marked inside it, holds two draggable boxes for the
+// HP/MP block and the four spirits. Positions are kept in frame pixels
+// (the game's 320x240, with x measured from the window's left edge, so a
+// wider window has more room on both sides) and applied live by
+// widescreen.cpp, which redraws the HUD's texture rectangles from there.
+namespace {
+    // The blocks in the vanilla frame: where they start and how big they are.
+    constexpr float hud_hp_anchor_y = 24.0f;
+    constexpr float hud_hp_w = 66.0f;
+    constexpr float hud_hp_h = 37.0f;
+    constexpr float hud_sp_anchor_y = 197.0f;
+    constexpr float hud_sp_w = 91.0f;
+    constexpr float hud_sp_h = 17.0f;
+    constexpr float frame_h = 240.0f;
+    constexpr float frame_w_43 = 320.0f;
+    constexpr float preview_h_dp = 180.0f;
+
+    struct HudBox {
+        const char* id;
+        bool* custom;
+        float* x;
+        float* y;
+        float anchor_y;
+        float w;
+        float h;
+        bool dragging = false;
+        float drag_mouse[2] = { 0.0f, 0.0f };
+        float drag_origin[2] = { 0.0f, 0.0f };
+    };
+    HudBox hud_boxes[2] = {
+        { "hud_hp_box", &enhancements_context.edited.hud_hp_custom, &enhancements_context.edited.hud_hp_x, &enhancements_context.edited.hud_hp_y, hud_hp_anchor_y, hud_hp_w, hud_hp_h },
+        { "hud_sp_box", &enhancements_context.edited.hud_sp_custom, &enhancements_context.edited.hud_sp_x, &enhancements_context.edited.hud_sp_y, hud_sp_anchor_y, hud_sp_w, hud_sp_h },
+    };
+
+    // The window as frame pixels wide (240 tall).
+    float frame_width() {
+        int w = 0, h = 0;
+        recompui::get_window_size(w, h);
+        if (w <= 0 || h <= 0) {
+            return frame_w_43;
+        }
+        return frame_h * static_cast<float>(w) / static_cast<float>(h);
+    }
+
+    void push_hud_layout() {
+        const zelda64::enhancements::Options& e = enhancements_context.edited;
+        zelda64::renderer::set_hud_layout(e.hud_hp_custom, e.hud_hp_x, e.hud_hp_y, e.hud_sp_custom, e.hud_sp_x, e.hud_sp_y);
+    }
+
+    // Where a box sits, in frame pixels from the window's left edge.
+    void hud_box_position(const HudBox& box, float& x, float& y) {
+        if (*box.custom) {
+            x = *box.x;
+            y = *box.y;
+        }
+        else {
+            x = (frame_width() - frame_w_43) / 2.0f;
+            y = box.anchor_y;
+        }
+    }
+
+    class HudDragListener : public Rml::EventListener {
+        void ProcessEvent(Rml::Event& event) override {
+            Rml::Element* element = event.GetCurrentElement();
+            HudBox* box = nullptr;
+            for (HudBox& candidate : hud_boxes) {
+                if (element->GetId() == candidate.id) {
+                    box = &candidate;
+                }
+            }
+            Rml::Element* preview = element->GetParentNode();
+            if (box == nullptr || preview == nullptr) {
+                return;
+            }
+            Rml::Vector2f preview_size = preview->GetBox().GetSize();
+            Rml::Vector2f preview_origin = preview->GetAbsoluteOffset(Rml::BoxArea::Padding);
+            Rml::Vector2f element_origin = element->GetAbsoluteOffset(Rml::BoxArea::Border) - preview_origin;
+            Rml::Vector2f element_size = element->GetBox().GetSize(Rml::BoxArea::Border);
+            float mouse_x = event.GetParameter("mouse_x", 0.0f);
+            float mouse_y = event.GetParameter("mouse_y", 0.0f);
+
+            if (event.GetId() == Rml::EventId::Dragstart) {
+                box->dragging = true;
+                box->drag_mouse[0] = mouse_x;
+                box->drag_mouse[1] = mouse_y;
+                box->drag_origin[0] = element_origin.x;
+                box->drag_origin[1] = element_origin.y;
+                return;
+            }
+            if (!box->dragging) {
+                return;
+            }
+            float left = std::clamp(box->drag_origin[0] + (mouse_x - box->drag_mouse[0]), 0.0f, std::max(preview_size.x - element_size.x, 0.0f));
+            float top = std::clamp(box->drag_origin[1] + (mouse_y - box->drag_mouse[1]), 0.0f, std::max(preview_size.y - element_size.y, 0.0f));
+            element->SetProperty(Rml::PropertyId::Left, Rml::Property(left, Rml::Unit::PX));
+            element->SetProperty(Rml::PropertyId::Top, Rml::Property(top, Rml::Unit::PX));
+
+            // Preview pixels to frame pixels.
+            *box->custom = true;
+            *box->x = left / preview_size.x * frame_width();
+            *box->y = top / preview_size.y * frame_h;
+            push_hud_layout();
+            if (event.GetId() == Rml::EventId::Dragend) {
+                box->dragging = false;
+                enhancements_option_changed(false);
+            }
+        }
+    };
+    HudDragListener hud_drag_listener;
+}
+
+// Every frame the config menu is up: size the preview to the window and
+// place the boxes from the settings (unless one is being dragged).
+void recompui::update_hud_preview() {
+    Rml::ElementDocument* document = config_context.get_document();
+    Rml::Element* preview = document ? document->GetElementById("hud_preview") : nullptr;
+    Rml::Element* area = document ? document->GetElementById("hud_area") : nullptr;
+    if (preview == nullptr || area == nullptr) {
+        return;
+    }
+    float fw = frame_width();
+    float dp_per_px = preview_h_dp / frame_h;
+    preview->SetProperty(Rml::PropertyId::Width, Rml::Property(fw * dp_per_px, Rml::Unit::DP));
+    area->SetProperty(Rml::PropertyId::Left, Rml::Property((fw - frame_w_43) / 2.0f * dp_per_px, Rml::Unit::DP));
+    area->SetProperty(Rml::PropertyId::Width, Rml::Property(frame_w_43 * dp_per_px, Rml::Unit::DP));
+
+    for (HudBox& box : hud_boxes) {
+        Rml::Element* element = document->GetElementById(box.id);
+        if (element == nullptr || box.dragging) {
+            continue;
+        }
+        float x, y;
+        hud_box_position(box, x, y);
+        element->SetProperty(Rml::PropertyId::Left, Rml::Property(x * dp_per_px, Rml::Unit::DP));
+        element->SetProperty(Rml::PropertyId::Top, Rml::Property(y * dp_per_px, Rml::Unit::DP));
+        element->SetProperty(Rml::PropertyId::Width, Rml::Property(box.w * dp_per_px, Rml::Unit::DP));
+        element->SetProperty(Rml::PropertyId::Height, Rml::Property(box.h * dp_per_px, Rml::Unit::DP));
+    }
+}
+
+void recompui::attach_hud_preview() {
+    Rml::ElementDocument* document = config_context.get_document();
+    if (document == nullptr) {
+        return;
+    }
+    for (HudBox& box : hud_boxes) {
+        Rml::Element* element = document->GetElementById(box.id);
+        if (element == nullptr) {
+            continue;
+        }
+        element->AddEventListener(Rml::EventId::Dragstart, &hud_drag_listener);
+        element->AddEventListener(Rml::EventId::Drag, &hud_drag_listener);
+        element->AddEventListener(Rml::EventId::Dragend, &hud_drag_listener);
+    }
+    push_hud_layout();
+}
+
+
 // Helper copied from RmlUi to get a named child.
 Rml::Element* recompui::get_child_by_tag(Rml::Element* parent, const std::string& tag)
 {
@@ -1610,8 +1769,21 @@ public:
         make_glow_texture();
         recompui::update_mod_list(false);
         recompui::get_config_tabset()->AddEventListener(Rml::EventId::Tabchange, &config_tabset_listener);
+        recompui::attach_hud_preview();
     }
     void register_events(recompui::UiEventListenerInstancer& listener) override {
+        recompui::register_event(listener, "hud_reset_hp",
+            [](const std::string& param, Rml::Event& event) {
+                enhancements_context.edited.hud_hp_custom = false;
+                push_hud_layout();
+                enhancements_option_changed(false);
+            });
+        recompui::register_event(listener, "hud_reset_sp",
+            [](const std::string& param, Rml::Event& event) {
+                enhancements_context.edited.hud_sp_custom = false;
+                push_hud_layout();
+                enhancements_option_changed(false);
+            });
         recompui::register_event(listener, "apply_options",
             [](const std::string& param, Rml::Event& event) {
                 graphics_model_handle.DirtyVariable("options_changed");

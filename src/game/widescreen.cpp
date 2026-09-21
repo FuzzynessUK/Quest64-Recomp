@@ -64,6 +64,47 @@ namespace {
     // Textures at most this wide are treated as repeating backdrops.
     constexpr int backdrop_max_texture_width = 128;
 
+    // HUD layout (Enhancements > HUD). The HP/MP block (top-left, y 24-60)
+    // and the four element gems with their level digits (bottom-left,
+    // y 197-213) are texture rectangles drawn from x = 0 in the 320-wide
+    // frame, which RT64 keeps inside the centred 4:3 area. When a block has
+    // a custom position, each of its rectangles is rebuilt with both edges
+    // on the LEFT origin (x counted from the real left edge of the window,
+    // in the same frame pixels) at the block's position plus the
+    // rectangle's offset within the block. Rectangles are recognised by
+    // zone and by the textures the HUD is made of (from the frame dumps):
+    // the digit strip 129x11, the HP/MP labels 63x18 and 63x19, the bar
+    // 57x6 and the 13x13 gems.
+    struct HudBlock {
+        std::atomic<bool> custom = false;
+        std::atomic<float> x = 0.0f;
+        std::atomic<float> y = 0.0f;
+    };
+    HudBlock hud_hp;
+    HudBlock hud_spirits;
+    constexpr int hud_max_x = 100;
+    constexpr int hud_hp_anchor_y = 24;
+    constexpr int hud_sp_anchor_y = 197;
+
+    // Which block a texture rectangle belongs to, or null.
+    HudBlock* hud_block_of(int ulx, int uly, const TileState& tile) {
+        if (ulx >= hud_max_x) {
+            return nullptr;
+        }
+        bool hud_texture = (tile.width == 129 && tile.height == 11) || (tile.width == 63 && (tile.height == 18 || tile.height == 19))
+            || (tile.width == 57 && tile.height == 6) || (tile.width == 13 && tile.height == 13);
+        if (!hud_texture) {
+            return nullptr;
+        }
+        if (uly >= 16 && uly <= 72) {
+            return &hud_hp;
+        }
+        if (uly >= 188 && uly <= 224) {
+            return &hud_spirits;
+        }
+        return nullptr;
+    }
+
     constexpr uint32_t ex_opcode = 0x64;
     constexpr uint32_t ex_fillrect = 0x000003;
     constexpr uint32_t ex_texrect = 0x000002;
@@ -336,6 +377,36 @@ namespace {
         write_w(rdram, addr + 16, static_cast<uint32_t>(op_spnoop) << 24);
         write_w(rdram, addr + 20, 0);
     }
+    // Replace the texture rectangle at `addr` with a copy placed at the
+    // block's position: x from the window's left edge, in frame pixels.
+    void move_hud_texrect(uint8_t* rdram, int32_t addr, uint32_t w0, uint32_t w1, uint32_t st, uint32_t dsdt, const HudBlock& block, int anchor_y) {
+        int lry = w0 & 0xFFF;
+        int lrx = (w0 >> 12) & 0xFFF;
+        int uly = w1 & 0xFFF;
+        int ulx = (w1 >> 12) & 0xFFF;
+        int tile = (w1 >> 24) & 0x7;
+        // 10.2 fixed point throughout; nothing left of or above the window.
+        int dx = static_cast<int>(block.x.load() * 4.0f);
+        int dy = static_cast<int>(block.y.load() * 4.0f) - anchor_y * 4;
+        auto shift = [](int v, int d) { return static_cast<uint32_t>(std::max(v + d, 0)); };
+
+        SubList sub(rdram, 34);
+        sub.enable_ex();
+        sub.wide_scissor();
+        sub.cmd((ex_opcode << 24) | ex_texrect, static_cast<uint32_t>(tile) | (ex_origin_left << 3) | (ex_origin_left << 15));
+        sub.cmd((shift(ulx, dx) << 16) | shift(uly, dy), (shift(lrx, dx) << 16) | shift(lry, dy));
+        sub.cmd(st, dsdt);
+        sub.restore_scissor();
+        sub.end();
+
+        write_w(rdram, addr, static_cast<uint32_t>(op_dl) << 24);
+        write_w(rdram, addr + 4, static_cast<uint32_t>(sub.start));
+        write_w(rdram, addr + 8, static_cast<uint32_t>(op_spnoop) << 24);
+        write_w(rdram, addr + 12, 0);
+        write_w(rdram, addr + 16, static_cast<uint32_t>(op_spnoop) << 24);
+        write_w(rdram, addr + 20, 0);
+    }
+
     void walk(uint8_t* rdram, int32_t addr, int depth, int& budget, int32_t branch_addr = 0) {
         if (depth > max_depth) {
             return;
@@ -443,6 +514,13 @@ namespace {
                         && backdrop && is_backdrop_span(ulx >> 2, lrx >> 2)) {
                         extend_texrect(rdram, addr, w0, w1, read_w(rdram, addr + 12), read_w(rdram, addr + 20));
                     }
+                    else if (op == op_texrect && (h1_w0 >> 24) == op_rdphalf_1 && (h2_w0 >> 24) == op_rdphalf_2) {
+                        HudBlock* block = hud_block_of(ulx >> 2, (w1 & 0xFFF) >> 2, tiles[tile]);
+                        if (block != nullptr && block->custom.load()) {
+                            move_hud_texrect(rdram, addr, w0, w1, read_w(rdram, addr + 12), read_w(rdram, addr + 20), *block,
+                                block == &hud_hp ? hud_hp_anchor_y : hud_sp_anchor_y);
+                        }
+                    }
                     // Skip the two RDPHALF commands regardless.
                     addr += 16;
                     break;
@@ -458,6 +536,15 @@ namespace {
 
 void zelda64::renderer::set_widescreen_2d_enabled(bool value) {
     enabled.store(value);
+}
+
+void zelda64::renderer::set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y) {
+    hud_hp.x.store(hp_x);
+    hud_hp.y.store(hp_y);
+    hud_hp.custom.store(hp_custom);
+    hud_spirits.x.store(sp_x);
+    hud_spirits.y.store(sp_y);
+    hud_spirits.custom.store(sp_custom);
 }
 
 void zelda64::renderer::request_widescreen_frame_dump() {

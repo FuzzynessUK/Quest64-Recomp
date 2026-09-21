@@ -17,6 +17,10 @@ namespace zelda64 {
         // Extends the game's full-width 2D rectangles (fades, menu backdrops)
         // to the screen edges when the aspect ratio is expanded.
         void set_widescreen_2d_enabled(bool value);
+        // Where the HP/MP block and the four spirits are drawn, in frame
+        // pixels (240 tall, x from the window's left edge); `custom` false
+        // leaves a block where the game puts it (Enhancements > HUD).
+        void set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y);
         // Writes the next frame's display list to widescreen_frame.txt (F9).
         void request_widescreen_frame_dump();
 
