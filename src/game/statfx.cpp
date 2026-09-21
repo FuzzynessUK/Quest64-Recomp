@@ -22,11 +22,14 @@ namespace {
     // world position in the first three floats.
     constexpr int32_t gPlayerData1 = 0x8007BACC;
 
-    // The field loop is game mode 1; battles run inside it. gNextMap is -1
+    // gGameMode is 1 in the field and 3 in a battle (the setter at
+    // 0x80026CAC picks one or the other); 2 is the file select and 4 the
+    // title, where the stats are whatever the save has. gNextMap is -1
     // until a map is loaded.
     constexpr int32_t gGameMode = 0x8007B2E0;
     constexpr int32_t gNextMap = 0x80084EE4;
     constexpr int game_mode_field = 1;
+    constexpr int game_mode_battle = 3;
 
     // The float matrices func_80012Cxx hands to guPerspectiveF and
     // guLookAtReflectF every frame, the game's only camera set-up. Both are
@@ -116,7 +119,8 @@ void zelda64::statfx::on_frame(uint8_t* rdram) {
     if (!zelda64::enhancements::active_options().stat_up_effect) {
         return;
     }
-    bool in_game = MEM_HU(0, gGameMode) == game_mode_field
+    int mode = MEM_HU(0, gGameMode);
+    bool in_game = (mode == game_mode_field || mode == game_mode_battle)
         && static_cast<int32_t>(MEM_W(0, gNextMap)) != -1;
     update_anchor(rdram, in_game);
 

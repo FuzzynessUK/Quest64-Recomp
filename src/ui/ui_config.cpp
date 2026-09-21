@@ -1266,7 +1266,11 @@ void recompui::update_stat_effects() {
 
     for (const zelda64::statfx::Event& event : zelda64::statfx::take_events()) {
         if (!statfx_seen) {
-            continue;
+            // No projection yet: burst in the middle of the screen rather
+            // than nowhere, so a broken projection is visible, not silent.
+            statfx_feet_px[0] = statfx_head_px[0] = size.x / 2.0f;
+            statfx_feet_px[1] = size.y / 2.0f + 60.0f * dp;
+            statfx_head_px[1] = size.y / 2.0f - 60.0f * dp;
         }
         for (int i = 0; i < sparks_per_rise; i++) {
             Rml::ElementPtr made = document->CreateElement("div");
