@@ -18,10 +18,18 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Background Music</div><div class="config-tip-text">Every area, town and event plays a track drawn at random, freshly shuffled on each launch. Some battle and boss music is hard-coded elsewhere and stays put. Works with or without the randomizer.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Background Music</div><div class="config-tip-text">Towns: every area's music is drawn at random from the game's tracks, freshly on each launch. All: the same, plus everything the game starts by name rather than by area - the title screen, battles and bosses, the death jingle, the credits, saving - each swapped for a random track for the session. Works with or without the randomizer.</div></div>
                                         <select data-value="aud_music_shuffle" id="aud_music_shuffle_select" style="nav-up: #tab_audio">
                                             <option value="0">Off</option>
-                                            <option value="1">Shuffled</option>
+                                            <option value="1">Towns</option>
+                                            <option value="2">All</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle sound effects</div><div class="config-tip-text">Every one of the game's 70 sound effects becomes a different one, the same swap for the whole session and a new draw on each launch. Menus, footsteps, spells, hits and all.</div></div>
+                                        <select data-value="aud_sfx_shuffle" id="aud_sfx_shuffle_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
                                         </select>
                                     </div>
                                 </div>

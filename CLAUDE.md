@@ -34,13 +34,26 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   (below). A "Changed settings apply when the game is next launched" line
   appears only once something on the tab has been changed; the Randomizer
   tab does the same.
-- **Audio tab** (2026-09-21) — one option so far, Background Music
-  (Off/Shuffled): Merrow's music shuffle moved out of the randomizer so it
-  works in any mode, freshly drawn each launch from `std::random_device`.
-  `src/game/audio.cpp`, `include/audio.h`, settings in `audio.json`,
-  applied last in `quest64_on_init`. The randomizer no longer has a
-  `music_shuffle` option at all. The "Sound" tab (volumes) is the
-  template's and is separate.
+- **Audio tab** (2026-09-21) — `src/game/audio.cpp`, `include/audio.h`,
+  settings in `audio.json`, applied last in `quest64_on_init`, every draw
+  fresh per launch (`std::random_device`). The "Sound" tab (volumes) is the
+  template's and is separate. Options:
+  - *Background Music* Off/Towns/All. Towns is Merrow's music shuffle moved
+    out of the randomizer (the 73 track bytes of the map music table at
+    ROM 0x054700, read by `func_8002684C`), so it works in any mode. All
+    adds the tracks the game starts by number - title 0x1B, battle 0xD,
+    bosses (0x8001CA28), death jingle 0x1E, credits 0x14 - by remapping a0
+    in hooks on `UpdateBGM` (shared with Hard Mode's death-jingle hook) and
+    `func_800267F8`, one random track per source track per session. Tracks
+    are 0-41 with 27-30 unused.
+  - *Shuffle sound effects*: a permutation of the 70 real effect ids (the
+    per-id volume table at 0x80053CAC has 84 entries, the last 14 zero)
+    applied in a hook on `func_80025B8C`, the routine every effect ends in
+    (direct, queued through `func_800268D4`, or the title overlay's own
+    calls) with the id in a0.
+- **Tab bar**: ten tabs no longer fit at header size, so the config menu's
+  tabs are 26dp and the row starts 48dp down, clear of the quit/close
+  buttons (`Tabs.scss`, mirrored in `recomp.rcss`).
 - **Hard Mode** — Landmine36's hack (the .rup is embedded and applied at
   boot, its payload recompiled, its code patches redone as native hooks; own
   save folder; overrides the randomizer). Switched from the **Mods tab**,

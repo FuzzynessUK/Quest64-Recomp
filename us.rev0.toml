@@ -49,6 +49,19 @@ func = "func_80005748"
 text = "quest64_enh_walk_unscale(rdram, ctx);"
 before_vram = 0x80005A08
 
+# Audio tab. Music shuffle "All": remap the track a0 wherever the game starts
+# music by number (UpdateBGM above, and its fading twin here); the map table
+# rows are rewritten in the ROM instead. Sound effect shuffle: every effect,
+# queued or direct, ends in func_80025B8C with its id in a0.
+[[patches.hook]]
+func = "func_800267F8"
+text = "quest64_audio_bgm(rdram, ctx);"
+before_vram = 0x800267F8
+[[patches.hook]]
+func = "func_80025B8C"
+text = "quest64_audio_sfx(rdram, ctx);"
+before_vram = 0x80025B8C
+
 # Post-process each frame's display list for widescreen just before the
 # graphics task is loaded; a0 holds the NUScTask at this point.
 [[patches.hook]]
@@ -250,7 +263,7 @@ text = "quest64_hardmode_scripted_message_1(rdram, ctx);"
 before_vram = 0x80007B1C
 [[patches.hook]]
 func = "UpdateBGM"
-text = "quest64_hardmode_death_jingle(rdram, ctx);"
+text = "quest64_hardmode_death_jingle(rdram, ctx); quest64_audio_bgm(rdram, ctx);"
 before_vram = 0x800267B8
 [[patches.hook]]
 func = "func_80008FE0"

@@ -919,9 +919,16 @@ void make_audio_bindings(Rml::Context* context) {
     constructor.BindFunc("aud_changed", [](Rml::Variant& out) { out = audio_context.changed ? 1 : 0; });
     bind_tooltip_events(constructor);
     constructor.BindFunc("aud_music_shuffle",
-        [](Rml::Variant& out) { out = audio_context.edited.music_shuffle ? 1 : 0; },
+        [](Rml::Variant& out) { out = static_cast<int>(audio_context.edited.music_shuffle); },
         [](const Rml::Variant& in) {
-            audio_context.edited.music_shuffle = in.Get<int>() != 0;
+            audio_context.edited.music_shuffle = static_cast<zelda64::audio::MusicShuffle>(std::clamp(in.Get<int>(), 0, 2));
+            audio_option_changed();
+        }
+    );
+    constructor.BindFunc("aud_sfx_shuffle",
+        [](Rml::Variant& out) { out = audio_context.edited.sfx_shuffle ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            audio_context.edited.sfx_shuffle = in.Get<int>() != 0;
             audio_option_changed();
         }
     );

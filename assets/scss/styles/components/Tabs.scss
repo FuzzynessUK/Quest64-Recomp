@@ -60,3 +60,17 @@
     height: 2dp;
     background-color: rgba(0, 0, 0, 0);
 }
+
+// The config menu has ten tabs; at the header-3 size the row runs under the
+// quit/close buttons in the top-right corner, so those tabs are smaller and
+// the row starts below the buttons (which sit at top: 8dp, 53.8dp tall).
+.centered-page__modal > .tabs > tabs {
+    padding-top: space(48);
+}
+
+.centered-page__modal > .tabs > tabs .tab {
+    font-size: 26dp;
+    letter-spacing: 1.8dp;
+    line-height: 26dp;
+    padding: space(14) space(16);
+}

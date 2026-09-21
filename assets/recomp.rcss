@@ -2553,3 +2553,13 @@ button {
   white-space: normal;
   pointer-events: none;
 }
+.centered-page__modal > .tabs > tabs {
+  padding-top: 48dp;
+}
+
+.centered-page__modal > .tabs > tabs .tab {
+  font-size: 26dp;
+  letter-spacing: 1.8dp;
+  line-height: 26dp;
+  padding: 14dp 16dp;
+}

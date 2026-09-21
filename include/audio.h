@@ -5,14 +5,28 @@
 
 // The Audio tab: settings that change what the game plays rather than how
 // loud it is (volumes are the Sound tab, in the general config). Stored in
-// audio.json next to the other settings and applied to the in-memory ROM at
-// boot, after the randomizer and the enhancements.
+// audio.json next to the other settings and applied at boot, after the
+// randomizer and the enhancements. Every draw is fresh on each launch.
 namespace zelda64::audio {
+    enum class MusicShuffle {
+        Off,
+        // The 73 area slots of the map music table (Merrow's music shuffle):
+        // a ROM write, so it reaches func_8002684C's table lookup.
+        Towns,
+        // Towns plus everything the game starts by track number instead of
+        // by map - title screen, battles and bosses, the death jingle, the
+        // credits, saving - remapped as they are requested (UpdateBGM and
+        // func_800267F8), each source track to one random track for the
+        // session.
+        All,
+    };
+
     struct Options {
-        // Every background-music slot plays a track drawn at random. This is
-        // Merrow's music shuffle, moved out of the randomizer so it works in
-        // any mode; the draw is fresh on every launch rather than seeded.
-        bool music_shuffle = false;
+        MusicShuffle music_shuffle = MusicShuffle::Off;
+        // A random permutation of the 70 sound effects, applied where every
+        // effect is finally queued (func_80025B8C), so each sound is
+        // consistently some other sound for the session.
+        bool sfx_shuffle = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.

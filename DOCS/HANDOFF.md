@@ -282,6 +282,24 @@ cheats frame hook.
   `std::mt19937`, so it works with the randomizer off and differs every
   launch. `ConfigTab` gained Enhancements and Audio; Debug's index was 7
   (Enhancements' slot) before and is 9 now.
+- **Music and sound effect plumbing** (2026-09-21), for the Audio tab:
+  - The BGM request is the byte D_8008FCC1 plus bit 0 of D_8008FCC2; the
+    per-frame `func_80026658` (the cheats hook site) consumes it, copies it
+    to D_8008FCC0 and starts the track. Three setters: `UpdateBGM`
+    (0x800267B8, a0 = track or -1 to stop), `func_800267F8` (a0 track, a1
+    fade/delay to D_8008FCC4) and `func_8002684C` (a0 map, a1 submap: looks
+    up the 70-row map/submap/track table at 0x80053B00 = ROM 0x054700,
+    which is what Merrow's `bgmdata` patches; its three extra entries are
+    code-segment immediates and do nothing here). Callers by number: title
+    overlay 0x8010050C (0x1B), battle 0x8001C8A4 (0xD), boss pick
+    0x8001CA28 (0x29 Mammon), death 0x800040CC (0x1E), credits 0x80002634
+    (0x14).
+  - Sound effects: `func_800268D4(a0 delay, a1 id, a2 volume)` either calls
+    `func_80025B8C(id, vol, 0x40)` at once or queues into the 16 x 3-byte
+    table at D_8008FCC8 that `func_80026658` drains into the same routine;
+    the title overlay calls `func_80025B8C` directly. So `func_80025B8C` is
+    the single choke point (id in a0). Ids 0-69 are real (volume table at
+    0x80053CAC, 84 bytes, last 14 zero).
 - **Tooltips** (2026-09-21): see CLAUDE.md "Tooltips". Position is computed
   in px from `GetAbsoluteOffset` of the label and the `.config-debug`
   ancestor; `SetProperty` needs the `PropertyId` overload for a
