@@ -27,7 +27,6 @@ namespace zelda64::audio {
 
     enum class CustomMusic {
         Off,
-        Shuffle,
         Custom,
     };
 
@@ -41,10 +40,11 @@ namespace zelda64::audio {
         bool sfx_shuffle = false;
         // Replacement music. `<exe dir>/custom_music` is a library of
         // `.seq` files (compact sequences in the game's own format;
-        // tools/mid2cseq.pl writes one from a MIDI), named freely. Shuffle
-        // gives every looping track a random file from the library each
-        // launch; Custom plays the file chosen for each track in
-        // `custom_tracks`. A chosen file is appended to the ROM at boot
+        // tools/mid2cseq.pl writes one from a MIDI), named freely. Custom
+        // plays the file chosen for each track in `custom_tracks` (the
+        // menu's Randomise all fills every looping track from the library).
+        // The menu shows this and music_shuffle as one control, Randomize
+        // Music: Off / Towns / All / Custom. A chosen file is appended to the ROM at boot
         // (the free tail from 0xF94348, growing the ROM past 16MB if the
         // library needs it) and the sequence bank's entry pointed at it,
         // so the game DMAs it like any other track. What was loaded, and
@@ -59,7 +59,7 @@ namespace zelda64::audio {
     // play requests use, with the place or event each is heard.
     constexpr int game_track_count = 44;
     const char* track_label(int track);
-    // The short one-shot jingles (level up, death, victory); the shuffle
+    // The short one-shot jingles (level up, death, victory); Randomise all
     // leaves them alone, since a looping song on the jingle player would
     // never end.
     bool track_is_jingle(int track);

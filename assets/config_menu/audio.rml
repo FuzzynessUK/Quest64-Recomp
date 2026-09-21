@@ -18,13 +18,23 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Background Music</div><div class="config-tip-text">Towns: every area's music is drawn at random from the game's tracks, freshly on each launch. All: the same, plus everything the game starts by name rather than by area - the title screen, battles and bosses, the victory fanfare, the death jingle, the credits, saving - each swapped for a random track for the session. Works with or without the randomizer.</div></div>
-                                        <select data-value="aud_music_shuffle" id="aud_music_shuffle_select" style="nav-up: #tab_audio">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomize Music</div><div class="config-tip-text">Towns: every area's music is drawn at random from the game's tracks, freshly on each launch. All: the same, plus everything the game starts by name rather than by area - the title screen, battles and bosses, the victory fanfare, the death jingle, the credits, saving - each swapped for a random track for the session. Custom: play your own music from the custom_music folder next to the game, chosen per track below (Randomise all fills every track from the folder). A file is a .seq in the game's own format; tools/mid2cseq.pl in the source makes one from a MIDI, and custom_music.txt beside the settings says what was loaded.</div></div>
+                                        <select data-value="aud_music" id="aud_music_select" style="nav-up: #tab_audio">
                                             <option value="0">Off</option>
                                             <option value="1">Towns</option>
                                             <option value="2">All</option>
+                                            <option value="3">Custom</option>
                                         </select>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Sound effects</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle sound effects</div><div class="config-tip-text">Every one of the game's 70 sound effects becomes a different one, the same swap for the whole session and a new draw on each launch. Menus, footsteps, spells, hits and all. Any sound still going three seconds after it started is cut, so a looping ambience that lands on a common sound cannot run on.</div></div>
                                         <select data-value="aud_sfx_shuffle" id="aud_sfx_shuffle_select">
@@ -35,29 +45,17 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
-                                <div>Custom Music</div>
-                            </label>
-                            <div class="config-debug__option-split">
-                                <div class="config-debug__option-controls">
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Custom Music</div><div class="config-tip-text">Plays music from the custom_music folder next to the game in place of the game's own. Shuffle: every looping track gets a random file from the folder, a new draw each launch. Custom: pick a file for each track below. A file is a .seq in the game's own format; tools/mid2cseq.pl in the source makes one from a MIDI. What was loaded is written to custom_music.txt beside the settings.</div></div>
-                                        <select data-value="aud_custom_music" id="aud_custom_music_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">Shuffle</option>
-                                            <option value="2">Custom</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="config-debug-option" data-if="aud_custom_music == 2">
+                        <div class="config-debug-option" data-if="aud_music == 3">
                             <label class="config-debug-option__label">
                                 <div>Tracks</div>
                             </label>
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper" style="margin-bottom: 8dp;">
+                                        <button class="button" onclick="aud_music_random_all">Randomise all</button>
+                                        <button class="button" onclick="aud_music_clear_all">Clear all</button>
+                                        <button class="button" onclick="aud_music_rescan">Rescan folder</button>
+                                    </div>
                                     <div class="config-debug__select-wrapper" data-if="aud_library_count == 0">
                                         <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>No .seq files in the custom_music folder</div></div>
                                     </div>
@@ -369,11 +367,6 @@
                                             <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
                                         </select>
                                     </div>
-                                </div>
-                                <div class="config-debug__option-trigger">
-                                    <button class="button" onclick="aud_music_random_all">Randomise all</button>
-                                    <button class="button" onclick="aud_music_clear_all">Clear all</button>
-                                    <button class="button" onclick="aud_music_rescan">Rescan folder</button>
                                 </div>
                             </div>
                         </div>

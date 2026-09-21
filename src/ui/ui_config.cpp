@@ -1058,10 +1058,18 @@ void make_audio_bindings(Rml::Context* context) {
 
     constructor.BindFunc("aud_changed", [](Rml::Variant& out) { out = audio_context.changed ? 1 : 0; });
     bind_tooltip_events(constructor);
-    constructor.BindFunc("aud_music_shuffle",
-        [](Rml::Variant& out) { out = static_cast<int>(audio_context.edited.music_shuffle); },
+    // One control for the two music settings: 0 off, 1 Towns and 2 All are
+    // the shuffle of the game's own tracks, 3 is the custom library.
+    constructor.BindFunc("aud_music",
+        [](Rml::Variant& out) {
+            const auto& e = audio_context.edited;
+            out = e.custom_music == zelda64::audio::CustomMusic::Custom ? 3 : static_cast<int>(e.music_shuffle);
+        },
         [](const Rml::Variant& in) {
-            audio_context.edited.music_shuffle = static_cast<zelda64::audio::MusicShuffle>(std::clamp(in.Get<int>(), 0, 2));
+            int value = std::clamp(in.Get<int>(), 0, 3);
+            auto& e = audio_context.edited;
+            e.custom_music = value == 3 ? zelda64::audio::CustomMusic::Custom : zelda64::audio::CustomMusic::Off;
+            e.music_shuffle = value == 3 ? zelda64::audio::MusicShuffle::Off : static_cast<zelda64::audio::MusicShuffle>(value);
             audio_option_changed();
         }
     );
@@ -1069,13 +1077,6 @@ void make_audio_bindings(Rml::Context* context) {
         [](Rml::Variant& out) { out = audio_context.edited.sfx_shuffle ? 1 : 0; },
         [](const Rml::Variant& in) {
             audio_context.edited.sfx_shuffle = in.Get<int>() != 0;
-            audio_option_changed();
-        }
-    );
-    constructor.BindFunc("aud_custom_music",
-        [](Rml::Variant& out) { out = static_cast<int>(audio_context.edited.custom_music); },
-        [](const Rml::Variant& in) {
-            audio_context.edited.custom_music = static_cast<zelda64::audio::CustomMusic>(std::clamp(in.Get<int>(), 0, 2));
             audio_option_changed();
         }
     );

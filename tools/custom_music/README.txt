@@ -4,7 +4,6 @@ Custom Music
 This folder is a music library. Put .seq files here (any name; the name is
 what the menu shows), then in the game's Audio tab set Custom Music to:
 
-  Shuffle  every looping track gets a random file from here, a new draw
            each launch;
   Custom   pick a file for each track in the list that appears (with
            Randomise all / Clear all / Rescan folder buttons).

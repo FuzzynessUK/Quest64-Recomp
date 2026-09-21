@@ -134,25 +134,12 @@ namespace {
         v[at + 3] = static_cast<uint8_t>(value);
     }
 
-    // Which library file each track gets this session: Shuffle draws one
-    // per looping track, Custom takes the menu's choices (a name that is
-    // no longer in the folder is reported and left vanilla).
+    // Which library file each track gets this session: the menu's choices
+    // (a name that is no longer in the folder is reported and left vanilla).
     std::map<int, std::string> plan_custom_music(const Options& options, const std::vector<std::string>& library,
-                                                 std::mt19937& rng, std::ofstream& log) {
+                                                 std::ofstream& log) {
         std::map<int, std::string> plan;
-        if (options.custom_music == CustomMusic::Shuffle) {
-            if (library.empty()) {
-                log << "  shuffle: the library is empty, nothing replaced\n";
-                return plan;
-            }
-            std::uniform_int_distribution<size_t> pick(0, library.size() - 1);
-            for (int track = 0; track < zelda64::audio::game_track_count; track++) {
-                if (!zelda64::audio::track_is_jingle(track)) {
-                    plan[track] = library[pick(rng)];
-                }
-            }
-        }
-        else if (options.custom_music == CustomMusic::Custom) {
+        if (options.custom_music == CustomMusic::Custom) {
             for (const auto& [track, name] : options.custom_tracks) {
                 if (track < 0 || track >= zelda64::audio::game_track_count || name.empty()) {
                     continue;
@@ -170,13 +157,13 @@ namespace {
 
     // Appends each chosen file to the ROM copy once and points every track
     // that uses it at that copy.
-    void apply_custom_music(std::vector<uint8_t>& patched, const Options& options, std::mt19937& rng) {
+    void apply_custom_music(std::vector<uint8_t>& patched, const Options& options) {
         std::filesystem::path folder = zelda64::audio::library_folder();
         std::ofstream log(zelda64::get_app_folder_path() / "custom_music.txt");
         log << "Custom music folder: " << folder.string() << "\n";
         std::vector<std::string> library = zelda64::audio::library_files();
         log << "  " << library.size() << " file(s) in the library\n";
-        std::map<int, std::string> plan = plan_custom_music(options, library, rng, log);
+        std::map<int, std::string> plan = plan_custom_music(options, library, log);
         session_songs.clear();
 
         uint32_t count = (static_cast<uint32_t>(patched[seq_bank_start + 2]) << 8) | patched[seq_bank_start + 3];
@@ -358,16 +345,20 @@ Options zelda64::audio::load_options() {
         }
     }
     get("sfx_shuffle", o.sfx_shuffle);
-    // custom_music was a bool for one build (track_NN.seq files); true
-    // becomes Custom, and the files are re-picked in the menu.
+    // custom_music was a bool for one build (track_NN.seq files) and had a
+    // per-launch shuffle (1) for another; anything but off is Custom now.
     auto custom = j.find("custom_music");
     if (custom != j.end()) {
         if (custom->is_boolean()) {
             o.custom_music = custom->get<bool>() ? CustomMusic::Custom : CustomMusic::Off;
         }
         else if (custom->is_number_integer()) {
-            o.custom_music = static_cast<CustomMusic>(std::clamp(custom->get<int>(), 0, 2));
+            o.custom_music = custom->get<int>() != 0 ? CustomMusic::Custom : CustomMusic::Off;
         }
+    }
+    // The menu offers Custom in place of the track shuffle, not on top.
+    if (o.custom_music == CustomMusic::Custom) {
+        o.music_shuffle = MusicShuffle::Off;
     }
     auto tracks = j.find("custom_tracks");
     if (tracks != j.end() && tracks->is_object()) {
@@ -388,7 +379,7 @@ void zelda64::audio::save_options(const Options& o) {
     nlohmann::json j;
     j["music_shuffle"] = static_cast<int>(o.music_shuffle);
     j["sfx_shuffle"] = o.sfx_shuffle;
-    j["custom_music"] = static_cast<int>(o.custom_music);
+    j["custom_music"] = o.custom_music == CustomMusic::Custom ? 2 : 0;
     nlohmann::json tracks = nlohmann::json::object();
     for (const auto& [track, name] : o.custom_tracks) {
         if (!name.empty()) {
@@ -431,7 +422,7 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
         std::span<const uint8_t> rom = recomp::get_rom();
         std::vector<uint8_t> patched(rom.begin(), rom.end());
         if (custom_music) {
-            apply_custom_music(patched, options, rng);
+            apply_custom_music(patched, options);
         }
         for (size_t i = 0; options.music_shuffle != MusicShuffle::Off && i * 2 + 1 < data::bgmdata.size(); i++) {
             uint32_t address = static_cast<uint32_t>(std::stoul(data::bgmdata[i * 2], nullptr, 16));
