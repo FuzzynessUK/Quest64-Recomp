@@ -1212,9 +1212,9 @@ namespace {
     constexpr float glow_peak_opacity = 0.9f;
     // The halo's diameter as a multiple of Brian's on-screen height: where
     // it starts, its full size, and what it shrinks to before it is gone.
-    constexpr float glow_scale_start = 0.8f;
-    constexpr float glow_scale_full = 1.7f;
-    constexpr float glow_scale_end = 1.0f;
+    constexpr float glow_scale_start = 1.6f;
+    constexpr float glow_scale_full = 3.4f;
+    constexpr float glow_scale_end = 2.4f;
 
     const char* glow_class(zelda64::statfx::Stat stat) {
         switch (stat) {
@@ -1225,8 +1225,8 @@ namespace {
         }
     }
 
-    // White with a smooth radial alpha falloff: solid-ish core, long soft
-    // edge, so the tint reads as a haze around him rather than a disc.
+    // White with a solid core out to a third of the radius, then a smooth
+    // falloff to the edge, so the tint covers him fully and hazes out.
     void make_glow_texture() {
         std::vector<char> bytes(glow_texture_size * glow_texture_size * 4);
         float half = glow_texture_size / 2.0f;
@@ -1235,7 +1235,9 @@ namespace {
                 float dx = (x + 0.5f - half) / half;
                 float dy = (y + 0.5f - half) / half;
                 float r = std::sqrt(dx * dx + dy * dy);
-                float a = r >= 1.0f ? 0.0f : (1.0f - r) * (1.0f - r) * (1.0f + 2.0f * r);
+                constexpr float core = 0.33f;
+                float t = r <= core ? 0.0f : std::min((r - core) / (1.0f - core), 1.0f);
+                float a = (1.0f - t) * (1.0f - t) * (1.0f + 2.0f * t);
                 size_t i = (static_cast<size_t>(y) * glow_texture_size + x) * 4;
                 bytes[i + 0] = static_cast<char>(255);
                 bytes[i + 1] = static_cast<char>(255);
