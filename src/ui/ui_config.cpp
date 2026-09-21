@@ -1204,16 +1204,17 @@ namespace {
     constexpr const char* glow_texture = "?/statfx/glow";
     constexpr int glow_texture_size = 128;
 
-    // Seconds: swell in, hold, fade out.
-    constexpr float glow_in = 0.15f;
-    constexpr float glow_hold = 0.35f;
-    constexpr float glow_out = 0.65f;
+    // Seconds: fade in while expanding, hold, then shrink while fading out.
+    constexpr float glow_in = 0.3f;
+    constexpr float glow_hold = 0.15f;
+    constexpr float glow_out = 0.5f;
     constexpr float glow_life = glow_in + glow_hold + glow_out;
     constexpr float glow_peak_opacity = 0.9f;
-    // The halo's diameter as a multiple of Brian's on-screen height, at the
-    // start and the end of its life.
-    constexpr float glow_scale_start = 1.4f;
-    constexpr float glow_scale_end = 1.9f;
+    // The halo's diameter as a multiple of Brian's on-screen height: where
+    // it starts, its full size, and what it shrinks to before it is gone.
+    constexpr float glow_scale_start = 0.8f;
+    constexpr float glow_scale_full = 1.7f;
+    constexpr float glow_scale_end = 1.0f;
 
     const char* glow_class(zelda64::statfx::Stat stat) {
         switch (stat) {
@@ -1320,17 +1321,23 @@ void recompui::update_stat_effects() {
             continue;
         }
         float opacity;
+        float scale;
         if (glow.age < glow_in) {
-            opacity = glow_peak_opacity * (glow.age / glow_in);
+            // Eased so it bursts out and settles.
+            float f = glow.age / glow_in;
+            float eased = 1.0f - (1.0f - f) * (1.0f - f);
+            opacity = glow_peak_opacity * eased;
+            scale = glow_scale_start + (glow_scale_full - glow_scale_start) * eased;
         }
         else if (glow.age < glow_in + glow_hold) {
             opacity = glow_peak_opacity;
+            scale = glow_scale_full;
         }
         else {
             float f = (glow.age - glow_in - glow_hold) / glow_out;
             opacity = glow_peak_opacity * (1.0f - f) * (1.0f - f);
+            scale = glow_scale_full + (glow_scale_end - glow_scale_full) * f;
         }
-        float scale = glow_scale_start + (glow_scale_end - glow_scale_start) * (glow.age / glow_life);
         float diameter = body * scale;
         glow.element->SetProperty(Rml::PropertyId::Left, Rml::Property(centre_x - diameter / 2.0f, Rml::Unit::PX));
         glow.element->SetProperty(Rml::PropertyId::Top, Rml::Property(centre_y - diameter / 2.0f, Rml::Unit::PX));

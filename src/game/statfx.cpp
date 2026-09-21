@@ -1,8 +1,11 @@
+#include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 
 #include "statfx.h"
 #include "enhancements.h"
+#include "zelda_config.h"
 #include "recomp.h"
 
 using zelda64::statfx::Anchor;
@@ -36,6 +39,18 @@ namespace {
     // libultra row-vector matrices: clip = world * view * projection.
     constexpr int32_t camera_projection = 0x80086E48;
     constexpr int32_t camera_view = 0x80086E88;
+    constexpr int32_t camera_eye = 0x80086DCC;
+    constexpr int32_t camera_at = 0x80086DD8;
+    constexpr int32_t camera_fovy = 0x80086EC8;
+
+    // Calibration log, statfx_debug.txt next to the settings: a line a
+    // second while the effect is on, to check the projection against what
+    // is seen on screen. Capped so it cannot grow without bound.
+    constexpr int log_every_frames = 60;
+    constexpr int log_max_lines = 600;
+    int log_frame = 0;
+    int log_lines = 0;
+    FILE* log_file = nullptr;
 
     // How tall Brian is in world units, for the top of the burst. Walking
     // covers about two units a frame.
@@ -101,6 +116,34 @@ namespace {
         return out_x == out_x && out_y == out_y;
     }
 
+    void log_state(uint8_t* rdram, float x, float y, float z, const Anchor& a) {
+        if (++log_frame < log_every_frames || log_lines >= log_max_lines) {
+            return;
+        }
+        log_frame = 0;
+        if (log_file == nullptr) {
+            std::filesystem::path path = zelda64::get_app_folder_path() / "statfx_debug.txt";
+            log_file = std::fopen(path.string().c_str(), "w");
+            if (log_file == nullptr) {
+                log_lines = log_max_lines;
+                return;
+            }
+        }
+        float at_x, at_y;
+        bool at_ok = project(rdram, read_f32(rdram, camera_at), read_f32(rdram, camera_at + 4), read_f32(rdram, camera_at + 8), at_x, at_y);
+        std::fprintf(log_file,
+            "mode %d map %d | brian %.1f %.1f %.1f | eye %.1f %.1f %.1f | at %.1f %.1f %.1f | fovy %.1f | feet ndc %d %.3f %.3f | head ndc %.3f %.3f | at ndc %d %.3f %.3f\n",
+            MEM_HU(0, gGameMode), static_cast<int32_t>(MEM_W(0, gNextMap)),
+            x, y, z,
+            read_f32(rdram, camera_eye), read_f32(rdram, camera_eye + 4), read_f32(rdram, camera_eye + 8),
+            read_f32(rdram, camera_at), read_f32(rdram, camera_at + 4), read_f32(rdram, camera_at + 8),
+            read_f32(rdram, camera_fovy),
+            a.valid ? 1 : 0, a.feet_x, a.feet_y, a.head_x, a.head_y,
+            at_ok ? 1 : 0, at_x, at_y);
+        std::fflush(log_file);
+        log_lines++;
+    }
+
     void update_anchor(uint8_t* rdram, bool in_game) {
         Anchor a;
         if (in_game) {
@@ -109,6 +152,7 @@ namespace {
             float z = read_f32(rdram, gPlayerData1 + 0x8);
             a.valid = project(rdram, x, y, z, a.feet_x, a.feet_y)
                 && project(rdram, x, y + brian_height, z, a.head_x, a.head_y);
+            log_state(rdram, x, y, z, a);
         }
         std::lock_guard<std::mutex> lock(events_mutex);
         shared_anchor = a;
