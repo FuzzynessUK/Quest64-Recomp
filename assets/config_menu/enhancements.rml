@@ -104,11 +104,6 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
-                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">One Hit KO means everything in the game dies to one hit. Every monster and boss is set to 1 HP, and Brian's max HP is held at 1 so it applies to a save already in progress.</div>
-                            </label>
-                        </div>
-                        <div class="config-debug-option">
-                            <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Settings save as you change them and take effect the next time the game is launched.</div>
                             </label>
                         </div>
