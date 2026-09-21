@@ -13,7 +13,7 @@ namespace data = merrow::data;
 namespace {
     // Brian's element levels, in the order the four bytes sit in memory.
     constexpr int32_t gPlayerMainData = 0x8007BA80;
-    constexpr int32_t element_levels = gPlayerMainData + 0x24;   // Fire, Earth, Wind, Water
+    constexpr int32_t element_levels = gPlayerMainData + 0x24;   // Fire, Earth, Water, Wind (the spell table order; seen in game)
     constexpr int element_count = 4;
 
     // The levels change on the element-choice screen a spirit opens, which
@@ -42,8 +42,8 @@ namespace {
     int element_index(const std::string& name) {
         if (name == "Fire") return 0;
         if (name == "Earth") return 1;
-        if (name == "Wind") return 2;
-        return 3;   // Water
+        if (name == "Water") return 2;
+        return 3;   // Wind
     }
 
     void load_spells() {
