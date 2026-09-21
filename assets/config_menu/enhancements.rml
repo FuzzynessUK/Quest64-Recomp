@@ -18,7 +18,7 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notifications</div><div class="config-tip-text">The on-screen messages in the top-left corner. Off hides the options below and shows nothing. Applies straight away.</div></div>
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notifications</div><div class="config-tip-text">The on-screen messages in the top-left corner. Off hides the options below and shows nothing. Applies straight away.</div></div>
                                         <select data-value="enh_notifications" id="enh_notifications_select" style="nav-up: #tab_enhancements">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
