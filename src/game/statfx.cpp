@@ -63,6 +63,36 @@ namespace {
     // A rise bigger than this is a save loading or a cheat, not a stat-up.
     constexpr int max_rise = 30;
 
+    // The sound. Eltale Monsters queues effect 0x35 four frames after a
+    // stat levels up (JP 0x80009080; the US twin of that routine at
+    // 0x800078DC has no such call, and nothing in the US code plays 0x35,
+    // though the bank still has it). It goes in the way func_800268D4
+    // queues a delayed effect: the 16 x 3-byte table at D_8008FCC8 -
+    // frames left, id, volume - that func_80026658 counts down and plays
+    // through func_80025B8C. The volume is the id's entry in the table at
+    // 0x80053CAC scaled by the request (0xFF) and the master byte at
+    // D_8008FCC6, as the game does it.
+    constexpr int stat_up_sfx = 0x35;
+    constexpr int stat_up_sfx_delay = 4;
+    constexpr int32_t sfx_queue = 0x8008FCC8;
+    constexpr int sfx_queue_slots = 16;
+    constexpr int32_t sfx_volume_table = 0x80053CAC;
+    constexpr int32_t sfx_master_volume = 0x8008FCC6;
+
+    void queue_sfx(uint8_t* rdram, int id, int delay) {
+        for (int slot = 0; slot < sfx_queue_slots; slot++) {
+            int32_t entry = sfx_queue + slot * 3;
+            if (MEM_BU(0, entry) != 0) {
+                continue;
+            }
+            uint32_t volume = (MEM_BU(0, sfx_volume_table + id) * 0xFFu * MEM_BU(0, sfx_master_volume)) >> 16;
+            MEM_B(0, entry) = static_cast<int8_t>(delay);
+            MEM_B(1, entry) = static_cast<int8_t>(id);
+            MEM_B(2, entry) = static_cast<int8_t>(volume);
+            return;
+        }
+    }
+
     struct Watched {
         Stat stat;
         int32_t address;
@@ -184,12 +214,18 @@ void zelda64::statfx::on_frame(uint8_t* rdram) {
         current[i] = MEM_HU(0, watched[i].address);
     }
     if (primed) {
+        bool rose = false;
         for (size_t i = 0; i < watched_count; i++) {
             int rise = current[i] - previous[i];
             if (rise > 0 && rise <= max_rise && previous[i] > 0) {
                 std::lock_guard<std::mutex> lock(events_mutex);
                 events.push_back({ watched[i].stat, rise });
+                rose = true;
             }
+        }
+        // One chime even when two stats rise on the same frame.
+        if (rose) {
+            queue_sfx(rdram, stat_up_sfx, stat_up_sfx_delay);
         }
     }
     for (size_t i = 0; i < watched_count; i++) {
