@@ -16,8 +16,10 @@ namespace {
     constexpr int32_t element_levels = gPlayerMainData + 0x24;   // Fire, Earth, Wind, Water
     constexpr int element_count = 4;
 
-    // gGameMode is 1 in the field and 3 in a battle; the baseline is reset
-    // anywhere else so loading a save never reads as learning.
+    // The levels change on the element-choice screen a spirit opens, which
+    // is neither the field (gGameMode 1) nor a battle (3), so the watch runs
+    // in every mode except the file select (2) and the title (4), where the
+    // baseline is reset so loading a save never reads as learning.
     constexpr int32_t gGameMode = 0x8007B2E0;
     constexpr int32_t gNextMap = 0x80084EE4;
 
@@ -61,7 +63,7 @@ void zelda64::spellnotice::on_frame(uint8_t* rdram) {
         return;
     }
     int mode = MEM_HU(0, gGameMode);
-    bool in_game = (mode == 1 || mode == 3) && static_cast<int32_t>(MEM_W(0, gNextMap)) != -1;
+    bool in_game = mode != 2 && mode != 4 && static_cast<int32_t>(MEM_W(0, gNextMap)) != -1;
     if (!in_game) {
         primed = false;
         return;
