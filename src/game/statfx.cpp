@@ -52,9 +52,13 @@ namespace {
     int log_lines = 0;
     FILE* log_file = nullptr;
 
-    // How tall Brian is in world units, for the top of the burst. Walking
-    // covers about two units a frame.
-    constexpr float brian_height = 22.0f;
+    // Where Brian's feet and head sit relative to the position the game
+    // stores for him, in world units. Calibrated from the camera: it aims
+    // 12 units above that position and a halo centred there floated over
+    // his head, so he is small - about 8 units - with the origin near his
+    // middle. Walking covers about two units a frame.
+    constexpr float brian_feet_offset = -5.0f;
+    constexpr float brian_head_offset = 3.0f;
 
     // A rise bigger than this is a save loading or a cheat, not a stat-up.
     constexpr int max_rise = 30;
@@ -150,8 +154,8 @@ namespace {
             float x = read_f32(rdram, gPlayerData1 + 0x0);
             float y = read_f32(rdram, gPlayerData1 + 0x4);
             float z = read_f32(rdram, gPlayerData1 + 0x8);
-            a.valid = project(rdram, x, y, z, a.feet_x, a.feet_y)
-                && project(rdram, x, y + brian_height, z, a.head_x, a.head_y);
+            a.valid = project(rdram, x, y + brian_feet_offset, z, a.feet_x, a.feet_y)
+                && project(rdram, x, y + brian_head_offset, z, a.head_x, a.head_y);
             log_state(rdram, x, y, z, a);
         }
         std::lock_guard<std::mutex> lock(events_mutex);
