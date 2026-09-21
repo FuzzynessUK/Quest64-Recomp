@@ -35,7 +35,7 @@ before_vram = 0x80024260
 # Run queued cheats (map warp, stat edits) once per frame of every game-mode loop.
 [[patches.hook]]
 func = "func_80026658"
-text = "quest64_cheats_frame(rdram);"
+text = "quest64_cheats_frame(rdram); quest64_status_watch_frame(rdram);"
 before_vram = 0x80026658
 # Faster walking: scale Brian's per-frame velocity (player struct +0x18/+0x20,
 # passed in a1) on entry to the collision/move routine and restore it before
@@ -61,6 +61,13 @@ before_vram = 0x800267F8
 func = "func_80025B8C"
 text = "quest64_audio_sfx(rdram, ctx);"
 before_vram = 0x80025B8C
+
+# Easier Quest: wings stay in the bag. func_80021524 removes a used item when
+# its handler (func_800212E4) returned non-zero; this sits on the test.
+[[patches.hook]]
+func = "func_80021524"
+text = "quest64_easier_wings(rdram, ctx);"
+before_vram = 0x800220DC
 
 # Post-process each frame's display list for widescreen just before the
 # graphics task is loaded; a0 holds the NUScTask at this point.
@@ -267,7 +274,7 @@ text = "quest64_hardmode_death_jingle(rdram, ctx); quest64_audio_bgm(rdram, ctx)
 before_vram = 0x800267B8
 [[patches.hook]]
 func = "func_80008FE0"
-text = "quest64_hardmode_night_hp(rdram, ctx);"
+text = "quest64_hardmode_night_hp(rdram, ctx); quest64_status_watch_enemy(rdram, ctx);"
 before_vram = 0x8000908C
 [[patches.hook]]
 func = "func_80008FE0"

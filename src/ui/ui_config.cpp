@@ -779,6 +779,15 @@ void recompui::set_hard_mode_enabled(bool enabled) {
     enhancements_option_changed();
 }
 
+bool recompui::is_easier_quest_enabled() {
+    return enhancements_context.edited.easier_quest;
+}
+
+void recompui::set_easier_quest_enabled(bool enabled) {
+    enhancements_context.edited.easier_quest = enabled;
+    enhancements_option_changed();
+}
+
 
 // N64 mode, in the spirit of Ship of Harkinian's: render the way the console
 // did. Applied straight to the graphics config rather than the ROM, and the

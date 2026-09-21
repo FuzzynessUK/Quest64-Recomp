@@ -6,6 +6,7 @@
 #include <random>
 
 #include "randomizer.h"
+#include "easierquest.h"
 #include "merrow_data.h"
 #include "merrow_mapdata.h"
 #include "enemy_progression.h"
@@ -852,7 +853,7 @@ namespace {
                 rng.shuffle(boss_order);
             }
             if (options.boss_element) {
-                guilty_element = rng.next(0, 4);
+                guilty_element = options.guilty_element >= 0 ? options.guilty_element & 3 : rng.next(0, 4);
                 monster_stats[437] = guilty_element;
             }
 
@@ -915,7 +916,7 @@ namespace {
                 for (int i = 0; i < 75; i++) {
                     if (options.exp_boost != 0) {
                         int value = round_even(monster_stats[(i * 6) + 4] * scale * (options.exp_boost * 0.25));
-                        monster_stats[(i * 6) + 4] = value == 0 ? 1 : value;
+                        monster_stats[(i * 6) + 4] = value == 0 ? 1 : std::min(value, 65535);
                     }
                     else {
                         monster_stats[(i * 6) + 4] = 0;
@@ -2121,6 +2122,11 @@ bool zelda64::randomizer::delete_preset(const std::string& name) {
 }
 
 const zelda64::randomizer::Options& zelda64::randomizer::active_options() {
+    // Easier Quest plays with its own fixed settings in place of the user's,
+    // so that the boot writes and every native hook see the same thing.
+    if (zelda64::easierquest::active()) {
+        return zelda64::easierquest::preset();
+    }
     if (!active_loaded) {
         active = load_options();
         active_loaded = true;

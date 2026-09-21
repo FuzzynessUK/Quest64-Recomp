@@ -134,6 +134,9 @@ namespace recompui {
     // tab. Stored with the other enhancements; applies on the next launch.
     bool is_hard_mode_enabled();
     void set_hard_mode_enabled(bool enabled);
+    // Easier Quest, the other built-in entry; stored the same way.
+    bool is_easier_quest_enabled();
+    void set_easier_quest_enabled(bool enabled);
 
     void apply_color_hack();
     void get_window_size(int& width, int& height);

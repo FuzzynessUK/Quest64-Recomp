@@ -71,6 +71,10 @@ namespace zelda64::randomizer {
         int exp_boost = 4;         // quarters: 4 = x1, 0 = no EXP
         bool boss_order = false;
         bool boss_element = false;
+        // With boss_element, the element to use instead of rolling one
+        // (0 Fire, 1 Earth, 2 Water, 3 Wind); -1 rolls. Not a menu option
+        // and not saved: Easier Quest's preset sets it.
+        int guilty_element = -1;
         // Merrow's 5-tier encounter slider: 0 Halved, 1 Reduced, 2 Default
         // (vanilla, no-op), 3 Increased, 4 Doubled. Needs native hooks since
         // the step/roll/max values are baked into the recompiled code as C

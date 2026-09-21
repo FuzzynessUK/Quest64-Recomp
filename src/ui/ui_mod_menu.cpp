@@ -25,15 +25,46 @@ static std::string generate_thumbnail_src_for_mod(const std::string &mod_id) {
     return "?/mods/" + mod_id + "/thumb";
 }
 
-// Hard Mode is not an installed mod - it is compiled in and switched from
-// enhancements.json - but it belongs on this tab, so it is shown as a
-// built-in entry pinned to the top of the list. Every call that would go
-// to librecomp with its id is answered here instead; librecomp itself
-// treats the unknown id as "no such mod" and does nothing.
+// Hard Mode and Easier Quest are not installed mods - they are compiled in
+// and switched from enhancements.json - but they belong on this tab, so
+// they are shown as built-in entries pinned to the top of the list. Every
+// call that would go to librecomp with their ids is answered here instead;
+// librecomp itself treats an unknown id as "no such mod" and does nothing.
 static const std::string hard_mode_mod_id = "quest64-hard-mode";
+static const std::string easier_quest_mod_id = "quest64-easier-quest";
+static constexpr uint32_t builtin_entry_count = 2;
 
 static bool is_hard_mode_entry(const std::string &mod_id) {
     return mod_id == hard_mode_mod_id;
+}
+
+static bool is_easier_quest_entry(const std::string &mod_id) {
+    return mod_id == easier_quest_mod_id;
+}
+
+static bool is_builtin_entry(const std::string &mod_id) {
+    return is_hard_mode_entry(mod_id) || is_easier_quest_entry(mod_id);
+}
+
+static recomp::mods::ModDetails easier_quest_details() {
+    recomp::mods::ModDetails details{};
+    details.mod_id = easier_quest_mod_id;
+    details.display_name = "Easier Quest";
+    details.description =
+        "The vanilla game with a gentler curve: Extra Healing (Mending Lv1 in place of Soul Search Lv1), "
+        "Guilty's element fixed to Earth, walking MP regen at its fastest, wings that stay in your bag "
+        "after use, experience tripled - combat experience and the hidden experience behind HP, MP, "
+        "agility and defense - plus the JP Healing Amounts and JP Magic Barrier enhancements.\n\n"
+        "Takes effect the next time the game is launched (Reset on the General tab restarts now). "
+        "It replaces the Randomizer's settings while it is on; Hard Mode takes priority if both are on.";
+    details.short_description = "Vanilla with a gentler curve, built in.";
+    details.authors = { "Quest 64 Recompiled" };
+    details.version.major = 1;
+    details.version.minor = 0;
+    details.version.patch = 0;
+    details.runtime_toggleable = true;
+    details.enabled_by_default = false;
+    return details;
 }
 
 static recomp::mods::ModDetails hard_mode_details() {
@@ -80,6 +111,7 @@ static recomp::mods::ModDetails hard_mode_details() {
 
 static std::vector<recomp::mods::ModDetails> all_mod_details_with_hard_mode(const std::string &game_mod_id) {
     std::vector<recomp::mods::ModDetails> details = recomp::mods::get_all_mod_details(game_mod_id);
+    details.insert(details.begin(), easier_quest_details());
     details.insert(details.begin(), hard_mode_details());
     return details;
 }
@@ -87,6 +119,9 @@ static std::vector<recomp::mods::ModDetails> all_mod_details_with_hard_mode(cons
 static bool is_mod_enabled_or_auto(const std::string &mod_id) {
     if (is_hard_mode_entry(mod_id)) {
         return recompui::is_hard_mode_enabled();
+    }
+    if (is_easier_quest_entry(mod_id)) {
+        return recompui::is_easier_quest_enabled();
     }
     return recomp::mods::is_mod_enabled(mod_id) || recomp::mods::is_mod_auto_enabled(mod_id);
 }
@@ -360,6 +395,11 @@ void ModMenu::mod_toggled(bool enabled) {
             mod_entry_buttons[active_mod_index]->set_mod_enabled(enabled);
             return;
         }
+        if (is_easier_quest_entry(mod_details[active_mod_index].mod_id)) {
+            recompui::set_easier_quest_enabled(enabled);
+            mod_entry_buttons[active_mod_index]->set_mod_enabled(enabled);
+            return;
+        }
         recomp::mods::enable_mod(mod_details[active_mod_index].mod_id, enabled);
         
         // Refresh enabled status for all mods in case one of them got auto-enabled due to being a dependency.
@@ -420,11 +460,11 @@ void ModMenu::mod_selected(uint32_t mod_index) {
 void ModMenu::mod_dragged(uint32_t mod_index, EventDrag drag) {
     constexpr float spacer_height = modEntryHeight + modEntryPadding * 2.0f;
 
-    // The built-in entry stays where it is and nothing is dropped above it.
-    if (is_hard_mode_entry(mod_details[mod_index].mod_id)) {
+    // The built-in entries stay where they are and nothing is dropped above them.
+    if (is_builtin_entry(mod_details[mod_index].mod_id)) {
         return;
     }
-    constexpr uint32_t first_movable_index = 1;
+    constexpr uint32_t first_movable_index = builtin_entry_count;
 
     switch (drag.phase) {
     case DragPhase::Start: {

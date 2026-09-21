@@ -125,6 +125,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("faster_walk", o.faster_walk);
     get("stat_up_effect", o.stat_up_effect);
     get("hard_mode", o.hard_mode);
+    get("easier_quest", o.easier_quest);
     return o;
 }
 
@@ -144,6 +145,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["faster_walk"] = o.faster_walk;
     j["stat_up_effect"] = o.stat_up_effect;
     j["hard_mode"] = o.hard_mode;
+    j["easier_quest"] = o.easier_quest;
     std::ofstream out(options_path());
     out << j.dump(4);
 }
@@ -151,6 +153,13 @@ void zelda64::enhancements::save_options(const Options& o) {
 const zelda64::enhancements::Options& zelda64::enhancements::active_options() {
     if (!active_loaded) {
         active = load_options();
+        // Easier Quest's two JP options. Checked against the saved
+        // hard_mode flag rather than hardmode::active(), which is not known
+        // yet the first time this runs; Hard Mode ignores both anyway.
+        if (active.easier_quest && !active.hard_mode) {
+            active.jp_healing = true;
+            active.longer_magic_barrier = true;
+        }
         active_loaded = true;
     }
     return active;

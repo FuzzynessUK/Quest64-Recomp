@@ -74,6 +74,12 @@ namespace zelda64::enhancements {
         // 0x80400000, and src/game/hardmode/ supplies the hooks the hack's
         // code patches would otherwise have made. Uses its own save folder.
         bool hard_mode = false;
+
+        // Easier Quest (include/easierquest.h): the vanilla game with a
+        // fixed set of conveniences. Switched from the Mods tab. Hard Mode
+        // wins when both are on. Forces jp_healing and longer_magic_barrier
+        // in the boot copy.
+        bool easier_quest = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.

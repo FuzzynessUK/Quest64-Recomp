@@ -197,6 +197,8 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/enhancements.cpp
     ${CMAKE_SOURCE_DIR}/src/game/audio.cpp
     ${CMAKE_SOURCE_DIR}/src/game/statfx.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/easierquest.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/statuswatch.cpp
     ${CMAKE_SOURCE_DIR}/src/game/speedrun.cpp
     ${CMAKE_SOURCE_DIR}/src/game/hardmode/hardmode.cpp
     ${CMAKE_SOURCE_DIR}/src/game/hardmode/hooks.cpp
