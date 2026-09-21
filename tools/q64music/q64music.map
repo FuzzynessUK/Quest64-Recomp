@@ -1,0 +1,313 @@
+# q64music.map - Ocarina of Time soundfont instruments to Quest 64 programs.
+# Lines: <font> <instrument> <program>  (numbers hex with 0x or decimal; # comments)
+# Instrument numbers are the sequence's (0-based); the names are from
+# LuigiXHero's OoT instrument list (1-based there). A first guess by
+# instrument type, to be tuned by ear: Quest 64's bank has no names, but
+# its envelopes say which programs sustain and which decay:
+#   sustain (strings, winds, pads, organ): 0 1 2 3 4 5 6 10 11 15 19 20 21 22 23 28
+#   decay (piano, harp, plucks, mallets):  7 8 12 13 14 16 17 18 25 27
+#   bass (multi-sampled low keys): 26     drum kit (GM keys): 9     one-shot hit: 24
+# Programs the game's music uses: field theme 4 5 0 6 7 9; battle 21 0 18 25 23 19 7 9.
+
+
+# Set 0x03 Main Orchestra
+0x03  0  1   # Flute
+0x03  1  6   # Oboe
+0x03  2  6   # Clarinet
+0x03  3  6   # Bassoon
+0x03  4  2   # Horn
+0x03  5  4   # Trumpet
+0x03  6  4   # Trumpet
+0x03  7  3   # Tuba
+0x03  8 25   # Glockenspiel
+0x03 10  5   # Strings
+0x03 11  5   # Strings
+0x03 12  7   # Pizzicato strings
+0x03 13  8   # Piano
+0x03 14 13   # Harp
+0x03 15 25   # Xylophone
+
+# Set 0x04 Deku Tree
+0x04  0  0   # Pad
+0x04  1  0   # Pad
+
+# Set 0x05 Hylian Troupe
+0x05  0 13   # Koto
+0x05  1  1   # Ocarina
+0x05  2  6   # Bassoon
+0x05  3  6   # Oboe
+0x05 12  7   # Pizzicato Strings
+
+# Set 0x06 Title Screen
+0x06  1  1   # Ocarina
+0x06 10  5   # Strings
+0x06 11  5   # Strings
+0x06 13  8   # Piano
+0x06 14  8   # Piano
+
+# Set 0x07 Jabu Jabu's Belly
+0x07  0 22   # Wind
+0x07  2  0   # Synth Strings
+0x07  3 22   # Creeking
+0x07  4 22   # Creeking
+
+# Set 0x08 Kakariko Village (Guitar)
+0x08  0 23   # Harmonica
+0x08  1 13   # Guitar
+0x08  2 13   # Guitar
+0x08  3  1   # Ocarina
+0x08  4 25   # Glockenspiel
+0x08  5 23   # Accordion
+0x08  6 23   # Accordion
+
+# Set 0x09 Fairy Fountain
+0x09  0 13   # Harp
+0x09  1 13   # Harp
+0x09  2 13   # Harp
+0x09  3 13   # Harp
+0x09  4  5   # Strings
+0x09  5  1   # Ocarina
+0x09  6 11   # Choir
+0x09  7 11   # Choir
+0x09  8 25   # Glockenspiel
+0x09 10  5   # Strings
+0x09 11  5   # Strings
+0x09 12  7   # Pizzicato Strings
+
+# Set 0x0A Fire Temple
+0x0A  0 11   # Islamic chant 1
+0x0A  1 11   # Islamic chant 2
+0x0A  2 11   # Islamic chant 2
+0x0A  3 25   # Xylophone
+0x0A  5 22   # Wind
+0x0A  6  9   # Cymbal
+0x0A 10 11   # Choir
+0x0A 11 11   # Choir
+0x0A 12 11   # Choir
+0x0A 13 11   # Choir
+
+# Set 0x0B Dodongo's Cavern
+0x0B  0 22   # Wind
+0x0B  1 22   # Sounds 1
+0x0B  2 22   # Sounds 2
+0x0B  3 22   # Sounds 3
+
+# Set 0x0C Forest Temple
+0x0C  0  0   # Pad
+0x0C  1 11   # Voice thing
+0x0C  2 25   # Wood chime
+
+# Set 0x0D Lon Lon Ranch
+0x0D  0  1   # Malon Voice
+0x0D  1  1   # Malon Voice
+0x0D  2 27   # Electric guitar
+0x0D  3 27   # Electric guitar (high)
+0x0D  4 27   # Electric guitar (high)
+0x0D 11  5   # Strings
+0x0D 12  5   # Strings
+0x0D 13  5   # Violin
+0x0D 14  5   # Violin
+0x0D 15 25   # Bell
+
+# Set 0x0E Goron City
+0x0E  0  9   # Drum
+0x0E  1  9   # Clap
+0x0E  2 22   # lolwut
+0x0E  3 25   # xylophone
+0x0E  4 25   # Xylophone
+
+# Set 0x0F Kokiri Forest
+0x0F  0  1   # Flute
+0x0F  1  6   # Oboe
+0x0F  2  6   # Clarinet
+0x0F  3  6   # Bassoon
+0x0F  4  2   # Horn
+0x0F  8 25   # Glockenspiel
+0x0F 10  5   # Strings
+0x0F 11  5   # Strings
+0x0F 12  7   # Pizzicato Strings
+0x0F 13  7   # Harpsichord
+0x0F 14 13   # Harp
+0x0F 15 25   # Xylophone
+
+# Set 0x10 Spirit Temple
+0x10  0  0   # Voice pad
+0x10  1 19   # Synth
+0x10  2  1   # Egyptian flute
+0x10  3  9   # Clap
+0x10  4 19   # Synth
+0x10  5  1   # Egyptian flute
+
+# Set 0x11 Horse Race
+0x11  0 13   # Banjo
+0x11  1 13   # Banjo
+0x11  5 26   # Bass guitar
+0x11  6 23   # Harmonica
+0x11  7 13   # Guitar
+0x11 13  5   # Violin
+0x11 14  5   # Violin
+
+# Set 0x12 Warp Songs
+0x12  0 13   # Harp
+0x12  1 13   # Harp
+0x12  2 13   # Harp
+0x12  3 13   # Harp
+0x12  4  5   # Strings
+0x12  5  1   # Ocarina
+0x12  8 25   # Glockenspiel
+0x12 10  5   # Strings
+0x12 11  5   # Strings
+0x12 12  7   # Pizzicato Strings
+
+# Set 0x13 Legend of Hyrule
+0x13  0 11   # Choir
+0x13  1 11   # Choir
+0x13  2 13   # Harp
+0x13  3 25   # Glockenspiel
+
+# Set 0x14 Minigame Shop
+0x14  0  1   # Flute
+0x14  1  6   # Clarinet
+0x14  2  6   # Clarinet
+0x14  3 23   # Accordion
+0x14  4 25   # Glockenspiel
+
+# Set 0x15 Zora's Domain
+0x15  0 25   # Steel drum
+0x15  1  0   # Voice pad
+0x15  2 13   # Guitar
+
+# Set 0x16 Shop
+0x16  0 13   # Guitar
+0x16  1 23   # Accordion
+0x16  2 26   # Bass guitar
+0x16  3  4   # Trumpet
+0x16  4  4   # Trumpet (high)
+0x16 10  9   # Drum
+
+# Set 0x17 Ice Cavern
+0x17  0  0   # Bell pad
+0x17  1  0   # Bell pad
+0x17  2 22   # Wind
+0x17  3  0   # Bell pad
+
+# Set 0x18 Shadow Temple
+0x18  0  9   # Drum
+0x18  1 22   # Wind
+0x18  2 22   # Sounds 1
+0x18  3 11   # Choir
+0x18  4 11   # Choir (high)
+0x18  6 11   # Islamic chant
+0x18  7 22   # Sounds 2
+0x18  8  7   # Harpsichord
+
+# Set 0x19 Water Temple
+0x19  0  1   # Flute
+0x19  1 25   # Wind chime
+0x19  4  0   # Bell pad
+0x19  5 25   # Wood chime
+0x19  6  0   # Voice pad
+0x19  7 13   # Koto
+
+# Set 0x1A Unused
+0x1A 13  8   # Piano
+0x1A 14  8   # Piano
+
+# Set 0x1B Gerudo Valley
+0x1B  0  4   # Trumpet
+0x1B  1  4   # Trumpet (low)
+0x1B  2 13   # Guitar
+0x1B  3 13   # Guitar
+0x1B  5 26   # Bass guitar
+0x1B  7 13   # Guitar
+0x1B 10  9   # Clap
+0x1B 11  9   # Clap
+
+# Set 0x1C Lakeside Laboratory
+0x1C  0 13   # Koto
+0x1C  1  9   # Drum
+0x1C  3  9   # Drum 2
+0x1C  4 25   # Wind chime
+
+# Set 0x1D Kotake and Koume
+0x1D  0 13   # Koto
+0x1D  1  9   # Drum
+0x1D  5  1   # Flute
+0x1D  7  1   # Flute
+0x1D 10  5   # Strings
+0x1D 11  5   # Strings
+
+# Set 0x1E Ganon's Castle (Organ)
+0x1E  0 21   # Organ
+0x1E  1 21   # Organ
+0x1E  2 21   # Organ
+0x1E  4  2   # Horn
+
+# Set 0x1F Inside Ganon's Castle
+0x1F  1 22   # Wind
+0x1F  2 22   # Sounds 1
+0x1F  3 11   # Choir
+0x1F  4  8   # Piano
+0x1F  5  8   # Piano
+0x1F  7 22   # Sounds 2
+
+# Set 0x20 Ganondorf Battle
+0x20  0  1   # Flute
+0x20  1 11   # Choir
+0x20  2 11   # Choir (low)
+0x20  4  2   # Horn
+0x20  5  4   # Trumpet
+0x20  6  4   # Trumpet (low)
+0x20  7  3   # Tuba
+0x20 10  5   # Strings
+0x20 11  5   # Strings
+0x20 13  8   # Piano
+0x20 15 25   # Xylophone
+
+# Set 0x21 Ending sequence 1
+0x21  0  1   # Malon Voice
+0x21  1  1   # Malon Voice
+0x21  2  6   # Clarinet
+0x21  4  2   # Horn
+0x21  5  6   # Oboe
+0x21  6 13   # Harp
+0x21  7  5   # Violin
+0x21  8 25   # Glockenspiel
+0x21 10  5   # Strings
+0x21 11  5   # Strings
+0x21 13 25   # Bell
+0x21 14 13   # Harp
+0x21 15 11   # Choir
+
+# Set 0x22 Ending sequence 2
+0x22  0 13   # Koto
+0x22  1  1   # Ocarina
+0x22  2  6   # Bassoon
+0x22  3  6   # Oboe
+0x22  4 11   # Choir
+0x22  6 13   # Harp
+0x22  7 25   # Glockenspiel
+0x22  8  1   # Malon Voice
+0x22 10  5   # Strings
+0x22 11  5   # Strings
+0x22 12  7   # Pizzicato Strings
+0x22 13  2   # Horn
+0x22 14 11   # Choir
+0x22 15 22   # lolwut
+
+# Set 0x23 Fanfares
+0x23  5  4   # Trumpet
+0x23  6  4   # Trumpet (low)
+0x23  7  3   # Tuba
+0x23  8 25   # Glockenspiel
+0x23 10  5   # Strings
+0x23 11  5   # Strings
+0x23 14 13   # Harp
+
+# Set 0x24 Owl
+0x24  1  6   # Oboe
+0x24  3  6   # Bassoon
+0x24 10  5   # Strings
+0x24 11  5   # Strings
+0x24 12  7   # Pizzicato Strings
+0x24 14 13   # Harp

@@ -260,6 +260,26 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
 - `tools/enemyrandologic.pl` — one script writes both the design workbook and
   the progression data; edit it, then `perl tools/enemyrandologic.pl`, then
   copy the xlsx to `D:\Downloads` if the user wants it.
+- `tools/q64music/` — **q64music.exe**, the music converter (CMake target
+  `q64music`, links miniz; deployed next to the game with `q64music.map`).
+  `.ootrs` / OoT sequence bytecode / MIDI → the game's compact sequence.
+  `oot_seq.cpp` is an interpreter of the Zelda audio engine's three script
+  kinds (sequence / channel / layer, 48 ticks a beat, shared flow control
+  0xF2-0xFF, four-deep stacks, a `value` register each); it snapshots the
+  whole machine state every tick and takes the first repeated state as the
+  loop (verified on the gym-leader pack: intro 1920 ticks, loop 13047, as
+  the script says). OoT note 0 = MIDI 21 (verified: the pack was made from
+  vgmusic's PkmRB-Battle3.mid and the notes match one for one). The
+  instrument map `q64music.map` was generated from LuigiXHero's OoT
+  instrument list (1-based there, 0-based in the file) with a
+  type-to-program guess; Quest 64's bank was classified by envelope:
+  sustain 0 1 2 3 4 5 6 10 11 15 19 20 21 22 23 28, decay 7 8 12 13 14 16
+  17 18 25 27, bass 26 (multi-sampled at keys 36/48/60), kit 9, one-shot
+  24. `cseq_writer.cpp` is the format writer, `midi.cpp` the MIDI reader
+  (supersedes `mid2cseq.pl`, kept). `main.cpp` validates every written
+  file with a walker before saving it. Untested so far: packs using small
+  notes, dynamic layers (0x98), runseq, and bends beyond two semitones
+  (whole semitones go into the note number, the rest to the wheel).
 
 ## Conventions that bit us
 

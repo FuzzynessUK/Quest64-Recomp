@@ -473,3 +473,13 @@ target_sources(Quest64Recompiled PRIVATE ${GENERATED_NRM_SOURCES})
 target_sources(Quest64Recompiled PRIVATE ${SOURCES})
 
 set_property(TARGET Quest64Recompiled PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+# q64music: the command-line music converter for the custom_music folder
+# (.ootrs / OoT sequence bytecode / MIDI into the game's compact sequences).
+add_executable(q64music
+    ${CMAKE_SOURCE_DIR}/tools/q64music/main.cpp
+    ${CMAKE_SOURCE_DIR}/tools/q64music/oot_seq.cpp
+    ${CMAKE_SOURCE_DIR}/tools/q64music/midi.cpp
+    ${CMAKE_SOURCE_DIR}/tools/q64music/cseq_writer.cpp
+)
+target_link_libraries(q64music PRIVATE miniz)
