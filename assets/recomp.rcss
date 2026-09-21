@@ -2611,3 +2611,49 @@ button {
   font-size: 14dp;
   line-height: 14dp;
 }
+
+.aud-name {
+  padding: 6dp 12dp;
+  font-size: 14dp;
+  line-height: 14dp;
+  width: 300dp;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.aud-picker {
+  margin: 4dp 0dp 12dp 0dp;
+  padding: 8dp;
+  border-width: 1dp;
+  border-color: rgba(185, 125, 242, 0.6);
+  background-color: rgba(0, 0, 0, 0.35);
+}
+
+.aud-picker__title {
+  font-size: 16dp;
+  color: #FFFFFF;
+  margin-bottom: 6dp;
+}
+
+.aud-picker__list {
+  height: 300dp;
+  overflow-y: auto;
+  margin-top: 6dp;
+}
+
+.aud-choice {
+  display: block;
+  width: 100%;
+  padding: 5dp 10dp;
+  margin-bottom: 2dp;
+  font-size: 14dp;
+  line-height: 14dp;
+  text-align: left;
+}
+
+.aud-picker__note {
+  font-size: 12dp;
+  color: #AAAAAA;
+  margin-top: 6dp;
+}

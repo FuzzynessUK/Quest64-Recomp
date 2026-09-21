@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cmath>
 #include <random>
+#include <sstream>
 #include <type_traits>
 
 #include "recomp_ui.h"
@@ -1029,16 +1030,67 @@ struct AudioContext {
     Rml::DataModelHandle model_handle;
     zelda64::audio::Options edited;
     bool changed = false;
-    // The custom_music folder's files, for the per-track pickers.
+    // The custom_music folder's files (UTF-8 names), and how many were
+    // left out for being over the game's buffer.
     std::vector<std::string> library;
+    int too_big = 0;
+    // The shared picker: which track it is choosing for (-1: closed), the
+    // search text and the matches shown.
+    int picker_track = -1;
+    std::string filter;
+    std::vector<std::string> filtered;
 };
 
 AudioContext audio_context;
+constexpr size_t picker_limit = 60;
+
+// The matches for the search text: every word typed must appear, any case.
+void refilter_music_library() {
+    std::vector<std::string> words;
+    std::istringstream in(audio_context.filter);
+    std::string word;
+    while (in >> word) {
+        std::transform(word.begin(), word.end(), word.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        words.push_back(word);
+    }
+    audio_context.filtered.clear();
+    for (const std::string& name : audio_context.library) {
+        std::string lower = name;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        bool all = true;
+        for (const std::string& w : words) {
+            if (lower.find(w) == std::string::npos) {
+                all = false;
+                break;
+            }
+        }
+        if (all) {
+            audio_context.filtered.push_back(name);
+            if (audio_context.filtered.size() >= picker_limit) {
+                break;
+            }
+        }
+    }
+    if (audio_context.model_handle) {
+        audio_context.model_handle.DirtyVariable("aud_filtered");
+    }
+}
+
+void dirty_track_names() {
+    if (!audio_context.model_handle) {
+        return;
+    }
+    for (int track = 0; track < zelda64::audio::game_track_count; track++) {
+        audio_context.model_handle.DirtyVariable("aud_track_" + std::to_string(track) + "_name");
+    }
+}
 
 void refresh_music_library() {
-    audio_context.library = zelda64::audio::library_files();
+    audio_context.library = zelda64::audio::library_files(&audio_context.too_big);
+    refilter_music_library();
     if (audio_context.model_handle) {
-        audio_context.model_handle.DirtyAllVariables();
+        audio_context.model_handle.DirtyVariable("aud_library_count");
+        audio_context.model_handle.DirtyVariable("aud_library_big");
     }
 }
 
@@ -1096,53 +1148,64 @@ void make_audio_bindings(Rml::Context* context) {
             audio_option_changed();
         }
     );
-    // Custom mode's per-track pickers: value 0 is the game's own track,
-    // i + 1 the i-th library file. Saved by name, so the folder can change
-    // order without moving choices.
+    // Custom mode's tracks: each row shows its choice by name and opens the
+    // one shared picker (a search box over the library, at most
+    // picker_limit matches shown), Ship of Harkinian style. Choices are
+    // saved by name, so the folder can change order without moving them.
     constructor.RegisterArray<std::vector<std::string>>();
-    audio_context.library = zelda64::audio::library_files();
-    constructor.Bind("aud_library", &audio_context.library);
+    refresh_music_library();
+    constructor.Bind("aud_filtered", &audio_context.filtered);
     constructor.BindFunc("aud_library_count", [](Rml::Variant& out) { out = static_cast<int>(audio_context.library.size()); });
+    constructor.BindFunc("aud_library_big", [](Rml::Variant& out) { out = audio_context.too_big; });
+    constructor.BindFunc("aud_picker_track", [](Rml::Variant& out) { out = audio_context.picker_track; });
+    constructor.BindFunc("aud_picker_label", [](Rml::Variant& out) {
+        out = audio_context.picker_track >= 0 ? std::string(zelda64::audio::track_label(audio_context.picker_track)) : std::string();
+    });
+    constructor.BindFunc("aud_filter",
+        [](Rml::Variant& out) { out = audio_context.filter; },
+        [](const Rml::Variant& in) {
+            audio_context.filter = in.Get<std::string>();
+            refilter_music_library();
+        });
     static std::string track_names[zelda64::audio::game_track_count];
     for (int track = 0; track < zelda64::audio::game_track_count; track++) {
-        track_names[track] = "aud_track_" + std::to_string(track);
-        constructor.BindFunc(track_names[track],
-            [track](Rml::Variant& out) {
-                auto it = audio_context.edited.custom_tracks.find(track);
-                int value = 0;
-                if (it != audio_context.edited.custom_tracks.end()) {
-                    auto pos = std::find(audio_context.library.begin(), audio_context.library.end(), it->second);
-                    if (pos != audio_context.library.end()) {
-                        value = static_cast<int>(pos - audio_context.library.begin()) + 1;
-                    }
-                }
-                out = value;
-            },
-            [track](const Rml::Variant& in) {
-                int value = in.Get<int>();
+        track_names[track] = "aud_track_" + std::to_string(track) + "_name";
+        constructor.BindFunc(track_names[track], [track](Rml::Variant& out) {
+            auto it = audio_context.edited.custom_tracks.find(track);
+            out = it != audio_context.edited.custom_tracks.end() ? it->second : std::string("Game's own");
+        });
+    }
+    // A row's name button: open the picker for that track.
+    constructor.BindEventCallback("aud_open_picker",
+        [](Rml::DataModelHandle model_handle, Rml::Event& event, const Rml::VariantList& inputs) {
+            audio_context.picker_track = inputs.at(0).Get<int>();
+            audio_context.filter.clear();
+            refresh_music_library();
+            model_handle.DirtyVariable("aud_picker_track");
+            model_handle.DirtyVariable("aud_picker_label");
+            model_handle.DirtyVariable("aud_filter");
+        });
+    // A match in the picker (its index in aud_filtered), or -1 for the
+    // game's own track; -2 closes without a change.
+    constructor.BindEventCallback("aud_pick",
+        [](Rml::DataModelHandle model_handle, Rml::Event& event, const Rml::VariantList& inputs) {
+            int index = inputs.at(0).Get<int>();
+            int track = audio_context.picker_track;
+            if (track >= 0 && index >= -1) {
                 auto& tracks = audio_context.edited.custom_tracks;
-                std::string before;
-                if (auto it = tracks.find(track); it != tracks.end()) {
-                    before = it->second;
-                }
-                std::string after;
-                if (value >= 1 && value <= static_cast<int>(audio_context.library.size())) {
-                    after = audio_context.library[value - 1];
-                }
-                if (after == before) {
-                    return;   // the select reporting its own value on load
-                }
-                if (after.empty()) {
+                if (index == -1) {
                     tracks.erase(track);
                 }
-                else {
-                    tracks[track] = after;
+                else if (index < static_cast<int>(audio_context.filtered.size())) {
+                    tracks[track] = audio_context.filtered[index];
                 }
                 audio_option_changed(false);
                 push_tracks_live();
-            });
-    }
-
+                model_handle.DirtyVariable(track_names[track]);
+            }
+            audio_context.picker_track = -1;
+            model_handle.DirtyVariable("aud_picker_track");
+        });
     audio_context.model_handle = constructor.GetModelHandle();
 }
 
@@ -1989,14 +2052,14 @@ public:
                 }
                 audio_option_changed(false);
                 push_tracks_live();
-                audio_context.model_handle.DirtyAllVariables();
+                dirty_track_names();
             });
         recompui::register_event(listener, "aud_music_clear_all",
             [](const std::string& param, Rml::Event& event) {
                 audio_context.edited.custom_tracks.clear();
                 audio_option_changed(false);
                 push_tracks_live();
-                audio_context.model_handle.DirtyAllVariables();
+                dirty_track_names();
             });
         recompui::register_event(listener, "aud_music_rescan",
             [](const std::string& param, Rml::Event& event) {

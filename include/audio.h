@@ -81,9 +81,12 @@ namespace zelda64::audio {
     void preview_track(int track);
     bool library_loaded();
 
-    // The library folder and the file names (no extension) in it, sorted.
+    // The library folder and the file names (no extension, UTF-8) in it,
+    // sorted; files over the game's 32 KB sequence buffer are left out and
+    // counted in `too_big`.
     std::filesystem::path library_folder();
-    std::vector<std::string> library_files();
+    std::vector<std::string> library_files(int* too_big = nullptr);
+    std::filesystem::path library_path(const std::string& name);
 
     // Options as saved on disk; a missing file gives defaults.
     Options load_options();

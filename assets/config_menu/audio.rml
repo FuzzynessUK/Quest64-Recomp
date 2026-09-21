@@ -60,356 +60,239 @@
                                     <div class="config-debug__select-wrapper" data-if="aud_library_count == 0">
                                         <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>No .seq files in the custom_music folder</div></div>
                                     </div>
+                                    <div class="config-debug__select-wrapper" data-if="aud_library_big > 0">
+                                        <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>{{aud_library_big}} file(s) over 32 KB are not offered</div></div>
+                                    </div>
+                                    <div class="aud-picker" data-if="aud_picker_track >= 0">
+                                        <div class="aud-picker__title">Choose for: {{aud_picker_label}}</div>
+                                        <div class="config-debug__select-wrapper">
+                                            <input type="text" id="aud_filter_input" data-value="aud_filter" maxlength="60" style="width: 320dp;" />
+                                            <button class="button aud-play" data-event-click="aud_pick(-1)">Game's own</button>
+                                            <button class="button aud-play" data-event-click="aud_pick(-2)">Cancel</button>
+                                        </div>
+                                        <div class="aud-picker__list">
+                                            <button class="button aud-choice" data-for="name, i : aud_filtered" data-event-click="aud_pick(i)">{{name}}</button>
+                                        </div>
+                                        <div class="aud-picker__note">Type to search; the first 60 matches are listed.</div>
+                                    </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Title screen</div><div class="config-tip-text">Track 27: Title screen. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_27" id="aud_track_27_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Title screen</div><div class="config-tip-text">Track 27: Title screen. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(27)">{{aud_track_27_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:27">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Battle</div><div class="config-tip-text">Track 13: Battle. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_13" id="aud_track_13_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Battle</div><div class="config-tip-text">Track 13: Battle. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(13)">{{aud_track_13_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:13">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boss battle</div><div class="config-tip-text">Track 0: Boss battle. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_0" id="aud_track_0_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boss battle</div><div class="config-tip-text">Track 0: Boss battle. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(0)">{{aud_track_0_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:0">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Mammon battle</div><div class="config-tip-text">Track 41: Mammon battle. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_41" id="aud_track_41_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Mammon battle</div><div class="config-tip-text">Track 41: Mammon battle. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(41)">{{aud_track_41_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:41">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Victory fanfare</div><div class="config-tip-text">Track 43: Victory fanfare. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_43" id="aud_track_43_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Victory fanfare</div><div class="config-tip-text">Track 43: Victory fanfare. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(43)">{{aud_track_43_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:43">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Death</div><div class="config-tip-text">Track 30: Death. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_30" id="aud_track_30_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Death</div><div class="config-tip-text">Track 30: Death. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(30)">{{aud_track_30_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:30">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Credits</div><div class="config-tip-text">Track 20: Credits. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_20" id="aud_track_20_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Credits</div><div class="config-tip-text">Track 20: Credits. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(20)">{{aud_track_20_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:20">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Melrode Monastery</div><div class="config-tip-text">Track 15: Melrode Monastery. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_15" id="aud_track_15_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Melrode Monastery</div><div class="config-tip-text">Track 15: Melrode Monastery. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(15)">{{aud_track_15_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:15">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Melrode</div><div class="config-tip-text">Track 2: Melrode. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_2" id="aud_track_2_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Melrode</div><div class="config-tip-text">Track 2: Melrode. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(2)">{{aud_track_2_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:2">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" style="font-size: 14dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Churches, halls and Mammon's World</div><div class="config-tip-text">Track 33: Churches, halls and Mammon's World. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_33" id="aud_track_33_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" style="font-size: 14dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Churches, halls and Mammon's World</div><div class="config-tip-text">Track 33: Churches, halls and Mammon's World. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(33)">{{aud_track_33_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:33">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Buildings</div><div class="config-tip-text">Track 7: Buildings (shops, inns, houses). Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_7" id="aud_track_7_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Buildings</div><div class="config-tip-text">Track 7: Buildings (shops, inns, houses). Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(7)">{{aud_track_7_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:7">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fields</div><div class="config-tip-text">Track 21: Fields (Holy Plains, Dondoran Flats, West Carmagh, West Limelin). Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_21" id="aud_track_21_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fields</div><div class="config-tip-text">Track 21: Fields (Holy Plains, Dondoran Flats, West Carmagh, West Limelin). Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(21)">{{aud_track_21_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:21">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Dondoran</div><div class="config-tip-text">Track 25: Dondoran. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_25" id="aud_track_25_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Dondoran</div><div class="config-tip-text">Track 25: Dondoran. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(25)">{{aud_track_25_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:25">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Dondoran Castle</div><div class="config-tip-text">Track 3: Dondoran Castle. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_3" id="aud_track_3_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Dondoran Castle</div><div class="config-tip-text">Track 3: Dondoran Castle. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(3)">{{aud_track_3_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:3">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Connor Forest</div><div class="config-tip-text">Track 35: Connor Forest. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_35" id="aud_track_35_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Connor Forest</div><div class="config-tip-text">Track 35: Connor Forest. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(35)">{{aud_track_35_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:35">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Forests</div><div class="config-tip-text">Track 24: Forests (Connor, Glencoe, Windward). Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_24" id="aud_track_24_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Forests</div><div class="config-tip-text">Track 24: Forests (Connor, Glencoe, Windward). Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(24)">{{aud_track_24_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:24">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Forests</div><div class="config-tip-text">Track 12: Forests (inner paths). Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_12" id="aud_track_12_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Forests</div><div class="config-tip-text">Track 12: Forests (inner paths). Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(12)">{{aud_track_12_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:12">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Larapool</div><div class="config-tip-text">Track 34: Larapool. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_34" id="aud_track_34_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Larapool</div><div class="config-tip-text">Track 34: Larapool. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(34)">{{aud_track_34_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:34">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Blue Cave</div><div class="config-tip-text">Track 23: Blue Cave. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_23" id="aud_track_23_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Blue Cave</div><div class="config-tip-text">Track 23: Blue Cave. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(23)">{{aud_track_23_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:23">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Blue Cave</div><div class="config-tip-text">Track 9: Blue Cave (inner). Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_9" id="aud_track_9_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Blue Cave</div><div class="config-tip-text">Track 9: Blue Cave (inner). Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(9)">{{aud_track_9_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:9">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Blue Cave</div><div class="config-tip-text">Track 11: Blue Cave (deep). Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_11" id="aud_track_11_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Blue Cave</div><div class="config-tip-text">Track 11: Blue Cave (deep). Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(11)">{{aud_track_11_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:11">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Cull Hazard</div><div class="config-tip-text">Track 10: Cull Hazard. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_10" id="aud_track_10_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Cull Hazard</div><div class="config-tip-text">Track 10: Cull Hazard. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(10)">{{aud_track_10_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:10">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Normoon</div><div class="config-tip-text">Track 37: Normoon. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_37" id="aud_track_37_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Normoon</div><div class="config-tip-text">Track 37: Normoon. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(37)">{{aud_track_37_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:37">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Limelin</div><div class="config-tip-text">Track 36: Limelin. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_36" id="aud_track_36_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Limelin</div><div class="config-tip-text">Track 36: Limelin. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(36)">{{aud_track_36_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:36">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Limelin Castle</div><div class="config-tip-text">Track 8: Limelin Castle. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_8" id="aud_track_8_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Limelin Castle</div><div class="config-tip-text">Track 8: Limelin Castle. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(8)">{{aud_track_8_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:8">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Dindom Dries</div><div class="config-tip-text">Track 22: Dindom Dries. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_22" id="aud_track_22_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Dindom Dries</div><div class="config-tip-text">Track 22: Dindom Dries. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(22)">{{aud_track_22_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:22">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boil Hole</div><div class="config-tip-text">Track 18: Boil Hole. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_18" id="aud_track_18_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boil Hole</div><div class="config-tip-text">Track 18: Boil Hole. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(18)">{{aud_track_18_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:18">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Baragoon Tunnel</div><div class="config-tip-text">Track 1: Baragoon Tunnel. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_1" id="aud_track_1_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Baragoon Tunnel</div><div class="config-tip-text">Track 1: Baragoon Tunnel. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(1)">{{aud_track_1_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:1">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" style="font-size: 14dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Brannoch and Baragoon Moor</div><div class="config-tip-text">Track 39: Brannoch and Baragoon Moor. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_39" id="aud_track_39_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" style="font-size: 14dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Brannoch and Baragoon Moor</div><div class="config-tip-text">Track 39: Brannoch and Baragoon Moor. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(39)">{{aud_track_39_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:39">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Brannoch Castle</div><div class="config-tip-text">Track 31: Brannoch Castle. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_31" id="aud_track_31_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Brannoch Castle</div><div class="config-tip-text">Track 31: Brannoch Castle. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(31)">{{aud_track_31_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:31">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Isle of Skye</div><div class="config-tip-text">Track 26: Isle of Skye. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_26" id="aud_track_26_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Isle of Skye</div><div class="config-tip-text">Track 26: Isle of Skye. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(26)">{{aud_track_26_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:26">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Nepty's arena</div><div class="config-tip-text">Track 14: Nepty's arena. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_14" id="aud_track_14_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Nepty's arena</div><div class="config-tip-text">Track 14: Nepty's arena. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(14)">{{aud_track_14_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:14">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shamwood</div><div class="config-tip-text">Track 5: Shamwood. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_5" id="aud_track_5_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shamwood</div><div class="config-tip-text">Track 5: Shamwood. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(5)">{{aud_track_5_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:5">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" style="font-size: 14dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hidden rooms and shrines</div><div class="config-tip-text">Track 6: Hidden rooms and shrines. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_6" id="aud_track_6_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" style="font-size: 14dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hidden rooms and shrines</div><div class="config-tip-text">Track 6: Hidden rooms and shrines. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(6)">{{aud_track_6_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:6">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Mammon's World</div><div class="config-tip-text">Track 38: Mammon's World (inner). Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_38" id="aud_track_38_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Mammon's World</div><div class="config-tip-text">Track 38: Mammon's World (inner). Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(38)">{{aud_track_38_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:38">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 4</div><div class="config-tip-text">Track 4: Track 4. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_4" id="aud_track_4_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 4</div><div class="config-tip-text">Track 4: Track 4. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(4)">{{aud_track_4_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:4">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 16</div><div class="config-tip-text">Track 16: Track 16. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_16" id="aud_track_16_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 16</div><div class="config-tip-text">Track 16: Track 16. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(16)">{{aud_track_16_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:16">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 17</div><div class="config-tip-text">Track 17: Track 17. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_17" id="aud_track_17_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 17</div><div class="config-tip-text">Track 17: Track 17. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(17)">{{aud_track_17_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:17">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 19</div><div class="config-tip-text">Track 19: Track 19. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_19" id="aud_track_19_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 19</div><div class="config-tip-text">Track 19: Track 19. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(19)">{{aud_track_19_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:19">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Jingle 28</div><div class="config-tip-text">Track 28: Jingle 28. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_28" id="aud_track_28_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Jingle 28</div><div class="config-tip-text">Track 28: Jingle 28. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(28)">{{aud_track_28_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:28">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Jingle 29</div><div class="config-tip-text">Track 29: Jingle 29. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_29" id="aud_track_29_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Jingle 29</div><div class="config-tip-text">Track 29: Jingle 29. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(29)">{{aud_track_29_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:29">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 32</div><div class="config-tip-text">Track 32: Track 32. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_32" id="aud_track_32_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 32</div><div class="config-tip-text">Track 32: Track 32. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(32)">{{aud_track_32_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:32">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 40</div><div class="config-tip-text">Track 40: Track 40. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_40" id="aud_track_40_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 40</div><div class="config-tip-text">Track 40: Track 40. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(40)">{{aud_track_40_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:40">Play</button>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 42</div><div class="config-tip-text">Track 42: Track 42. Play starts it now, as set here.</div></div>
-                                        <select data-value="aud_track_42" id="aud_track_42_select">
-                                            <option value="0">Game's own</option>
-                                            <option data-for="name, i : aud_library" data-attr-value="i + 1">{{name}}</option>
-                                        </select>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Track 42</div><div class="config-tip-text">Track 42: Track 42. Click the name to choose a file; Play starts the track now, as set here.</div></div>
+                                        <button class="button aud-name" data-event-click="aud_open_picker(42)">{{aud_track_42_name}}</button>
                                         <button class="button aud-play" onclick="aud_play_track:42">Play</button>
                                     </div>
                                 </div>

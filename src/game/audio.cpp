@@ -176,7 +176,7 @@ namespace {
         if (placed.count(name)) {
             return placed[name].len != 0;
         }
-        std::ifstream in(zelda64::audio::library_folder() / (name + ".seq"), std::ios::binary);
+        std::ifstream in(zelda64::audio::library_path(name), std::ios::binary);
         std::vector<uint8_t> seq((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         if (seq.size() < seq_header_size + 2 || seq.size() > seq_buffer_size) {
             log << "  " << name << ".seq: skipped, " << seq.size() << " bytes (a sequence is between "
@@ -247,7 +247,7 @@ namespace {
         size_t need = 0;
         std::error_code ec;
         for (const std::string& name : library) {
-            need += (static_cast<size_t>(std::filesystem::file_size(folder / (name + ".seq"), ec)) + 15) & ~static_cast<size_t>(15);
+            need += (static_cast<size_t>(std::filesystem::file_size(zelda64::audio::library_path(name), ec)) + 15) & ~static_cast<size_t>(15);
         }
         rom_cursor = rom_free_start;
         size_t wanted = rom_free_start + need + rom_slack;
@@ -391,15 +391,33 @@ std::filesystem::path zelda64::audio::library_folder() {
     return std::filesystem::absolute(zelda64::get_program_path() / "custom_music");
 }
 
-std::vector<std::string> zelda64::audio::library_files() {
+// Names are UTF-8 (path::u8string): the menu shows them, the settings
+// file stores them (a non-UTF-8 string makes the JSON writer throw), and
+// library_path turns one back into a path.
+std::filesystem::path zelda64::audio::library_path(const std::string& name) {
+    return library_folder() / std::filesystem::u8path(name + ".seq");
+}
+
+std::vector<std::string> zelda64::audio::library_files(int* too_big) {
     std::vector<std::string> names;
+    int big = 0;
     std::error_code ec;
     for (const auto& entry : std::filesystem::directory_iterator(library_folder(), ec)) {
         if (entry.is_regular_file() && entry.path().extension() == ".seq") {
-            names.push_back(entry.path().stem().string());
+            // A file the game's sequence buffer cannot hold is never
+            // offered; the converter says so when it writes one.
+            if (entry.file_size(ec) > seq_buffer_size) {
+                big++;
+                continue;
+            }
+            std::u8string u8 = entry.path().stem().u8string();
+            names.emplace_back(u8.begin(), u8.end());
         }
     }
     std::sort(names.begin(), names.end());
+    if (too_big != nullptr) {
+        *too_big = big;
+    }
     return names;
 }
 
