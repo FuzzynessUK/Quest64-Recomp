@@ -61,6 +61,11 @@ before_vram = 0x800267F8
 func = "func_80025B8C"
 text = "quest64_audio_sfx(rdram, ctx);"
 before_vram = 0x80025B8C
+# The second sequence player's jingles, started by track number.
+[[patches.hook]]
+func = "func_800263A8"
+text = "quest64_audio_jingle(rdram, ctx);"
+before_vram = 0x800263A8
 
 # Randomizer "Wings never expire" (also part of Easier Quest). func_80021524
 # removes a used item when its handler (func_800212E4) returned non-zero;

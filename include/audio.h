@@ -25,7 +25,9 @@ namespace zelda64::audio {
         MusicShuffle music_shuffle = MusicShuffle::Off;
         // A random permutation of the 70 sound effects, applied where every
         // effect is finally queued (func_80025B8C), so each sound is
-        // consistently some other sound for the session.
+        // consistently some other sound for the session. Every effect is
+        // cut three seconds after it starts, so a looping ambience that
+        // lands on a common effect cannot run on.
         bool sfx_shuffle = false;
     };
 
@@ -38,6 +40,11 @@ namespace zelda64::audio {
     const Options& active_options();
 
     void apply_at_boot(uint8_t* rdram);
+
+    // Game thread, once per frame: with the sound effect shuffle on, stops
+    // any effect three seconds after it last started, so a shuffled loop
+    // cannot run on.
+    void on_frame(uint8_t* rdram);
 }
 
 #endif

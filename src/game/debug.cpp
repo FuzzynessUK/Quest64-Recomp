@@ -12,6 +12,7 @@
 #include "speedrun.h"
 #include "statfx.h"
 #include "spellnotice.h"
+#include "audio.h"
 #include "librecomp/helpers.hpp"
 
 namespace {
@@ -266,6 +267,7 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     zelda64::enhancements::on_frame(rdram);
     zelda64::statfx::on_frame(rdram);
     zelda64::spellnotice::on_frame(rdram);
+    zelda64::audio::on_frame(rdram);
     zelda64::hardmode::on_frame(rdram);
     zelda64::speedrun::update(false);
 }

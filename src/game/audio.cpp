@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <numeric>
@@ -37,9 +38,12 @@ namespace {
     constexpr uint32_t bgm_table_start = 0x054700;
     constexpr uint32_t bgm_table_end = 0x0548B0;
 
-    // Tracks: 0-41 exist, of which 27-30 are unused, so a roll of 0-37
-    // skips the gap in the middle, as Merrow's does.
-    constexpr int track_count = 42;
+    // Tracks. Merrow's map-music pool is 0-26 and 31-41 (27-30 unused), so
+    // a roll of 0-37 skips the gap, as Merrow's does; that pool is what any
+    // remapped track becomes. The game itself starts tracks beyond it by
+    // number - the victory fanfare is 0x2B, the Mammon fight 0x29 - so the
+    // ids that can be remapped run further.
+    constexpr int track_count = 64;
     constexpr int usable_tracks = 38;
     constexpr int unused_gap_start = 27;
     constexpr int unused_gap_size = 4;
@@ -51,6 +55,35 @@ namespace {
     // Per-session tables, built at boot; identity until then.
     std::array<int8_t, track_count> bgm_remap{};
     std::array<int8_t, sfx_count> sfx_remap{};
+
+    // With the shuffle on, a looping ambience (a waterfall, say) can land on
+    // any effect and then never stop, so every effect is cut three seconds
+    // after its latest start. The cut is the game's own stop request:
+    // func_80025B3C queues { id, volume 0, 0x40 } into the ring buffer the
+    // plays go through (eight slots at 0x8005390C / 0x8005392C / 0x8005394C,
+    // index at 0x80053970, mirrored to 0x8008FCB0) and the audio thread
+    // stops that id. A one-shot is long over by then, so stopping it does
+    // nothing; a loop ends.
+    constexpr float sfx_cutoff_seconds = 3.0f;
+    constexpr int32_t sfx_ring_id = 0x8005390C;
+    constexpr int32_t sfx_ring_volume = 0x8005392C;
+    constexpr int32_t sfx_ring_param = 0x8005394C;
+    constexpr int32_t sfx_ring_index = 0x80053970;
+    constexpr int32_t sfx_stop_pending = 0x8008FCB0;
+    constexpr int sfx_ring_slots = 8;
+    using sfx_clock = std::chrono::steady_clock;
+    std::array<sfx_clock::time_point, sfx_count> sfx_started{};
+    std::array<bool, sfx_count> sfx_live{};
+
+    void queue_sfx_stop(uint8_t* rdram, int id) {
+        int32_t index = static_cast<int32_t>(MEM_W(0, sfx_ring_index)) & (sfx_ring_slots - 1);
+        MEM_W(0, sfx_ring_id + index * 4) = id;
+        MEM_W(0, sfx_ring_volume + index * 4) = 0;
+        MEM_W(0, sfx_ring_param + index * 4) = 0x40;
+        index = (index + 1) & (sfx_ring_slots - 1);
+        MEM_W(0, sfx_ring_index) = index;
+        MEM_W(0, sfx_stop_pending) = index;
+    }
 
     int roll_track(std::mt19937& rng) {
         int track = std::uniform_int_distribution<int>(0, usable_tracks - 1)(rng);
@@ -175,14 +208,52 @@ extern "C" void quest64_audio_bgm(uint8_t*, recomp_context* ctx) {
     }
 }
 
+// func_800263A8: the second sequence player, used for jingles started by
+// number (a0 is the track).
+extern "C" void quest64_audio_jingle(uint8_t*, recomp_context* ctx) {
+    if (zelda64::audio::active_options().music_shuffle != MusicShuffle::All) {
+        return;
+    }
+    int track = static_cast<int32_t>(ctx->r4);
+    if (usable_track(track)) {
+        ctx->r4 = S32(bgm_remap[track]);
+    }
+}
+
 // func_80025B8C: the routine every sound effect ends in, queued or not,
-// with the effect id in a0 (volume in a1, 0x40 in a2).
+// with the effect id in a0 (volume in a1, 0x40 in a2). A volume of zero is
+// a stop request (func_80025B3C), left alone.
 extern "C" void quest64_audio_sfx(uint8_t*, recomp_context* ctx) {
     if (!zelda64::audio::active_options().sfx_shuffle) {
         return;
     }
     int32_t id = static_cast<int32_t>(ctx->r4);
-    if (id >= 0 && id < sfx_count) {
-        ctx->r4 = S32(sfx_remap[id]);
+    if (id < 0 || id >= sfx_count) {
+        return;
+    }
+    if (static_cast<int32_t>(ctx->r5) == 0) {
+        return;
+    }
+    int played = sfx_remap[id];
+    ctx->r4 = S32(played);
+    sfx_started[played] = sfx_clock::now();
+    sfx_live[played] = true;
+}
+
+// Once per frame from the cheats frame hook: cut whatever has been going
+// for three seconds since it last started.
+void zelda64::audio::on_frame(uint8_t* rdram) {
+    if (!active_options().sfx_shuffle) {
+        return;
+    }
+    sfx_clock::time_point now = sfx_clock::now();
+    for (int id = 0; id < sfx_count; id++) {
+        if (!sfx_live[id]) {
+            continue;
+        }
+        if (std::chrono::duration<float>(now - sfx_started[id]).count() >= sfx_cutoff_seconds) {
+            queue_sfx_stop(rdram, id);
+            sfx_live[id] = false;
+        }
     }
 }
