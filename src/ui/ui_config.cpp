@@ -1225,8 +1225,9 @@ namespace {
         }
     }
 
-    // White: a small bright core, then a thin haze that fades to the edge,
-    // so the colour covers him but he stays visible through it.
+    // White with a solid core out to a third of the radius, then a smooth
+    // falloff to the edge held a little under full, so the middle reads
+    // strongest and the rest stays slightly see-through.
     void make_glow_texture() {
         std::vector<char> bytes(glow_texture_size * glow_texture_size * 4);
         float half = glow_texture_size / 2.0f;
@@ -1235,9 +1236,9 @@ namespace {
                 float dx = (x + 0.5f - half) / half;
                 float dy = (y + 0.5f - half) / half;
                 float r = std::sqrt(dx * dx + dy * dy);
-                constexpr float core = 0.08f;       // bright centre
-                constexpr float core_blend = 0.10f; // softening past it
-                constexpr float haze = 0.4f;        // the rest, at most
+                constexpr float core = 0.3f;        // solid centre
+                constexpr float core_blend = 0.08f; // softening past it
+                constexpr float haze = 0.8f;        // the rest, at most
                 float t = std::min(std::max((r - core) / (1.0f - core), 0.0f), 1.0f);
                 float a = haze * (1.0f - t) * (1.0f - t) * (1.0f + 2.0f * t);
                 if (r < core + core_blend) {
