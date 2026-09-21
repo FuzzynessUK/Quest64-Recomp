@@ -1056,6 +1056,13 @@ void make_audio_bindings(Rml::Context* context) {
             audio_option_changed();
         }
     );
+    constructor.BindFunc("aud_custom_music",
+        [](Rml::Variant& out) { out = audio_context.edited.custom_music ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            audio_context.edited.custom_music = in.Get<int>() != 0;
+            audio_option_changed();
+        }
+    );
 
     audio_context.model_handle = constructor.GetModelHandle();
 }

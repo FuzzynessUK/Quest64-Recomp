@@ -54,6 +54,27 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     applied in a hook on `func_80025B8C`, the routine every effect ends in
     (direct, queued through `func_800268D4`, or the title overlay's own
     calls) with the id in a0.
+  - *Custom Music* (2026-09-21, experiment, awaiting play-test): every
+    `<exe dir>/custom_music/track_NN.seq` replaces track NN. At boot the
+    file is appended to the ROM's free tail (0xF94348 onward is 0xFF) and
+    the sequence bank's entry rewritten: the bank is an ALSeqFile at ROM
+    0xEBABD0 (u16 rev, u16 count = 44, then u32 offset from the bank
+    start + u32 len), DMA'd into RAM by `func_80025040` at init and read
+    per play by `func_800252D8` into a 0x8000-byte buffer, so the ROM copy
+    is all that needs patching and 32 KB is the size cap. Log:
+    `custom_music.txt`. `tools/mid2cseq.pl` converts a MIDI to the
+    game's compact-sequence format (header 16 u32 track offsets + u32
+    division 480; notes are `9n key vel <VLQ duration>` with no note-offs;
+    `FF 2E 00 FF` loop start, `FF 2D FF FF <u32 back>` loop end where
+    back is measured from just after that payload to just after the loop
+    start; `FE hi lo len` is a back-reference measured from the FE byte
+    itself, not from after it as in stock libultra; `FE FE` = literal).
+    The instrument bank (ROM 0xE7E800) has 29 programs, no percussion
+    bank: program 9 is a GM-keyed drum kit. The battle theme uses 21
+    (lead), 0, 18, 25, 23, 19, 7, 9. The sample `tools/custom_music/track_15.seq`, deployed to the game folder (Melrode
+    Monastery, the first thing heard) is the Pokémon G/S gym leader theme
+    from a MIDI, pinned `--prog 0=21,1=23,2=0`; the Darunia's Joy `.ootrs`
+    is OoT bytecode, a different format, so it was not used directly.
 - **JP Stat Up Effect** (2026-09-21, awaiting play-test) — the Eltale
   Monsters colour burst on a stat rise, which the US ROM has no routine for
   (HANDOFF "JP stat-gain effect"), drawn by us instead. `src/game/statfx.cpp`

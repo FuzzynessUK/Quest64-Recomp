@@ -32,6 +32,13 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Custom Music</div><div class="config-tip-text">Plays your own music in place of the game's. Every track_NN.seq file in the custom_music folder next to the game replaces track NN for the session (15 is Melrode Monastery, 2 Melrode, 21 Holy Plains, 13 battles). A file is a sequence in the game's own format; tools/mid2cseq.pl in the source makes one from a MIDI. What was loaded is written to custom_music.txt beside the settings.</div></div>
+                                        <select data-value="aud_custom_music" id="aud_custom_music_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -29,6 +29,15 @@ namespace zelda64::audio {
         // cut three seconds after it starts, so a looping ambience that
         // lands on a common effect cannot run on.
         bool sfx_shuffle = false;
+        // Replacement music: every `track_NN.seq` in `<exe dir>/custom_music`
+        // replaces track NN (decimal, the number the map music table and
+        // the play requests use) for the session. A file is a compact
+        // sequence in the game's own format - tools/mid2cseq.pl writes one
+        // from a MIDI - and is appended to the free tail of the ROM at
+        // boot, with the sequence bank's entry pointed at it, so the game
+        // DMAs it like any other track. What was loaded, and what was
+        // rejected and why, goes to custom_music.txt beside the settings.
+        bool custom_music = false;
     };
 
     // Options as saved on disk; a missing file gives defaults.

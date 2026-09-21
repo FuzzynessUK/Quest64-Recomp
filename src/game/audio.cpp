@@ -13,6 +13,7 @@
 #include "audio.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
+#include "zelda_support.h"
 #include "json/json.hpp"
 #include "librecomp/game.hpp"
 #include "recomp.h"
@@ -97,6 +98,99 @@ namespace {
         return track >= 0 && track < track_count &&
             (track < unused_gap_start || track >= unused_gap_start + unused_gap_size);
     }
+
+    // The music sequence bank: an ALSeqFile at ROM 0xEBABD0 (u16 revision,
+    // u16 count, then { u32 offset, u32 len } per sequence, offsets from
+    // the bank's own start). func_80025040 DMAs the table into RAM at init
+    // and alSeqFileNew turns the offsets into ROM addresses; each play
+    // then DMAs the sequence (func_800252D8) into the player's 0x8000-byte
+    // buffer (func_8002513C), so that is the size limit. The ROM's tail
+    // from 0xF94348 is 0xFF padding, which is where replacements go.
+    constexpr uint32_t seq_bank_start = 0xEBABD0;
+    constexpr uint32_t rom_free_start = 0xF94348;
+    constexpr uint32_t seq_buffer_size = 0x8000;
+    constexpr uint32_t seq_header_size = 17 * 4;
+
+    uint32_t read_u32(const std::vector<uint8_t>& v, size_t at) {
+        return (static_cast<uint32_t>(v[at]) << 24) | (static_cast<uint32_t>(v[at + 1]) << 16) |
+            (static_cast<uint32_t>(v[at + 2]) << 8) | v[at + 3];
+    }
+
+    void write_u32(std::vector<uint8_t>& v, size_t at, uint32_t value) {
+        v[at + 0] = static_cast<uint8_t>(value >> 24);
+        v[at + 1] = static_cast<uint8_t>(value >> 16);
+        v[at + 2] = static_cast<uint8_t>(value >> 8);
+        v[at + 3] = static_cast<uint8_t>(value);
+    }
+
+    // Reads `<exe dir>/custom_music/track_NN.seq` files into the ROM copy.
+    void apply_custom_music(std::vector<uint8_t>& patched) {
+        std::filesystem::path folder = std::filesystem::absolute(zelda64::get_program_path() / "custom_music");
+        std::ofstream log(zelda64::get_app_folder_path() / "custom_music.txt");
+        log << "Custom music folder: " << folder.string() << "\n";
+        std::error_code ec;
+        if (!std::filesystem::is_directory(folder, ec)) {
+            log << "  folder not found; nothing replaced\n";
+            return;
+        }
+        uint32_t count = (static_cast<uint32_t>(patched[seq_bank_start + 2]) << 8) | patched[seq_bank_start + 3];
+        uint32_t cursor = rom_free_start;
+        std::vector<std::filesystem::path> files;
+        for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
+            if (entry.is_regular_file()) {
+                files.push_back(entry.path());
+            }
+        }
+        std::sort(files.begin(), files.end());
+        for (const auto& path : files) {
+            std::string name = path.filename().string();
+            int track = -1;
+            if (name.size() > 10 && name.compare(0, 6, "track_") == 0 && name.compare(name.size() - 4, 4, ".seq") == 0) {
+                try {
+                    track = std::stoi(name.substr(6, name.size() - 10));
+                }
+                catch (std::exception&) {}
+            }
+            if (track < 0) {
+                log << "  " << name << ": skipped, not named track_NN.seq\n";
+                continue;
+            }
+            if (static_cast<uint32_t>(track) >= count) {
+                log << "  " << name << ": skipped, the bank has tracks 0-" << (count - 1) << "\n";
+                continue;
+            }
+            std::ifstream in(path, std::ios::binary);
+            std::vector<uint8_t> seq((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (seq.size() < seq_header_size + 2 || seq.size() > seq_buffer_size) {
+                log << "  " << name << ": skipped, " << seq.size() << " bytes (a sequence is between "
+                    << (seq_header_size + 2) << " and " << seq_buffer_size << ")\n";
+                continue;
+            }
+            bool sane = true;
+            for (int t = 0; t < 16; t++) {
+                uint32_t offset = read_u32(seq, t * 4);
+                if (offset != 0 && (offset < seq_header_size || offset >= seq.size())) {
+                    sane = false;
+                }
+            }
+            if (!sane) {
+                log << "  " << name << ": skipped, a track offset points outside the file\n";
+                continue;
+            }
+            uint32_t padded = (static_cast<uint32_t>(seq.size()) + 15) & ~static_cast<uint32_t>(15);
+            if (cursor + padded > patched.size()) {
+                log << "  " << name << ": skipped, no ROM space left\n";
+                continue;
+            }
+            std::copy(seq.begin(), seq.end(), patched.begin() + cursor);
+            uint32_t entry = seq_bank_start + 4 + static_cast<uint32_t>(track) * 8;
+            uint32_t len = static_cast<uint32_t>(seq.size());
+            write_u32(patched, entry, cursor - seq_bank_start);
+            write_u32(patched, entry + 4, len);
+            log << "  " << name << ": track " << track << " <- " << len << " bytes at ROM 0x" << std::hex << cursor << std::dec << "\n";
+            cursor += padded;
+        }
+    }
 }
 
 Options zelda64::audio::load_options() {
@@ -132,6 +226,7 @@ Options zelda64::audio::load_options() {
         }
     }
     get("sfx_shuffle", o.sfx_shuffle);
+    get("custom_music", o.custom_music);
     return o;
 }
 
@@ -139,6 +234,7 @@ void zelda64::audio::save_options(const Options& o) {
     nlohmann::json j;
     j["music_shuffle"] = static_cast<int>(o.music_shuffle);
     j["sfx_shuffle"] = o.sfx_shuffle;
+    j["custom_music"] = o.custom_music;
     std::ofstream out(options_path());
     out << j.dump(4);
 }
@@ -155,23 +251,27 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
     const Options& options = active_options();
     std::iota(bgm_remap.begin(), bgm_remap.end(), 0);
     std::iota(sfx_remap.begin(), sfx_remap.end(), 0);
-    if (options.music_shuffle == MusicShuffle::Off && !options.sfx_shuffle) {
+    if (options.music_shuffle == MusicShuffle::Off && !options.sfx_shuffle && !options.custom_music) {
         return;
     }
 
     std::mt19937 rng{ std::random_device{}() };
 
-    if (options.music_shuffle != MusicShuffle::Off) {
+    if (options.music_shuffle != MusicShuffle::Off || options.custom_music) {
         // Reads back whatever the earlier boot patches left, so this stacks
         // on top of them rather than replacing them. The table is in the
         // boot segment (ROM 0x1000.., 1MB), which has already been copied to
         // RAM at 0x80000400 by now, so each byte goes to both: the ROM copy
-        // alone is never read again.
+        // alone is never read again. The sequence bank, by contrast, is
+        // DMA'd from the ROM at init, so its entries need the ROM copy only.
         constexpr uint32_t boot_rom_start = 0x1000;
         constexpr int32_t boot_ram_start = 0x80000400;
         std::span<const uint8_t> rom = recomp::get_rom();
         std::vector<uint8_t> patched(rom.begin(), rom.end());
-        for (size_t i = 0; i * 2 + 1 < data::bgmdata.size(); i++) {
+        if (options.custom_music) {
+            apply_custom_music(patched);
+        }
+        for (size_t i = 0; options.music_shuffle != MusicShuffle::Off && i * 2 + 1 < data::bgmdata.size(); i++) {
             uint32_t address = static_cast<uint32_t>(std::stoul(data::bgmdata[i * 2], nullptr, 16));
             if (address >= bgm_table_start && address < bgm_table_end && address < patched.size()) {
                 uint8_t track = static_cast<uint8_t>(roll_track(rng));
