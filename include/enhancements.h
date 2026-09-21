@@ -70,6 +70,10 @@ namespace zelda64::enhancements {
         // element level reaches a spell's unlock level (include/spellnotice.h).
         bool spell_notice = false;
 
+        // "Received <item>" when anything is added to the bag
+        // (include/itemnotice.h).
+        bool item_notice = false;
+
         // Hacks.
         //
 

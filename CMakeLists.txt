@@ -201,6 +201,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/statuswatch.cpp
     ${CMAKE_SOURCE_DIR}/src/game/spellnotice.cpp
     ${CMAKE_SOURCE_DIR}/src/game/notify.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/itemnotice.cpp
     ${CMAKE_SOURCE_DIR}/src/game/speedrun.cpp
     ${CMAKE_SOURCE_DIR}/src/game/hardmode/hardmode.cpp
     ${CMAKE_SOURCE_DIR}/src/game/hardmode/hooks.cpp

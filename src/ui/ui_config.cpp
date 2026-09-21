@@ -857,6 +857,13 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    constructor.BindFunc("enh_item_notice",
+        [](Rml::Variant& out) { out = enhancements_context.edited.item_notice ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.item_notice = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
     constructor.BindFunc("enh_spell_notice",
         [](Rml::Variant& out) { out = enhancements_context.edited.spell_notice ? 1 : 0; },
         [](const Rml::Variant& in) {

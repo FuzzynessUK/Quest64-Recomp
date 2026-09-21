@@ -125,6 +125,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("faster_walk", o.faster_walk);
     get("stat_up_effect", o.stat_up_effect);
     get("spell_notice", o.spell_notice);
+    get("item_notice", o.item_notice);
     get("hard_mode", o.hard_mode);
     get("easier_quest", o.easier_quest);
     return o;
@@ -146,6 +147,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["faster_walk"] = o.faster_walk;
     j["stat_up_effect"] = o.stat_up_effect;
     j["spell_notice"] = o.spell_notice;
+    j["item_notice"] = o.item_notice;
     j["hard_mode"] = o.hard_mode;
     j["easier_quest"] = o.easier_quest;
     std::ofstream out(options_path());
