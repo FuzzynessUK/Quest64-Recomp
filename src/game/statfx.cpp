@@ -53,12 +53,12 @@ namespace {
     FILE* log_file = nullptr;
 
     // Where Brian's feet and head sit relative to the position the game
-    // stores for him, in world units. Calibrated from the camera: it aims
-    // 12 units above that position and a halo centred there floated over
-    // his head, so he is small - about 8 units - with the origin near his
-    // middle. Walking covers about two units a frame.
-    constexpr float brian_feet_offset = -5.0f;
-    constexpr float brian_head_offset = 3.0f;
+    // stores for him, in world units. Calibrated by eye: the position is
+    // his feet (a halo centred below it sat at his feet), a halo centred 11
+    // above it floated just over his head, and the camera aims 12 above it.
+    // Walking covers about two units a frame.
+    constexpr float brian_feet_offset = 0.0f;
+    constexpr float brian_head_offset = 9.0f;
 
     // A rise bigger than this is a save loading or a cheat, not a stat-up.
     constexpr int max_rise = 30;
