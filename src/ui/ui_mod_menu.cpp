@@ -25,7 +25,7 @@ static std::string generate_thumbnail_src_for_mod(const std::string &mod_id) {
     return "?/mods/" + mod_id + "/thumb";
 }
 
-// Hard Mode and Easier Quest are not installed mods - they are compiled in
+// Hard Mode and Easy Mode are not installed mods - they are compiled in
 // and switched from enhancements.json - but they belong on this tab, so
 // they are shown as built-in entries pinned to the top of the list. Every
 // call that would go to librecomp with their ids is answered here instead;
@@ -49,7 +49,7 @@ static bool is_builtin_entry(const std::string &mod_id) {
 static recomp::mods::ModDetails easier_quest_details() {
     recomp::mods::ModDetails details{};
     details.mod_id = easier_quest_mod_id;
-    details.display_name = "Easier Quest";
+    details.display_name = "Easy Mode";
     details.description =
         "The vanilla game with a gentler curve: Extra Healing (Mending Lv1 in place of Soul Search Lv1), "
         "Guilty's element fixed to Earth, walking MP regen at its fastest, wings that stay in your bag "

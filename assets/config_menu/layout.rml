@@ -52,13 +52,14 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notifications</div><div class="config-tip-text">The on-screen messages in the top-left corner. Off hides the options below and shows nothing. Applies straight away.</div></div>
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notifications</div><div class="config-tip-text">The on-screen messages. Off hides the options below and shows nothing; On fades each message after three seconds; On (Never Expire) keeps them until the maximum pushes the oldest out. Applies straight away.</div></div>
                                         <select data-value="enh_notifications" id="enh_notifications_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
+                                            <option value="2">On (Never Expire)</option>
                                         </select>
                                     </div>
-                                    <div data-if="enh_notifications == 1">
+                                    <div data-if="enh_notifications != 0">
                                     <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Position</div><div class="config-tip-text">Where the messages sit on screen. Top left shares its column with the Speedrun Timer when that is top left too. Applies straight away.</div></div>
                                         <select data-value="enh_notify_position" id="enh_notify_position_select">
@@ -71,13 +72,6 @@
                                             <option value="6">Bottom left</option>
                                             <option value="7">Bottom middle</option>
                                             <option value="8">Bottom right</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Never expire</div><div class="config-tip-text">Messages stay on screen instead of fading after three seconds; the oldest is pushed out when the maximum is reached. Applies straight away.</div></div>
-                                        <select data-value="enh_notify_never_expire" id="enh_notify_never_expire_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">

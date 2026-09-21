@@ -4,7 +4,7 @@
 #include <cstdint>
 #include "randomizer.h"
 
-// Easier Quest: the vanilla game with a fixed set of conveniences, switched
+// Easy Mode (code name Easier Quest): the vanilla game with a fixed set of conveniences, switched
 // from the Mods tab like Hard Mode (the setting is `easier_quest` in
 // enhancements.json, applied on the next launch). What it turns on:
 //

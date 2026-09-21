@@ -58,7 +58,7 @@ const Options& zelda64::easierquest::preset() {
     if (!preset_built) {
         Options o;
         o.mode = Mode::Randomizer;
-        o.seed = "Easier Quest";
+        o.seed = "Easy Mode";
         // Vanilla apart from the list below: Options defaults have the spell
         // shuffle and hinted names on, and every list shuffled.
         o.spell_shuffle = false;

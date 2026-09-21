@@ -917,17 +917,17 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed(false);
         }
     );
+    // One control: 0 off, 1 on, 2 on and never expiring. The two settings
+    // stay separate on disk.
     constructor.BindFunc("enh_notifications",
-        [](Rml::Variant& out) { out = enhancements_context.edited.notifications ? 1 : 0; },
+        [](Rml::Variant& out) {
+            const auto& e = enhancements_context.edited;
+            out = !e.notifications ? 0 : e.notify_never_expire ? 2 : 1;
+        },
         [](const Rml::Variant& in) {
-            enhancements_context.edited.notifications = in.Get<int>() != 0;
-            enhancements_option_changed(false);
-        }
-    );
-    constructor.BindFunc("enh_notify_never_expire",
-        [](Rml::Variant& out) { out = enhancements_context.edited.notify_never_expire ? 1 : 0; },
-        [](const Rml::Variant& in) {
-            enhancements_context.edited.notify_never_expire = in.Get<int>() != 0;
+            int value = std::clamp(in.Get<int>(), 0, 2);
+            enhancements_context.edited.notifications = value != 0;
+            enhancements_context.edited.notify_never_expire = value == 2;
             enhancements_option_changed(false);
         }
     );
