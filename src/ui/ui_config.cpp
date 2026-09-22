@@ -1312,6 +1312,9 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_max_accuracy_all", &Options::max_accuracy_all);
     bind_randomizer_field(constructor, "rnd_soul_search", &Options::soul_search);
     bind_randomizer_field(constructor, "rnd_invalidity", &Options::invalidity);
+    bind_randomizer_field(constructor, "rnd_boss_spells", &Options::boss_spells);
+    bind_randomizer_field(constructor, "rnd_spirit_shuffle", &Options::spirit_shuffle);
+    bind_randomizer_field(constructor, "rnd_chest_shuffle", &Options::chest_shuffle);
     bind_randomizer_field(constructor, "rnd_chests", &Options::chests);
     bind_randomizer_field(constructor, "rnd_drops", &Options::drops);
     bind_randomizer_field(constructor, "rnd_gifts", &Options::gifts);

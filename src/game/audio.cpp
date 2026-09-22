@@ -19,6 +19,7 @@
 #include "zelda_config.h"
 #include "zelda_support.h"
 #include "json/json.hpp"
+#include "librecomp/addresses.hpp"
 #include "librecomp/game.hpp"
 #include "recomp.h"
 
@@ -125,8 +126,41 @@ namespace {
     // from 0xF94348 is 0xFF padding, which is where replacements go.
     constexpr uint32_t seq_bank_start = 0xEBABD0;
     constexpr uint32_t rom_free_start = 0xF94348;
-    constexpr uint32_t seq_buffer_size = 0x8000;
     constexpr uint32_t seq_header_size = 17 * 4;
+
+    // ---- the sequence player's buffer
+    //
+    // The game gives each of its two sequence players a 0x8000-byte buffer
+    // out of the audio heap (func_8002513C; the heap is 0x68000 bytes at
+    // 0x80331AB0, alHeapInit at 0x80024704) and func_800252D8 DMAs a whole
+    // sequence into it every time a track starts, so 32 KB was the limit on
+    // a custom file. The game's own 44 sequences are all under 20 KB, but
+    // converted music routinely is not.
+    //
+    // The two buffers are moved instead of grown: the game's RAM reaches
+    // 0x804FBC80 and the audio heap is boxed in, while the recomp's RDRAM is
+    // 512 MB, so `quest64_audio_seq_buffer_0/1` replace the pointer at the
+    // store that keeps it with one from librecomp's own heap (above
+    // 0x81000000). Nothing else reads those pointers, the sequence player
+    // only ever touches the buffer through the CPU, and the DMA
+    // (recomp::do_rom_read) indexes RDRAM without a size check.
+    constexpr uint32_t seq_buffer_size = 1024 * 1024;
+    int32_t seq_buffers[2] = { 0, 0 };
+
+    // librecomp's heap is set up after the on_init callback but long before
+    // the game reaches its audio init, so this allocates on first use rather
+    // than at boot.
+    int32_t sequence_buffer(uint8_t* rdram, int player) {
+        if (seq_buffers[player] == 0) {
+            void* mem = recomp::alloc(rdram, seq_buffer_size);
+            if (mem == nullptr) {
+                return 0;   // leave the game its own buffer
+            }
+            uint32_t offset = static_cast<uint32_t>(reinterpret_cast<uint8_t*>(mem) - rdram);
+            seq_buffers[player] = static_cast<int32_t>(offset + 0x80000000u);
+        }
+        return seq_buffers[player];
+    }
 
     uint32_t read_u32(const std::vector<uint8_t>& v, size_t at) {
         return (static_cast<uint32_t>(v[at]) << 24) | (static_cast<uint32_t>(v[at + 1]) << 16) |
@@ -580,6 +614,10 @@ const Options& zelda64::audio::active_options() {
 
 void zelda64::audio::apply_at_boot(uint8_t* rdram) {
     const Options& options = active_options();
+    // A relaunch re-initialises librecomp's heap, so last launch's blocks
+    // are gone; the hook allocates fresh ones.
+    seq_buffers[0] = 0;
+    seq_buffers[1] = 0;
     std::iota(bgm_remap.begin(), bgm_remap.end(), 0);
     std::iota(sfx_remap.begin(), sfx_remap.end(), 0);
     // The library is placed whenever the folder has files, so the menu can
@@ -639,6 +677,25 @@ extern "C" void quest64_audio_bgm(uint8_t*, recomp_context* ctx) {
     int track = static_cast<int8_t>(ctx->r4 & 0xFF);
     if (usable_track(track)) {
         ctx->r4 = S32(bgm_remap[track]);
+    }
+}
+
+// func_8002513C, at the two stores that keep the sequence buffers the audio
+// heap just handed out (0x80025188 for player 0, 0x800251B8 for player 1):
+// v0 is that pointer, and is replaced with one of ours. The game's own
+// allocations are left to happen and go unused - 64 KB of an audio heap that
+// has the room, and not worth a second hook to reclaim.
+extern "C" void quest64_audio_seq_buffer_0(uint8_t* rdram, recomp_context* ctx) {
+    int32_t buffer = sequence_buffer(rdram, 0);
+    if (buffer != 0) {
+        ctx->r2 = S32(buffer);
+    }
+}
+
+extern "C" void quest64_audio_seq_buffer_1(uint8_t* rdram, recomp_context* ctx) {
+    int32_t buffer = sequence_buffer(rdram, 1);
+    if (buffer != 0) {
+        ctx->r2 = S32(buffer);
     }
 }
 

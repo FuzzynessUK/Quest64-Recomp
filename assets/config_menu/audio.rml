@@ -71,7 +71,7 @@
                                         <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>No .seq files in the custom_music folder</div></div>
                                     </div>
                                     <div class="config-debug__select-wrapper" data-if="aud_library_big > 0">
-                                        <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>{{aud_library_big}} file(s) over 32 KB are not offered</div></div>
+                                        <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>{{aud_library_big}} file(s) over 1 MB are not offered</div></div>
                                     </div>
                                     <div class="aud-picker" data-if="aud_picker_track >= 0">
                                         <div class="aud-picker__title">Choose for: {{aud_picker_label}}</div>

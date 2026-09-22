@@ -2,6 +2,8 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <map>
+#include <set>
 #include <optional>
 #include <random>
 
@@ -9,6 +11,10 @@
 #include "easierquest.h"
 #include "merrow_data.h"
 #include "merrow_mapdata.h"
+#include "boss_spells.h"
+#include "spirit_data.h"
+#include "chest_data.h"
+#include "zelda_debug.h"
 #include "enemy_progression.h"
 #include "enemy_progression_data.h"
 #include "zelda_config.h"
@@ -23,6 +29,8 @@
 
 namespace data = merrow::data;
 namespace mapdata = merrow::mapdata;
+namespace spirits = merrow::spirits;
+namespace chests_data = merrow::chests;
 using zelda64::randomizer::ListMode;
 using zelda64::randomizer::Mode;
 using zelda64::randomizer::Options;
@@ -41,6 +49,111 @@ namespace {
 
     // The six items that cast a spell, and the spell each one casts.
     constexpr int spell_item_ids[6] = { 58, 52, 38, 57, 17, 22 };
+
+    // Boss spells (SpellReplacement.cs, Merrow PR #6 by vbhayden). How a boss
+    // spell chooses the player spell whose slot it takes over.
+    enum class Replace { Specific, Buff, Debuff, Status, Damage, Any };
+
+    struct BossSpellPlan {
+        int boss;    // index into data::bossSpells
+        Replace how;
+        int target;  // the player spell, for Replace::Specific
+    };
+
+    // Narrower rules pick first, so a small category is not emptied by a rule
+    // that would have been happy with anything.
+    int plan_priority(Replace how) {
+        switch (how) {
+            case Replace::Specific: return 0;
+            case Replace::Buff: return 1;
+            case Replace::Debuff: return 2;
+            case Replace::Status: return 3;
+            case Replace::Damage: return 4;
+            default: return 5;
+        }
+    }
+
+    // The PR's own recommended mix.
+    const std::vector<BossSpellPlan> boss_spells_recommended = {
+        { 2, Replace::Debuff, -1 },    // Zelse's Wind Razor
+        { 3, Replace::Damage, -1 },    // Zelse's Wind Zipper
+        { 4, Replace::Specific, 33 },  // Nepty's Bubble Shot over Soul Search Lv1
+        { 9, Replace::Damage, -1 },    // Shilf's Dove Razor
+        { 6, Replace::Status, -1 },    // Fargo's Lava Ball
+        { 7, Replace::Damage, -1 },    // Fargo's Explosion
+        { 12, Replace::Any, -1 },      // Beigis' Spirit Sword
+        { 15, Replace::Buff, -1 },     // Mammon's Flame Waves
+        { 16, Replace::Any, -1 },      // Mammon's Fire Arrows
+    };
+
+    // Each boss spell over the player spell it most resembles.
+    const std::vector<BossSpellPlan> boss_spells_similar = {
+        { 2, Replace::Specific, 3 },   // Wind Razor over Homing Arrow Lv1
+        { 3, Replace::Specific, 18 },  // Wind Zipper over Rolling Rock Lv1
+        { 4, Replace::Specific, 33 },  // Bubble Shot over Soul Search Lv1
+        { 9, Replace::Specific, 46 },  // Dove Razor over Wind Cutter Lv2
+        { 6, Replace::Specific, 0 },   // Lava Ball over Fire Ball Lv1
+        { 7, Replace::Specific, 10 },  // Explosion over Fire Bomb
+        { 12, Replace::Specific, 55 }, // Spirit Sword over Cyclone
+        { 15, Replace::Specific, 12 }, // Flame Waves over Magma Ball
+        { 16, Replace::Specific, 9 },  // Fire Arrows over Homing Arrow Lv2
+    };
+
+    // Spirits -----------------------------------------------------------
+    //
+    // Where each map sits in the story, 1 (leaving Melrode) to 8 (Mammon's
+    // World), for the Spirit Randomizer's balanced mode. The sixteen maps
+    // the Enemy Randomizer covers keep the tier its area table gives them
+    // (enemy_progression_data.cpp); the towns, castles and building sets it
+    // has no entry for are placed by when the story reaches them.
+    constexpr uint8_t map_story_tier[36] = {
+        1, // 0  Melrode
+        2, // 1  Dondoran
+        1, // 2  Holy Plains
+        2, // 3  Dondoran Flats
+        3, // 4  Larapool
+        2, // 5  West Carmagh (Greenoch)
+        3, // 6  Normoon
+        3, // 7  West Limelin
+        3, // 8  Limelin
+        6, // 9  Dindom Dries
+        6, // 10 Shamwood
+        7, // 11 Brannoch / Baragoon Moor
+        4, // 12 Isle of Skye
+        1, // 13 Melrode Monastery
+        2, // 14 Dondoran Castle
+        1, // 15 Melrode buildings
+        2, // 16 Dondoran buildings
+        3, // 17 Larapool buildings
+        3, // 18 Larapool & Greenoch buildings
+        3, // 19 Normoon buildings (small set)
+        3, // 20 Normoon buildings
+        3, // 21 Limelin Castle
+        3, // 22 Limelin buildings
+        6, // 23 Dindom Dries & Brannoch buildings
+        6, // 24 Shamwood buildings
+        4, // 25 Hidden rooms & shrines
+        4, // 26 Blue Cave
+        3, // 27 Cull Hazard
+        5, // 28 Baragoon Tunnel (Shilf)
+        6, // 29 Boil Hole (Fargo)
+        7, // 30 Brannoch Castle
+        1, // 31 Connor Forest (Solvaring)
+        2, // 32 Glencoe Forest
+        4, // 33 Windward Forest (Zelse)
+        8, // 34 Mammon's World
+        4, // 35 Nepty's arena (Isle of Skye)
+    };
+
+    // Exit, Escape and Return: the only way out of a battle or a dungeon, and
+    // the three Merrow's crashlock table keeps out of most slots anyway. A
+    // boss spell never takes one over. PR #6 does not exclude them.
+    bool is_travel_spell(int spell) { return spell >= 37 && spell <= 39; }
+
+    // Merrow's Bubble option is already Nepty's Bubble Shot over Soul Search
+    // Lv1, so with it on that boss spell and that slot are both spoken for.
+    constexpr int nepty_bubble_shot = 4;
+    constexpr int bubble_spell = 33;
 
     // Merrow uses System.Random; this only needs to be reproducible with itself.
     class Rng {
@@ -278,6 +391,7 @@ namespace {
 
         // Working copies of the tables Merrow edits in place.
         std::vector<std::string> spells = data::spells;
+        std::vector<std::vector<std::string>> spell_names = data::shuffleNames2;
         std::vector<int> crashlock = data::crashlock;
         std::vector<std::string> item_capital_case = data::itemcapitalcase;
         std::vector<std::string> new_spell_item_desc = data::newSpellItemDesc;
@@ -286,6 +400,9 @@ namespace {
         std::vector<int> shuffles = std::vector<int>(player_spells, -1);
         std::vector<int> new_item_spells = std::vector<int>(6, 0);
         std::vector<int> item_spell_fix = std::vector<int>(6, 0);
+        // Which boss spell (an index into data::bossSpells) took over each
+        // player spell's slot, -1 where the slot is still the player's own.
+        std::vector<int> boss_spell_slots = std::vector<int>(player_spells, -1);
         std::vector<std::string> hint_names = std::vector<std::string>(player_spells);
         std::vector<int> chests = std::vector<int>(chest_count);
         std::vector<int> drops = std::vector<int>(drop_count);
@@ -309,6 +426,10 @@ namespace {
         std::string enemy_group_notes;
         // Enemy progression: the file each of the 16 merged areas was given.
         std::vector<int> progression_tables;
+        // The Spirit Randomizer's plan, one list per table slot.
+        std::vector<std::vector<zelda64::randomizer::SpiritPlacement>> spirit_slots;
+        // The Chest Randomizer's plan, in chest id order.
+        std::vector<zelda64::randomizer::ChestPlacement> chest_placements;
         bool beigis_moved = false;
 
         Builder(const Options& opts, uint32_t seed) : options(opts), rng(seed) {}
@@ -578,6 +699,447 @@ namespace {
             }
         }
 
+        // SpellReplacement.cs (Merrow PR #6) --------------------------------
+
+        // A boss spell's passive Invalidity, which strips buffs and debuffs,
+        // would follow it to Brian: Merrow's own switch for it writes to the
+        // boss's copy of the record, which nothing reads once the spell has
+        // moved.
+        static bool carries_invalidity(const data::BossSpell& boss) {
+            for (const std::string& location : data::invalidityLocations) {
+                if (hex_addr(location) == boss.data_address + 0x11) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Bubble: Nepty's bubble spell over Soul Search Lv1. Merrow's own
+        // hand-made version of the boss spell replacement below - the record
+        // is Nepty's with Soul Search Lv1's unlock level, menu position and
+        // rule byte, and the damage nerfed from 200 to 166 - so it goes in
+        // the working table the same way and the shuffle carries it.
+        void place_bubble() {
+            if (!options.bubble) {
+                return;
+            }
+            spells[(bubble_spell * 4) + 3] = data::ss1bubble[0];
+            spells[bubble_spell * 4] = "Bubble";
+            for (int word = 0; word < 4; word++) {
+                spell_names[bubble_spell][word] = data::bossSpellShuffleNames[nepty_bubble_shot][word];
+            }
+        }
+
+        // Give Brian the bosses' own spells. Each one takes over a player
+        // spell's slot: its whole record, and its animation, are copied over
+        // that spell's, keeping the slot's unlock level (bytes 0-1) and menu
+        // position (bytes 4-9), so it turns up where the spell it replaced
+        // did and that spell is gone. Everything after this point - the
+        // shuffle, the hinted names, the spell-item rules - reads the slot as
+        // though it had always held the boss spell.
+        void place_boss_spells() {
+            if (options.boss_spells == 0) {
+                return;
+            }
+
+            std::vector<BossSpellPlan> plan;
+            if (options.boss_spells == 1) {
+                plan = boss_spells_recommended;
+            }
+            else if (options.boss_spells == 2) {
+                plan = boss_spells_similar;
+            }
+            else {
+                for (size_t i = 0; i < data::bossSpells.size(); i++) {
+                    if (data::bossSpells[i].castable) {
+                        plan.push_back({ static_cast<int>(i), Replace::Any, -1 });
+                    }
+                }
+            }
+            if (options.bubble) {
+                plan.erase(std::remove_if(plan.begin(), plan.end(),
+                    [](const BossSpellPlan& entry) { return entry.boss == nepty_bubble_shot; }), plan.end());
+            }
+            std::stable_sort(plan.begin(), plan.end(), [](const BossSpellPlan& a, const BossSpellPlan& b) {
+                return plan_priority(a.how) < plan_priority(b.how);
+            });
+
+            std::vector<int> available;
+            for (int i = 0; i < player_spells; i++) {
+                if (is_travel_spell(i) || (options.bubble && i == bubble_spell)) {
+                    continue;
+                }
+                available.push_back(i);
+            }
+            auto take = [&](int spell) {
+                auto it = std::find(available.begin(), available.end(), spell);
+                if (it == available.end()) {
+                    return false;
+                }
+                available.erase(it);
+                return true;
+            };
+            // The first spell of a category that is still free, in a random
+            // order. Merrow falls back to the offensive spells when the
+            // category is used up, and we fall back again to anything left.
+            auto pick = [&](const std::vector<int>& pool) {
+                std::vector<int> order = pool;
+                rng.shuffle(order);
+                for (int spell : order) {
+                    if (take(spell)) {
+                        return spell;
+                    }
+                }
+                return -1;
+            };
+
+            for (const BossSpellPlan& entry : plan) {
+                const data::BossSpell& boss = data::bossSpells[entry.boss];
+                int target = -1;
+                switch (entry.how) {
+                    // Merrow leaves a named spell in the pool, so a later
+                    // random pick can land on it too and the first boss spell
+                    // is lost; we take it out.
+                    case Replace::Specific: target = take(entry.target) ? entry.target : -1; break;
+                    case Replace::Buff: target = pick(data::buffSpells); break;
+                    case Replace::Debuff: target = pick(data::debuffSpells); break;
+                    case Replace::Status: target = pick(data::statusspells); break;
+                    case Replace::Damage: target = pick(data::offenseSpells); break;
+                    default: target = pick(available); break;
+                }
+                if (target < 0) {
+                    target = pick(data::offenseSpells);
+                }
+                if (target < 0) {
+                    target = pick(available);
+                }
+                if (target < 0) {
+                    break;  // every slot is spoken for
+                }
+
+                boss_spell_slots[target] = entry.boss;
+                std::string record = boss.data;
+                record.replace(0, 4, spells[(target * 4) + 3].substr(0, 4));
+                record.replace(8, 12, spells[(target * 4) + 3].substr(8, 12));
+                if (options.invalidity && carries_invalidity(boss)) {
+                    record.replace(34, 2, "00");
+                }
+                spells[(target * 4) + 3] = record;
+                // The spoiler and the hinted names follow the spell, not the
+                // slot, so both are renamed to the boss spell here.
+                spells[target * 4] = boss.name;
+                for (int word = 0; word < 4; word++) {
+                    spell_names[target][word] = data::bossSpellShuffleNames[entry.boss][word];
+                }
+            }
+        }
+
+        // Spirits -----------------------------------------------------------
+
+        // Move the 98 spirits about. Only positions the game already stands
+        // something on are used - a vanilla spirit spot, or the spot Brian
+        // appears on when he walks into a submap - so every spirit is on
+        // solid ground, in bounds, in a room something leads to. The game
+        // drops each one onto the floor at its x and z itself, so no height
+        // is chosen here.
+        //
+        // The table func_80012220 reads has 43 slots and the loop bound is a
+        // code literal, so a plan may use at most 43 (map, submap) groups;
+        // which map and submap each slot names is data, so they can be any
+        // 43. The writing is quest64_randomizer_spirits, a native hook: the
+        // records live in each map's own data, which a ROM patch could only
+        // rewrite in place, and the point of this is to move them.
+        void shuffle_spirits() {
+            if (options.spirit_shuffle == 0) {
+                return;
+            }
+
+            // Spots by submap, and the vanilla counts we have to match.
+            std::map<std::pair<int, int>, std::vector<const spirits::Spot*>> by_submap;
+            for (const spirits::Spot& spot : spirits::spots) {
+                by_submap[{ spot.map, spot.submap }].push_back(&spot);
+            }
+            std::map<int, int> vanilla_by_map;
+            std::map<int, int> slots_by_map;
+            std::map<int, int> vanilla_by_tier;
+            std::map<int, int> slots_by_tier;
+            for (const spirits::Slot& slot : spirits::vanilla_slots) {
+                vanilla_by_map[slot.map] += slot.count;
+                slots_by_map[slot.map] += 1;
+                int tier = map_story_tier[slot.map];
+                vanilla_by_tier[tier] += slot.count;
+                slots_by_tier[tier] += 1;
+            }
+
+            // Take `wanted` spots out of `pool`, using at most `submap_cap`
+            // different submaps: the table has only 43 slots to name them in.
+            //
+            // The submaps are chosen before the spots, because most of them
+            // hold one or two spots and a run of small ones picked at random
+            // would not have room for the spirits. So: shuffle, take the
+            // first `submap_cap`, then while they cannot hold `wanted`, trade
+            // the smallest one in hand for the largest one left.
+            auto draw = [&](const std::vector<const spirits::Spot*>& pool, int wanted, int submap_cap,
+                            std::map<std::pair<int, int>, std::vector<const spirits::Spot*>>& into) {
+                std::map<std::pair<int, int>, std::vector<const spirits::Spot*>> groups;
+                for (const spirits::Spot* spot : pool) {
+                    groups[{ spot->map, spot->submap }].push_back(spot);
+                }
+                std::vector<std::pair<int, int>> keys;
+                for (const auto& group : groups) {
+                    keys.push_back(group.first);
+                }
+                rng.shuffle(keys);
+                if (static_cast<int>(keys.size()) > submap_cap) {
+                    std::vector<std::pair<int, int>> chosen(keys.begin(), keys.begin() + submap_cap);
+                    std::vector<std::pair<int, int>> rest(keys.begin() + submap_cap, keys.end());
+                    auto capacity = [&](const std::vector<std::pair<int, int>>& list) {
+                        int total = 0;
+                        for (const std::pair<int, int>& key : list) {
+                            total += static_cast<int>(groups[key].size());
+                        }
+                        return total;
+                    };
+                    auto bigger = [&](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                        return groups[a].size() < groups[b].size();
+                    };
+                    while (capacity(chosen) < wanted && !rest.empty()) {
+                        auto smallest = std::min_element(chosen.begin(), chosen.end(), bigger);
+                        auto largest = std::max_element(rest.begin(), rest.end(), bigger);
+                        if (groups[*largest].size() <= groups[*smallest].size()) {
+                            break;
+                        }
+                        std::swap(*smallest, *largest);
+                    }
+                    keys = chosen;
+                }
+
+                std::vector<const spirits::Spot*> order;
+                for (const std::pair<int, int>& key : keys) {
+                    order.insert(order.end(), groups[key].begin(), groups[key].end());
+                }
+                rng.shuffle(order);
+                int taken = 0;
+                for (const spirits::Spot* spot : order) {
+                    if (taken >= wanted) {
+                        break;
+                    }
+                    into[{ spot->map, spot->submap }].push_back(spot);
+                    taken++;
+                }
+                return taken;
+            };
+
+            std::map<std::pair<int, int>, std::vector<const spirits::Spot*>> placed;
+            if (options.spirit_shuffle == 1) {
+                // Same map: a map keeps the spirits it had, spread over as
+                // many of its submaps as it used before.
+                for (const std::pair<const int, int>& entry : vanilla_by_map) {
+                    std::vector<const spirits::Spot*> pool;
+                    for (const spirits::Spot& spot : spirits::spots) {
+                        if (spot.map == entry.first) {
+                            pool.push_back(&spot);
+                        }
+                    }
+                    draw(pool, entry.second, slots_by_map[entry.first], placed);
+                }
+            }
+            else if (options.spirit_shuffle == 3) {
+                // Balanced: a spirit can go anywhere, but each stretch of the
+                // story keeps the number it had, so the run is never starved
+                // early or back-loaded.
+                for (const std::pair<const int, int>& entry : vanilla_by_tier) {
+                    std::vector<const spirits::Spot*> pool;
+                    for (const spirits::Spot& spot : spirits::spots) {
+                        if (map_story_tier[spot.map] == entry.first) {
+                            pool.push_back(&spot);
+                        }
+                    }
+                    draw(pool, entry.second, slots_by_tier[entry.first], placed);
+                }
+            }
+            else {
+                // Anywhere.
+                std::vector<const spirits::Spot*> pool;
+                for (const spirits::Spot& spot : spirits::spots) {
+                    pool.push_back(&spot);
+                }
+                draw(pool, spirits::spirit_count, spirits::slot_count, placed);
+            }
+
+            // A plan that came out short would lose spirits, which no option
+            // is allowed to do; fall back to the vanilla placement.
+            int total = 0;
+            for (const std::pair<const std::pair<int, int>, std::vector<const spirits::Spot*>>& group : placed) {
+                total += static_cast<int>(group.second.size());
+            }
+            if (total != spirits::spirit_count || static_cast<int>(placed.size()) > spirits::slot_count) {
+                log("Spirits: the plan came out with " + std::to_string(total) + " of " +
+                    std::to_string(spirits::spirit_count) + " in " + std::to_string(placed.size()) +
+                    " groups; left where they were.");
+                return;
+            }
+
+            for (const std::pair<const std::pair<int, int>, std::vector<const spirits::Spot*>>& group : placed) {
+                std::vector<zelda64::randomizer::SpiritPlacement> slot;
+                for (const spirits::Spot* spot : group.second) {
+                    slot.push_back({ static_cast<uint8_t>(group.first.first), static_cast<uint8_t>(group.first.second),
+                                     spot->x, spot->z });
+                }
+                spirit_slots.push_back(std::move(slot));
+            }
+        }
+
+        // Chests -------------------------------------------------------------
+
+        // Move the 88 chests. Unlike a spirit, a chest has a front: it needs
+        // to face away from whatever is behind it and have floor in front for
+        // Brian to stand on. chest_data.cpp only offers spots where both can
+        // be justified - the game's own chest spots, spirit spots clear of a
+        // doorway, and points along the line between two known-walkable
+        // points outdoors - and carries the facing and Brian's position with
+        // each one, so nothing is worked out here but which chest goes where.
+        //
+        // The outer table has 19 map slots and the loop bound is a code
+        // literal, so a plan may use at most 19 maps; which map each slot
+        // names is data. Writing is quest64_randomizer_chests.
+        void shuffle_chests() {
+            if (options.chest_shuffle == 0) {
+                return;
+            }
+            bool outdoors = options.chest_shuffle == 2;
+
+            std::map<int, std::vector<const chests_data::Spot*>> by_map;
+            for (const chests_data::Spot& spot : chests_data::spots) {
+                if (outdoors && !spot.outdoor) {
+                    continue;
+                }
+                by_map[spot.map].push_back(&spot);
+            }
+            std::vector<int> maps;
+            for (const std::pair<const int, std::vector<const chests_data::Spot*>>& group : by_map) {
+                maps.push_back(group.first);
+            }
+            rng.shuffle(maps);
+
+            // At most 19 maps, and between them they have to hold 88 chests,
+            // so trade the smallest in hand for the largest left until they
+            // do - the same problem the spirit slots have.
+            if (static_cast<int>(maps.size()) > chests_data::map_slots) {
+                std::vector<int> chosen(maps.begin(), maps.begin() + chests_data::map_slots);
+                std::vector<int> rest(maps.begin() + chests_data::map_slots, maps.end());
+                auto capacity = [&](const std::vector<int>& list) {
+                    int total = 0;
+                    for (int map : list) {
+                        total += static_cast<int>(by_map[map].size());
+                    }
+                    return total;
+                };
+                auto bigger = [&](int a, int b) { return by_map[a].size() < by_map[b].size(); };
+                while (capacity(chosen) < chests_data::chest_count && !rest.empty()) {
+                    auto smallest = std::min_element(chosen.begin(), chosen.end(), bigger);
+                    auto largest = std::max_element(rest.begin(), rest.end(), bigger);
+                    if (by_map[*largest].size() <= by_map[*smallest].size()) {
+                        break;
+                    }
+                    std::swap(*smallest, *largest);
+                }
+                maps = chosen;
+            }
+
+            std::vector<const chests_data::Spot*> pool;
+            for (int map : maps) {
+                pool.insert(pool.end(), by_map[map].begin(), by_map[map].end());
+            }
+            if (static_cast<int>(pool.size()) < chests_data::chest_count) {
+                log("Chests: only " + std::to_string(pool.size()) + " spots reachable in " +
+                    std::to_string(maps.size()) + " maps, which is fewer than the " +
+                    std::to_string(chests_data::chest_count) + " chests; left where they were.");
+                return;
+            }
+            rng.shuffle(pool);
+
+            for (int i = 0; i < chests_data::chest_count; i++) {
+                const chests_data::Chest& chest = chests_data::chests[i];
+                const chests_data::Spot* spot = pool[i];
+                // The item comes from the item shuffle when it is on; its
+                // list is rolled either way, so vanilla has to be read back
+                // from the chest itself rather than taken from there.
+                int item = options.chests != ListMode::Off ? chests[i] : chest.item;
+                chest_placements.push_back({ spot->map, spot->submap, chest.id, static_cast<uint8_t>(item),
+                                             spot->x, spot->z, spot->facing, spot->ox, spot->oz });
+            }
+        }
+
+        void patch_chests() {
+            if (chest_placements.empty()) {
+                return;
+            }
+            log("");
+            log(std::string("CHEST LOCATIONS (") +
+                (options.chest_shuffle == 2 ? "outdoors only" : "anywhere") + "):");
+            std::map<int, int> per_map;
+            for (const zelda64::randomizer::ChestPlacement& chest : chest_placements) {
+                per_map[chest.map]++;
+            }
+            for (const std::pair<const int, int>& entry : per_map) {
+                log("  " + std::string(zelda64::map_name(entry.first)) + ": " + std::to_string(entry.second) +
+                    (entry.second == 1 ? " chest" : " chests"));
+            }
+            for (const zelda64::randomizer::ChestPlacement& chest : chest_placements) {
+                char buf[160];
+                std::snprintf(buf, sizeof buf, "    chest %d (%s): %s, room %d at (%.0f, %.0f)",
+                              chest.id, item_name(chest.item).c_str(),
+                              zelda64::map_name(chest.map), chest.submap, chest.x, chest.z);
+                log(buf);
+            }
+            if (options.lost_keys != 0) {
+                log("  Note: Shannon's hints name the places chests are in vanilla.");
+            }
+        }
+
+        void patch_spirits() {
+            if (spirit_slots.empty()) {
+                return;
+            }
+            static const char* const modes[] = { "", "within the same map", "anywhere", "anywhere, balanced by story" };
+            log("");
+            log(std::string("SPIRITS (") + modes[options.spirit_shuffle] + "):");
+            std::map<int, int> per_map;
+            for (const std::vector<zelda64::randomizer::SpiritPlacement>& slot : spirit_slots) {
+                per_map[slot.front().map] += static_cast<int>(slot.size());
+            }
+            for (const std::pair<const int, int>& entry : per_map) {
+                log("  " + std::string(zelda64::map_name(entry.first)) + ": " + std::to_string(entry.second) +
+                    (entry.second == 1 ? " spirit" : " spirits"));
+            }
+            for (const std::vector<zelda64::randomizer::SpiritPlacement>& slot : spirit_slots) {
+                for (const zelda64::randomizer::SpiritPlacement& spot : slot) {
+                    char buf[128];
+                    std::snprintf(buf, sizeof buf, "    %s, room %d at (%.0f, %.0f)",
+                                  zelda64::map_name(spot.map), spot.submap, spot.x, spot.z);
+                    log(buf);
+                }
+            }
+        }
+
+        // Spell items must keep rules that match what they now cast.
+        void set_spell_item_rules() {
+            for (int i = 0; i < 6; i++) {
+                new_item_spells[i] = shuffles[spell_item_ids[i]];
+                std::string rule = spells[(new_item_spells[i] * 4) + 3].substr(6, 2);
+                if (rule == "12") {
+                    item_spell_fix[i] = 1; // out of battle only
+                }
+                else if (rule == "03") {
+                    item_spell_fix[i] = 2; // either
+                }
+                else {
+                    item_spell_fix[i] = 0; // battle only
+                }
+            }
+        }
+
         void shuffle_spells() {
             for (int i = 0; i < player_spells; i++) {
                 shuffles[i] = -1;
@@ -588,6 +1150,7 @@ namespace {
                 for (int i = 0; i < player_spells; i++) {
                     shuffles[i] = i;
                 }
+                set_spell_item_rules();
                 return;
             }
 
@@ -667,20 +1230,7 @@ namespace {
                 }
             }
 
-            // Spell items must keep rules that match what they now cast.
-            for (int i = 0; i < 6; i++) {
-                new_item_spells[i] = shuffles[spell_item_ids[i]];
-                std::string rule = spells[(new_item_spells[i] * 4) + 3].substr(6, 2);
-                if (rule == "12") {
-                    item_spell_fix[i] = 1; // out of battle only
-                }
-                else if (rule == "03") {
-                    item_spell_fix[i] = 2; // either
-                }
-                else {
-                    item_spell_fix[i] = 0; // battle only
-                }
-            }
+            set_spell_item_rules();
         }
 
         void shuffle_spell_names() {
@@ -689,8 +1239,8 @@ namespace {
                 if (options.linear_spell_names) {
                     pick = 0;
                 }
-                const auto& mine = data::shuffleNames2[i];
-                const auto& theirs = data::shuffleNames2[shuffles[i]];
+                const auto& mine = spell_names[i];
+                const auto& theirs = spell_names[shuffles[i]];
                 switch (pick) {
                     case 1: hint_names[i] = mine[0] + " " + theirs[3]; break;
                     case 2: hint_names[i] = theirs[0] + " " + mine[2]; break;
@@ -941,11 +1491,25 @@ namespace {
 
         // QuestPatchBuild.cs -----------------------------------------------
 
+        void write_spell_item_rules() {
+            for (int i = 0; i < 6; i++) {
+                uint32_t addr = std::stoul(data::items[25 + (i * 3)], nullptr, 16);
+                int rule = item_spell_fix[i] == 0 ? 0x0002 : (item_spell_fix[i] == 1 ? 0x0001 : 0x0003);
+                add_u16(addr, rule);
+            }
+        }
+
         void patch_spells() {
             // Spell Damage Rebalance
             int rebalanced = 0;
             if (options.spell_rebalance) {
                 for (int i = 0; i < 18; i++) {
+                    // A slot a boss spell took over keeps the boss spell's
+                    // own damage: the rebalance figures are for the spell
+                    // that used to be there.
+                    if (boss_spell_slots[data::damageRebalance[i * 3]] >= 0) {
+                        continue;
+                    }
                     std::string dmg = hex4(data::damageRebalance[i * 3 + 2]);
                     std::string& spell = spells[data::damageRebalance[i * 3] * 4 + 3];
                     spell = spell.substr(0, 24) + dmg + spell.substr(28);
@@ -955,6 +1519,9 @@ namespace {
             }
             if (rebalanced != 0 && !options.spell_shuffle) {
                 for (int i = 0; i < 18; i++) {
+                    if (boss_spell_slots[data::damageRebalance[i * 3]] >= 0) {
+                        continue;
+                    }
                     uint32_t addr = std::stoul(spells[data::damageRebalance[i * 3] * 4 + 2]) + 12;
                     add_u16(addr, data::damageRebalance[i * 3 + rebalanced]);
                 }
@@ -962,6 +1529,23 @@ namespace {
 
             // Skelebat group in Blue Cave that can crash under lag.
             add_hex("667260", "000000060000000100000001");
+
+            // Boss spells. The record and its animation go in whole; the
+            // shuffle below then carries the slot's contents on like any
+            // other spell's.
+            if (options.boss_spells != 0) {
+                log("");
+                log("BOSS SPELLS (boss spell > the slot it took over):");
+                for (int i = 0; i < player_spells; i++) {
+                    if (boss_spell_slots[i] < 0) {
+                        continue;
+                    }
+                    const data::BossSpell& boss = data::bossSpells[boss_spell_slots[i]];
+                    add(hex_addr(spells[(i * 4) + 1]), hex_to_bytes(spells[(i * 4) + 3]));
+                    add(data::spell_anim_start + i * data::spell_anim_size, hex_to_bytes(boss.anim));
+                    log("  " + std::string(boss.name) + " > " + data::spells[i * 4]);
+                }
+            }
 
             if (!options.spell_shuffle) {
                 // Extra Healing on its own. Merrow only offers it inside the
@@ -977,6 +1561,20 @@ namespace {
                     add(base + 11, hex_to_bytes(spells[(healing_lv1 * 4) + 3].substr(22)));
                     add_hex(data::mendingdata[0], data::mendingdata[2]);
                     log("Extra Healing: Weakness Lv1 is Mending Lv1, a second Healing Lv1.");
+                }
+                // Bubble on its own. With the shuffle on, the loop below is
+                // what carries the record into the slot.
+                if (options.bubble) {
+                    add_hex(data::bubbledata[0], data::bubbledata[2]);
+                    add_hex(data::bubblecode[0], data::bubblecode[2]);
+                    add_hex(data::bubbleanim[0], data::bubbleanim[2]);
+                    log("Soul Search Lv1 replaced with Bubble.");
+                }
+                // A boss spell only works in a battle, so an item that now
+                // casts one has to say so or using it outside a battle locks
+                // the game up.
+                if (options.boss_spells != 0) {
+                    write_spell_item_rules();
                 }
                 return;
             }
@@ -1008,22 +1606,18 @@ namespace {
                 add_hex(data::shuffleBossSpellNames[0], data::shuffleBossSpellNames[2]);
                 add_hex(data::shuffleBossSpellNames[3], data::shuffleBossSpellNames[5]);
                 for (int i = 0; i < player_spells; i++) {
-                    add_hex(data::shuffleNames2[i][5], data::shuffleNames2[i][6]);
+                    add_hex(spell_names[i][5], spell_names[i][6]);
                 }
                 for (int i = 0; i < player_spells; i++) {
                     // Spell names are plain ASCII, padded to 16 bytes.
                     std::vector<uint8_t> name(hint_names[i].begin(), hint_names[i].end());
                     name.resize(16, 0);
-                    add(hex_addr(data::shuffleNames2[i][4]), name);
+                    add(hex_addr(spell_names[i][4]), name);
                 }
             }
 
             // Spell item softlock protection
-            for (int i = 0; i < 6; i++) {
-                uint32_t addr = std::stoul(data::items[25 + (i * 3)], nullptr, 16);
-                int rule = item_spell_fix[i] == 0 ? 0x0002 : (item_spell_fix[i] == 1 ? 0x0001 : 0x0003);
-                add_u16(addr, rule);
-            }
+            write_spell_item_rules();
 
             // Updated spell item names
             for (int i = 0; i < 6; i++) {
@@ -1821,11 +2415,15 @@ namespace {
         }
 
         void build() {
+            place_bubble();
+            place_boss_spells();
             shuffle_spells();
             shuffle_spell_names();
             shuffle_items();
             shuffle_monsters();
             shuffle_enemies();
+            shuffle_spirits();
+            shuffle_chests();
 
             patch_spells();
             patch_items();
@@ -1833,6 +2431,8 @@ namespace {
             patch_misc();
             patch_lost_keys();
             patch_enemies();
+            patch_spirits();
+            patch_chests();
             patch_cosmetics();
         }
     };
@@ -1906,6 +2506,9 @@ static nlohmann::json options_to_json(const Options& o) {
     j["max_accuracy_all"] = o.max_accuracy_all;
     j["soul_search"] = o.soul_search;
     j["invalidity"] = o.invalidity;
+    j["boss_spells"] = o.boss_spells;
+    j["spirit_shuffle"] = o.spirit_shuffle;
+    j["chest_shuffle"] = o.chest_shuffle;
     j["chests"] = list_mode_name(o.chests);
     j["drops"] = list_mode_name(o.drops);
     j["gifts"] = list_mode_name(o.gifts);
@@ -1999,6 +2602,9 @@ static Options options_from_json(const nlohmann::json& j) {
     get("max_accuracy_all", o.max_accuracy_all);
     get("soul_search", o.soul_search);
     get("invalidity", o.invalidity);
+    get("boss_spells", o.boss_spells);
+    get("spirit_shuffle", o.spirit_shuffle);
+    get("chest_shuffle", o.chest_shuffle);
     std::string list;
     list = "shuffle"; get("chests", list); o.chests = list_mode_from_name(list);
     list = "shuffle"; get("drops", list); o.drops = list_mode_from_name(list);
@@ -2183,6 +2789,8 @@ zelda64::randomizer::Result zelda64::randomizer::generate(const Options& options
     result.writes = std::move(builder.writes);
     result.spoiler = std::move(builder.spoiler);
     result.beigis_moved = builder.beigis_moved;
+    result.spirit_slots = std::move(builder.spirit_slots);
+    result.chest_placements = std::move(builder.chest_placements);
     result.progression_tables = std::move(builder.progression_tables);
     return result;
 }
@@ -2192,6 +2800,7 @@ const zelda64::randomizer::NativeState& zelda64::randomizer::native_state() {
 }
 
 void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
+    reset_native_scratch();
     const Options& options = active_options();
     if (options.mode != Mode::Randomizer) {
         return;
@@ -2199,6 +2808,8 @@ void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
 
     Result result = generate(options);
     native.beigis_moved = result.beigis_moved;
+    native.spirit_slots = result.spirit_slots;
+    native.chest_placements = result.chest_placements;
     if (!result.progression_tables.empty()) {
         std::string unused;
         progression::set_active(progression::make_plan(result.progression_tables, options, unused));

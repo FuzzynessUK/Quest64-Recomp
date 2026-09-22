@@ -191,6 +191,9 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/randomizer.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/merrow_mapdata.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/boss_spells.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/spirit_data.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/randomizer/chest_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/native_hooks.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/enemy_progression.cpp
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/enemy_progression_data.cpp

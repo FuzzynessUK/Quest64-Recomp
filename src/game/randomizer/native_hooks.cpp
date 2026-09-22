@@ -1,10 +1,14 @@
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 
 #include "hardmode.h"
 #include "randomizer.h"
 #include "enemy_progression.h"
+#include "spirit_data.h"
+#include "chest_data.h"
+#include "librecomp/addresses.hpp"
 #include "recomp.h"
 #include "zelda_config.h"
 
@@ -35,6 +39,8 @@ using zelda64::randomizer::Mode;
 using zelda64::randomizer::native_state;
 using zelda64::randomizer::Options;
 namespace progression = zelda64::randomizer::progression;
+namespace spirits = merrow::spirits;
+namespace chests = merrow::chests;
 
 namespace {
     // Hard Mode replaces the randomizer outright (see quest64_on_init), so
@@ -42,6 +48,17 @@ namespace {
     bool randomizing() {
         return active_options().mode == Mode::Randomizer && !zelda64::hardmode::active();
     }
+
+    // The Spirit Randomizer's records, taken out of librecomp's heap the
+    // first time the game places spirits.
+    int32_t spirit_records = 0;
+    // The Chest Randomizer's tables, likewise.
+    int32_t chest_records = 0;
+}
+
+void zelda64::randomizer::reset_native_scratch() {
+    spirit_records = 0;
+    chest_records = 0;
 }
 
 namespace {
@@ -323,6 +340,163 @@ void quest64_randomizer_wings_never_expire(uint8_t* rdram, recomp_context* ctx) 
     int item = MEM_BU(0, gInventory + index);
     if (item >= first_wing && item <= last_wing) {
         ctx->r2 = 0;
+    }
+}
+
+// --- Spirit Randomizer ------------------------------------------------------
+// func_80012220 places a map's spirits: it walks the 43-entry table at
+// 0x8004C510 for the current map and submap, then for each 12-byte record
+// { f32 x, f32 z, u8 id } drops a spirit onto the ground at that x and z.
+// Table and records are both plain data, so the shuffle is written straight
+// into RAM here rather than into the ROM - the records live in each map's own
+// data, which a ROM patch could only rewrite in place, and the point of the
+// option is to move them between maps.
+//
+// The records go in a block of librecomp's heap, which the game's memory map
+// has no room for and which is only taken once. The table itself is rewritten
+// on every call: it sits in the boot segment, so a reset would put the
+// vanilla entries back, and 43 entries is nothing to write at a map load.
+void quest64_randomizer_spirits(uint8_t* rdram, recomp_context* ctx) {
+    (void)ctx;
+    const auto& slots = native_state().spirit_slots;
+    if (!randomizing() || slots.empty()) {
+        return;
+    }
+    if (spirit_records == 0) {
+        void* mem = recomp::alloc(rdram, spirits::spirit_count * spirits::record_size);
+        if (mem == nullptr) {
+            return;
+        }
+        spirit_records = static_cast<int32_t>(
+            static_cast<uint32_t>(reinterpret_cast<uint8_t*>(mem) - rdram) + 0x80000000u);
+    }
+
+    int32_t at = spirit_records;
+    int id = 0;
+    for (int i = 0; i < spirits::slot_count; i++) {
+        int32_t entry = spirits::table_address + i * static_cast<int32_t>(spirits::slot_size);
+        if (i >= static_cast<int>(slots.size())) {
+            // A slot the plan does not need: no map matches 0xFFFF, and a
+            // count of zero makes func_80012220 place nothing anyway.
+            MEM_H(0, entry) = static_cast<int16_t>(0xFFFF);
+            MEM_H(2, entry) = static_cast<int16_t>(0xFFFF);
+            MEM_H(4, entry) = 0;
+            continue;
+        }
+        const auto& slot = slots[i];
+        MEM_H(0, entry) = static_cast<int16_t>(slot.front().map);
+        MEM_H(2, entry) = static_cast<int16_t>(slot.front().submap);
+        MEM_H(4, entry) = static_cast<int16_t>(slot.size());
+        MEM_H(6, entry) = 0;
+        MEM_W(8, entry) = at;
+        for (const zelda64::randomizer::SpiritPlacement& spot : slot) {
+            float x = spot.x;
+            float z = spot.z;
+            int32_t bits;
+            std::memcpy(&bits, &x, sizeof bits);
+            MEM_W(0, at) = bits;
+            std::memcpy(&bits, &z, sizeof bits);
+            MEM_W(4, at) = bits;
+            MEM_W(8, at) = static_cast<int32_t>(static_cast<uint32_t>(id & 0xFF) << 24);
+            at += static_cast<int32_t>(spirits::record_size);
+            id++;
+        }
+    }
+}
+
+// --- Chest Randomizer -------------------------------------------------------
+// func_80011B70 places a map's chests through two tables: 19 entries of
+// { u32 map, u32 per-submap array } at 0x8004C470, and per map an array
+// indexed by submap of { u16 count, u16 pad, u32 records }, each record 36
+// bytes of { f32 x, f32 z, f32 facing, f32 open x, f32 open z, f32 open
+// facing, f32 width, f32 depth, u8 id, u8 item }. As with a spirit the height
+// is worked out by the ground query, so only x and z are placed.
+//
+// Both the per-submap arrays and the records live in each map's own data, so
+// all of it is rebuilt in a block of librecomp's heap and the outer table
+// pointed at it. The record carries the chest's own size, which is what the
+// object collides with, so a chest takes its collision with it and leaves
+// nothing behind where it used to be.
+void quest64_randomizer_chests(uint8_t* rdram, recomp_context* ctx) {
+    (void)ctx;
+    const auto& placements = native_state().chest_placements;
+    if (!randomizing() || placements.empty()) {
+        return;
+    }
+    constexpr uint32_t submaps_bytes = chests::map_slots * chests::submap_slots * chests::submap_entry_size;
+    constexpr uint32_t records_bytes = chests::chest_count * chests::record_size;
+    if (chest_records == 0) {
+        void* mem = recomp::alloc(rdram, submaps_bytes + records_bytes);
+        if (mem == nullptr) {
+            return;
+        }
+        chest_records = static_cast<int32_t>(
+            static_cast<uint32_t>(reinterpret_cast<uint8_t*>(mem) - rdram) + 0x80000000u);
+    }
+    int32_t records = chest_records + static_cast<int32_t>(submaps_bytes);
+
+    // In map and submap order, so each submap's records are contiguous and
+    // can be named by the first of them.
+    std::vector<const zelda64::randomizer::ChestPlacement*> order;
+    order.reserve(placements.size());
+    for (const zelda64::randomizer::ChestPlacement& chest : placements) {
+        order.push_back(&chest);
+    }
+    std::stable_sort(order.begin(), order.end(),
+        [](const zelda64::randomizer::ChestPlacement* a, const zelda64::randomizer::ChestPlacement* b) {
+            return a->map != b->map ? a->map < b->map : a->submap < b->submap;
+        });
+
+    int slot = -1;
+    int last_map = -1;
+    int last_submap = -1;
+    int32_t at = records;
+    for (const zelda64::randomizer::ChestPlacement* chest : order) {
+        if (chest->map != last_map) {
+            if (++slot >= chests::map_slots) {
+                break;   // the planner keeps to 19 maps; this is belt and braces
+            }
+            last_map = chest->map;
+            last_submap = -1;
+            int32_t entry = chests::table_address + slot * static_cast<int32_t>(chests::map_slot_size);
+            int32_t submaps = chest_records + slot * chests::submap_slots * static_cast<int32_t>(chests::submap_entry_size);
+            MEM_W(0, entry) = static_cast<int32_t>(chest->map);
+            MEM_W(4, entry) = submaps;
+            for (int i = 0; i < chests::submap_slots; i++) {
+                MEM_W(0, submaps + i * static_cast<int32_t>(chests::submap_entry_size)) = 0;
+                MEM_W(4, submaps + i * static_cast<int32_t>(chests::submap_entry_size)) = 0;
+            }
+        }
+        int32_t submaps = chest_records + slot * chests::submap_slots * static_cast<int32_t>(chests::submap_entry_size);
+        int32_t submap_entry = submaps + chest->submap * static_cast<int32_t>(chests::submap_entry_size);
+        if (chest->submap != last_submap) {
+            last_submap = chest->submap;
+            MEM_W(4, submap_entry) = at;
+        }
+        MEM_H(0, submap_entry) = static_cast<int16_t>(MEM_HU(0, submap_entry) + 1);
+
+        auto put_float = [&](int32_t offset, float value) {
+            int32_t bits;
+            std::memcpy(&bits, &value, sizeof bits);
+            MEM_W(offset, at) = bits;
+        };
+        put_float(0x00, chest->x);
+        put_float(0x04, chest->z);
+        put_float(0x08, chest->facing);
+        put_float(0x0C, chest->open_x);
+        put_float(0x10, chest->open_z);
+        // Brian stands facing back at the chest.
+        put_float(0x14, chest->facing > 0.0f ? chest->facing - 3.14159265f : chest->facing + 3.14159265f);
+        put_float(0x18, chests::extent);
+        put_float(0x1C, chests::extent);
+        MEM_W(0x20, at) = static_cast<int32_t>((static_cast<uint32_t>(chest->id) << 24) |
+                                               (static_cast<uint32_t>(chest->item) << 16));
+        at += static_cast<int32_t>(chests::record_size);
+    }
+    for (int i = slot + 1; i < chests::map_slots; i++) {
+        int32_t entry = chests::table_address + i * static_cast<int32_t>(chests::map_slot_size);
+        MEM_W(0, entry) = -1;   // no map is 0xFFFFFFFF
+        MEM_W(4, entry) = 0;
     }
 }
 

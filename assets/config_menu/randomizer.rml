@@ -149,6 +149,15 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boss spells</div><div class="config-tip-text">Puts nine of the bosses' own spells into the pool, as Bubble already does with Nepty's. Each one takes over a player spell's slot, keeping its unlock level and menu position, so that spell is gone from the run. Recommended is the mix Merrow suggests; Replace similar swaps each boss spell for the one it most resembles; Replace any picks at random. Exit, Escape and Return are never taken.</div></div>
+                                        <select data-value="rnd_boss_spells" id="rnd_boss_spells_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Recommended</option>
+                                            <option value="2">Replace similar</option>
+                                            <option value="3">Replace any</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>All spells at level 1</div><div class="config-tip-text">Every spell unlocks at element level 1.</div></div>
                                         <select data-value="rnd_level_1_spells" id="rnd_level_1_spells_select">
                                             <option value="0">Off</option>
@@ -515,6 +524,23 @@
                                         <select data-value="rnd_level_2_spells" id="rnd_level_2_spells_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Spirit locations</div><div class="config-tip-text">Moves the 98 spirits. Same map keeps each map's own spirits but puts them somewhere else in it; Anywhere scatters all 98 across the whole game; Balanced does the same but each stretch of the story keeps the number of spirits it had, so the early game is never starved. Only places the game already stands something on are used - a spirit's own spot, or where Brian appears when he walks into a room - so every spirit is on solid ground and in bounds. The spoiler lists them all.</div></div>
+                                        <select data-value="rnd_spirit_shuffle" id="rnd_spirit_shuffle_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Same map</option>
+                                            <option value="2">Anywhere</option>
+                                            <option value="3">Balanced</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Chest locations</div><div class="config-tip-text">Moves the 88 chests, keeping whatever is inside each one. A chest has a front, so only spots where the facing can be justified are used: the game's own 88 chest spots, spirit spots that are clear of any doorway, and points along the line between two places the game walks you outdoors. The chest carries its own collision, so nothing is left behind. Outdoors only keeps them to the fields, towns and forests. The spoiler lists every chest.</div></div>
+                                        <select data-value="rnd_chest_shuffle" id="rnd_chest_shuffle_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Anywhere</option>
+                                            <option value="2">Outdoors only</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">

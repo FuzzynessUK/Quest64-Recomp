@@ -72,6 +72,19 @@ before_vram = 0x80025B8C
 func = "func_800263A8"
 text = "quest64_audio_jingle(rdram, ctx);"
 before_vram = 0x800263A8
+# Custom music size limit. func_8002513C takes a 0x8000-byte buffer out of the
+# audio heap for each sequence player and func_800252D8 DMAs a whole sequence
+# into it, so 32 KB was the biggest a custom file could be. Each hook sits on
+# the store that keeps the pointer and swaps in a 1 MB buffer of our own from
+# librecomp's heap, which the game's RAM map has no room for.
+[[patches.hook]]
+func = "func_8002513C"
+text = "quest64_audio_seq_buffer_0(rdram, ctx);"
+before_vram = 0x80025188
+[[patches.hook]]
+func = "func_8002513C"
+text = "quest64_audio_seq_buffer_1(rdram, ctx);"
+before_vram = 0x800251B8
 
 # Randomizer "Wings never expire" (also part of Easier Quest). func_80021524
 # removes a used item when its handler (func_800212E4) returned non-zero;
@@ -209,7 +222,7 @@ text = "if (quest64_hardmode_replace_80008A00(rdram, ctx)) return;"
 before_vram = 0x80008A00
 [[patches.hook]]
 func = "func_80012220"
-text = "if (quest64_hardmode_replace_80012220(rdram, ctx)) return;"
+text = "if (quest64_hardmode_replace_80012220(rdram, ctx)) return; quest64_randomizer_spirits(rdram, ctx);"
 before_vram = 0x80012220
 [[patches.hook]]
 func = "func_8001EBDC"
@@ -423,3 +436,11 @@ before_vram = 0x80035E28
 func = "func_80008EF4"
 text = "quest64_randomizer_enemy_scale_table(rdram, ctx);"
 before_vram = 0x80008F5C
+
+# Chest Randomizer. func_80011B70 places a map's chests through the outer table
+# at 0x8004C470 and a per-submap array in that map's own data; both, and the
+# records, are rebuilt in librecomp's heap and the outer table pointed at them.
+[[patches.hook]]
+func = "func_80011B70"
+text = "quest64_randomizer_chests(rdram, ctx);"
+before_vram = 0x80011B70

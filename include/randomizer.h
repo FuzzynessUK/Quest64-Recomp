@@ -44,6 +44,27 @@ namespace zelda64::randomizer {
         bool max_accuracy_all = false;
         bool soul_search = false;
         bool invalidity = false;
+        // Boss spells in the player's pool, from Merrow PR #6 (vbhayden).
+        // Nine of the bosses' seventeen spells work cast from anywhere; each
+        // one takes over a player spell's slot, keeping that slot's unlock
+        // level and menu position, so the spell it used to cast is gone.
+        // 0 off, 1 Merrow's recommended mix, 2 replace a similar spell,
+        // 3 replace any spell at random.
+        int boss_spells = 0;
+
+        // Spirits. Moves the 98 spirits around. Every position used is one
+        // the game already stands something on - a vanilla spirit spot or an
+        // entrance spawn point - so a spirit is always on solid ground and
+        // in bounds. 0 off, 1 same map, 2 anywhere, 3 anywhere but each
+        // stretch of the story keeps the number of spirits it had.
+        int spirit_shuffle = 0;
+
+        // Chests. Moves the 88 chests. A chest needs more than solid ground:
+        // it must face away from whatever is behind it and have floor in
+        // front for Brian to stand on, so only spots with a facing that can
+        // be justified are used - see chest_data.cpp. 0 off, 1 anywhere,
+        // 2 outdoors only.
+        int chest_shuffle = 0;
 
         // Items
         ListMode chests = ListMode::Shuffle;
@@ -188,6 +209,29 @@ namespace zelda64::randomizer {
         std::vector<uint8_t> data;
     };
 
+    // Where one spirit goes: a position in a submap. The game works out the
+    // height itself, so only x and z are placed.
+    struct SpiritPlacement {
+        uint8_t map;
+        uint8_t submap;
+        float x;
+        float z;
+    };
+
+    // Where one chest goes. A chest faces (sin, cos) of `facing` and Brian
+    // stands at open_x/open_z to open it; the game works out the height.
+    struct ChestPlacement {
+        uint8_t map;
+        uint8_t submap;
+        uint8_t id;
+        uint8_t item;
+        float x;
+        float z;
+        float facing;
+        float open_x;
+        float open_z;
+    };
+
     struct Result {
         std::vector<Write> writes;
         std::string spoiler;
@@ -198,6 +242,10 @@ namespace zelda64::randomizer {
         // Boss order moved Beigis out of his own arena, which the native hook
         // for his map check needs to know about.
         bool beigis_moved = false;
+        // The Spirit Randomizer's plan, one list per table slot.
+        std::vector<std::vector<SpiritPlacement>> spirit_slots;
+        // The Chest Randomizer's plan, in chest id order. Empty when off.
+        std::vector<ChestPlacement> chest_placements;
     };
 
     // What the Stage 2 native hooks need to know that isn't in Options,
@@ -205,8 +253,18 @@ namespace zelda64::randomizer {
     // the patch is generated at boot; all false before that.
     struct NativeState {
         bool beigis_moved = false;
+        // The Spirit Randomizer's plan, grouped into the 43 slots of the
+        // table func_80012220 reads. Empty when the option is off.
+        // quest64_randomizer_spirits writes it into RAM.
+        std::vector<std::vector<SpiritPlacement>> spirit_slots;
+        // The Chest Randomizer's plan, in chest id order. Empty when off.
+        std::vector<ChestPlacement> chest_placements;
     };
     const NativeState& native_state();
+
+    // Drops the memory the native hooks took out of librecomp's heap last
+    // launch, which a relaunch re-initialises. Called from apply_at_boot.
+    void reset_native_scratch();
 
     // Runs the shuffles for the given options and returns the ROM writes.
     Result generate(const Options& options);

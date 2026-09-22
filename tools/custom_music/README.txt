@@ -40,7 +40,10 @@ Programs that sustain (strings, winds, pads, organ): 0 1 2 3 4 5 6 10 11 15
 4 5 0 6 7 9; the battle theme 21 0 18 25 23 19 7 9.
 
 A pack's bundled soundfont (.zbank) cannot be used; a file may be at most
-32768 bytes (about ten minutes of dense music). The game log
+1 MB. (The game's own sequence buffer is 32768 bytes, which used to be the
+limit; this port gives each sequence player a 1 MB buffer of its own
+instead. Keep a file under 32768 bytes if it has to run on hardware or in
+another port.) The game log
 custom_music.txt (next to the settings, in %LOCALAPPDATA%\Quest64Recompiled)
 says what was loaded or why a file was skipped.
 

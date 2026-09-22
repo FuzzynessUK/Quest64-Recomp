@@ -24,7 +24,14 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   meaning: **On excludes** the final two Shannons from the gift shuffle. Data-only options are ROM writes
   applied at boot; options that patch *code* are native hooks instead. Includes
   Lost Keys (both rulesets), Shannon hints, the cosmetic palettes, Merrow's
-  table/stat shuffles, and our own **Enemy Randomizer** (below).
+  table/stat shuffles, **Boss spells** (2026-09-22, a port of Merrow PR #6:
+  nine of the bosses' spells take over player spell slots, the same mechanism
+  the Bubble option uses), **Spirit locations** (2026-09-22: moves the 98
+  spirits; every position is one the game already stands something on, or a
+  point on a short line between two of them), **Chest locations** (2026-09-22:
+  moves the 88 chests, keeping what is inside; only spots whose facing can be
+  justified are used, and a chest carries its own collision), and our own
+  **Enemy Randomizer** (below).
 - **Enhancements tab** — two groups:
   - *Quality of Life*: JP Healing Amounts, JP Magic barrier (+2 turns), JP
     Stat Up Effect, Show spell learnt (`src/game/spellnotice.cpp`, overlay
@@ -69,8 +76,13 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     the sequence bank's entry rewritten: the bank is an ALSeqFile at ROM
     0xEBABD0 (u16 rev, u16 count = 44, then u32 offset from the bank
     start + u32 len), DMA'd into RAM by `func_80025040` at init and read
-    per play by `func_800252D8` into a 0x8000-byte buffer, so the ROM copy
-    is all that needs patching and 32 KB is the size cap. Log:
+    per play by `func_800252D8` into the sequence player's buffer, so the
+    ROM copy is all that needs patching. That buffer is 0x8000 bytes out of
+    the audio heap (`func_8002513C`), which capped a file at 32 KB;
+    `quest64_audio_seq_buffer_0/1` now swap both players' pointers for 1 MB
+    blocks from librecomp's heap (above 0x81000000) at the stores that keep
+    them, 0x80025188 and 0x800251B8, so the cap is 1 MB (2026-09-22,
+    awaiting play-test). Log:
     `custom_music.txt`. `tools/mid2cseq.pl` converts a MIDI to the
     game's compact-sequence format (header 16 u32 track offsets + u32
     division 480; notes are `9n key vel <VLQ duration>` with no note-offs;
@@ -242,7 +254,10 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   the first item of that column so notices sit under it).
 - `src/game/randomizer/` — Merrow port. **GENERATED, never hand-edit:**
   `merrow_data.cpp`, `merrow_mapdata.cpp` (`tools/convert_merrow_*.pl`) and
-  `enemy_progression_data.cpp` (`tools/enemyrandologic.pl`). Applied to the
+  `enemy_progression_data.cpp` (`tools/enemyrandologic.pl`) and
+  `boss_spells.cpp` (`tools/extract_boss_spells.pl`) and `spirit_data.cpp`
+  (`tools/extract_spirits.pl`) and `chest_data.cpp`
+  (`tools/extract_chests.pl`), the last three read from the ROM. Applied to the
   in-memory ROM at boot via `quest64_on_init` in `src/main/main.cpp`.
   - `enemy_progression.{h,cpp}` — the Enemy Randomizer plan, `rescale()`,
     `scaled_value()`; constants `spread_down/up = 7`, `shape_exponent = 0.5`,
@@ -252,7 +267,24 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
     register in the window between the instruction that sets it and the one
     that uses it.
   - `randomizer.cpp` — `shuffle_enemies()` does the set placement and pack
-    rerolls; `patch_enemies()` writes the spoiler.
+    rerolls; `patch_enemies()` writes the spoiler. `place_bubble()` and
+    `place_boss_spells()` copy a boss spell's record and animation over a
+    player spell's, keeping the slot's unlock level and menu position, before
+    the shuffle runs; `boss_spells.{h,cpp}` holds the seventeen boss spells.
+    `shuffle_spirits()` moves the 98 spirits: the 43-slot table at RAM
+    0x8004C510 that `func_80012220` reads (`{ u16 map, u16 submap, u16 count,
+    u16 pad, u32 records }`, records `{ f32 x, f32 z, u8 id }` with no y — the
+    game drops each one onto the floor itself) is rewritten in RAM by
+    `quest64_randomizer_spirits`. Positions come only from `spirit_data.cpp`:
+    vanilla spirit spots, entrance spawn points, and points on short lines
+    between them, so they are always somewhere Brian can stand.
+    `shuffle_chests()` does the same for the 88 chests through the two-level
+    table at RAM 0x8004C470 that `func_80011B70` reads (19 map slots, a
+    per-submap array of `{ u16 count, u32 records }`, records of 36 bytes
+    carrying the chest's facing, Brian's opening position and the chest's own
+    collision size); `quest64_randomizer_chests` rebuilds all of it in the
+    heap. Map data ROM addresses come from the map table at RAM 0x80054F10
+    (+4 ROM start, +0xC RAM destination).
 - `src/game/map_table.cpp` — map/submap/entrance tables extracted from the ROM.
 - `src/game/widescreen.cpp` — display-list post-processor hooked in
   `nnScExecuteGraphics` before `osSpTaskLoad`; F3DEX 1.23 opcodes.

@@ -177,6 +177,6 @@ std::string cseq::summary(const Song& song, const std::vector<uint8_t>& file) {
     std::snprintf(buf, sizeof buf, "%zu bytes, %d channel(s), %zu notes, %.1f s at the opening tempo%s%s",
                   file.size(), used, notes, seconds,
                   song.loop_start >= 0 ? ", loops" : ", plays once",
-                  file.size() > max_file_size ? " - TOO BIG for the game's 32768-byte buffer" : "");
+                  file.size() > max_file_size ? " - TOO BIG, over 1 MB" : (file.size() > hardware_file_size ? " - over 32768 bytes: fine in this port, too big on hardware" : ""));
     return buf;
 }

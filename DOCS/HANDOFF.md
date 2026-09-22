@@ -136,6 +136,190 @@ source is checked out next to it at `D:\Games\reference\merrow` for reference.
     pair is never propagated. Re-run the ROM comparison if the data is ever
     regenerated.
 
+- Stage 8 (2026-09-22, **untested**): **boss spells in the player's pool**, a
+  port of Merrow PR #6 (vbhayden, "Data Refactor + Boss Spells",
+  github.com/hangedmandesign/merrow/pull/6, a draft on `trey/data-refactor`).
+  One select, `boss_spells` in `randomizer.json`: Off / Recommended /
+  Replace similar / Replace any, at the top of the Spells group.
+  - The mechanism is the one Merrow's **Bubble** option already uses: a boss
+    spell's 0x44-byte record is copied over a player spell's, keeping the
+    slot's unlock level (bytes 0-1) and menu position (bytes 4-9), and its
+    0x48-byte animation record is copied over the slot's. The player spell it
+    lands on is gone from that run. `place_boss_spells()` in `randomizer.cpp`
+    does the placement before `shuffle_spells()`, so the shuffle, the hinted
+    names and the spell-item rules all read the slot as the boss spell.
+  - Spell records are at ROM 0xD4BA60 + 0x44*i, animations at 0xD4D338 +
+    0x48*i, i = 0..76; 0..59 are the player's, 60..76 the bosses'. Only nine
+    of the seventeen work cast from anywhere (the PR's
+    `BossSpellsCastableAnywhere`): Zelse's Wind Razor and Wind Zipper,
+    Nepty's Bubble Shot, Fargo's Lava Ball and Explosion, Shilf's Dove Razor,
+    Beigis' Spirit Sword, Mammon's Flame Waves and Fire Arrows.
+  - `src/game/randomizer/boss_spells.{h,cpp}`; the .cpp is **GENERATED** by
+    `tools/extract_boss_spells.pl` from `quest64.us.z64`. The PR's own tables
+    were only used to find the addresses: its 77 spell records match the ROM
+    byte for byte, but **13 of its 77 animation records do not** — including
+    Zelse's Wind Zipper, one of the nine (byte 21 is 0A in the ROM, A0
+    there) — so every byte is read from the ROM instead.
+  - The words the hinted names use come from `bossSpellShuffleNames`, which
+    merrow already had for all seventeen. `shuffleBossSpellNames` (which
+    blanks the bosses' own name entries) is unchanged: the player-facing name
+    comes from the slot, so with hinted names off the slot keeps the replaced
+    spell's name, as in the PR.
+  - Four deliberate differences from the PR: a spell named explicitly is
+    taken out of the pool (Merrow leaves it in, so a later random pick can
+    land on it and lose the first boss spell); Exit, Escape and Return are
+    never taken over; a boss spell's passive Invalidity is stripped when the
+    Invalidity option is on (Merrow's own switch writes to the boss's copy of
+    the record, which nothing reads once the spell has moved); and with
+    Bubble on, Nepty's Bubble Shot and Soul Search Lv1's slot are both left
+    alone, because Bubble already *is* that replacement. The PR's per-spell
+    "Custom" preset is not ported — the three presets are.
+  - **Animations stay with the slot, not the data.** Merrow's spell shuffle
+    never moves animation records (Bubble writes its own at Soul Search Lv1's
+    slot and has always behaved this way), so with the shuffle on the boss
+    animation shows at the slot it took over while its data has moved
+    elsewhere. Faithful to both Merrow and the PR; revisit if it looks wrong.
+  - **Bug found and fixed while porting this:** our Bubble option never
+    swapped the spell's data at all. Merrow does it in its checkbox handler
+    (`library.spells[135] = library.ss1bubble[0]`), which this port skipped,
+    and it never wrote `bubblecode` on the no-shuffle path either, so Bubble
+    drew Nepty's animation and named the spell BUBBLE while it still behaved
+    as Soul Search Lv1. `place_bubble()` now does the swap.
+
+- Stage 9 (2026-09-22, **untested**): **Spirit Randomizer**, one select in the
+  Randomizer tab's World group (`spirit_shuffle` in `randomizer.json`): Off /
+  Same map / Anywhere / Balanced.
+  - How spirits are placed: `func_80012220` runs at every map load, walks a
+    43-entry table at RAM **0x8004C510** (ROM 0x4D110, inside the boot
+    segment) for the current map and submap - `u16 map, u16 submap, u16
+    count, u16 pad, u32 records` - and for each 12-byte record, `f32 x, f32
+    z, u8 id, u8 pad[3]`, places a spirit. **There is no y**: it hands x and
+    -z to the ground query at `func_8000EE60` (height 0xA00) and takes back
+    the height, so a spirit only needs an x and a z over something solid.
+    The id is the save flag's bit, numbered straight through the table (slot
+    0's first spirit is id 0, the last is 97).
+  - **All 98 spirits are identical** - the element is chosen on the screen
+    the pickup opens - so the only thing worth randomizing is where they are,
+    and how many each map gets.
+  - The records live in each map's own data. A RAM pointer becomes a ROM
+    offset through the **map table at RAM 0x80054F10** (0x44 bytes a map, 36
+    maps): +4 ROM start, +8 ROM end, +0xC RAM destination, +0x18 the submap
+    headers, +0x40 the submap count. ROM = pointer - destination + start.
+    Verified against Merrow's two `reveal_spirits` addresses, which come out
+    as map 25 submap 9 (0x609970) and map 21 submap 6 (0x56FAE0).
+  - **Obtainability.** The pool is, first, every spot the game already stands
+    something on: the 98 vanilla spirit spots, plus all 539 entrance spawn
+    positions (the same submap headers, +0xC a 20-byte table of `f32 x, f32
+    z, f32 facing, flags`, +0x10 its count). An entrance is where the game
+    puts Brian when he walks into a submap, so it is solid ground, in bounds,
+    in a room something leads to - and unlike a chest, a spirit in a doorway
+    is no trouble, you pick it up walking through.
+  - On top of that (2026-09-22, after the chest work) are **116 made spots**,
+    the same trick `tools/extract_chests.pl` uses: a point a third, a half or
+    two thirds along the line between two of the spots above in the same
+    submap. Both ends are ground the game itself uses, so a short line
+    between them is very nearly certain to be walkable - nearly, not
+    certainly, so the line is capped at 70 units indoors, where a long one
+    could cross a wall, and 140 outdoors. A made spot keeps 20 units from the
+    NPCs standing about and 18 from every other spot. A spirit asks less of a
+    spot than a chest does - no facing, no clear floor in front to stand on -
+    so these are made indoors as well. **753 spots in 258 submaps** in all.
+  - `tools/extract_spirits.pl` reads all of that out of the ROM into
+    `src/game/randomizer/spirit_data.cpp` (**GENERATED**, with
+    `spirit_data.h` written by hand). It checks every id as it goes.
+  - `shuffle_spirits()` in `randomizer.cpp` builds the plan.
+    **The table has 43 slots and the loop bound (0x2B) is a code literal, so
+    a plan may use at most 43 (map, submap) groups**; which map and submap
+    each slot names is data, so they can be any 43. `draw()` therefore picks
+    the submaps before the spots - most hold one or two, and a random run of
+    small ones would not have room - then trades the smallest in hand for the
+    largest left until the group can hold what it was asked for. Same map
+    keeps each map's count and submap budget; Balanced keeps each story
+    tier's (the `map_story_tier` table, which follows
+    `enemy_progression_data.cpp`'s areas where they overlap and places the
+    towns by when the story reaches them); Anywhere is the whole pool.
+    Feasibility was checked offline: every mode has headroom (Anywhere needs
+    98 in its best 43 submaps, which hold 420).
+  - Writing is `quest64_randomizer_spirits`, a **native hook** sharing
+    0x80012220 with Hard Mode's replacement (Hard Mode returns first, as it
+    overrides the randomizer). The records go in a block of librecomp's heap
+    - the game's own RAM map has no room and the whole point is to move
+    records between maps, which a ROM patch cannot do - and the 43 table
+    entries are rewritten on every call, because the table is in the boot
+    segment and a reset would put the vanilla entries back. Unused slots get
+    map 0xFFFF and count 0. `reset_native_scratch()` drops the block at
+    `apply_at_boot` so a relaunch takes a fresh one.
+  - A plan that comes out short of 98 logs and leaves the spirits alone
+    rather than losing any.
+  - **Not covered:** maps that have no spirits in vanilla can receive them
+    (their entrance spots are in the pool), but a map with no entrance table
+    cannot. Nothing checks that a *room* is reachable at the point the run
+    needs the spirit - only that the spot within it is stood on - so a spirit
+    behind a one-way event is still possible. The spoiler lists every
+    placement by map and room so anything odd is visible.
+
+- Stage 10 (2026-09-22, **untested**): **Chest Randomizer**, one select next to
+  the spirit one (`chest_shuffle` in `randomizer.json`): Off / Anywhere /
+  Outdoors only.
+  - How chests are placed: `func_80011B70` at map load walks an outer table of
+    **19** entries at RAM **0x8004C470** (ROM 0x4D070), `{ u32 map, u32
+    per-submap array }`; the per-submap array lives in that map's own data and
+    is indexed by submap, `{ u16 count, u16 pad, u32 records }`; a record is
+    **36 bytes**: `f32 x, f32 z, f32 facing, f32 open_x, f32 open_z, f32
+    open_facing, f32 width, f32 depth, u8 id, u8 item, u16 pad`. As with a
+    spirit there is no y - the same `func_8000EE60` ground query - so a chest
+    needs only an x and a z. `id` is the save flag's bit, `item` is the byte
+    Merrow's chest shuffle writes at +33.
+  - **A chest faces (sin f, cos f)**, and open_x/open_z is where Brian stands
+    to open it: six units along that direction, facing back at it. Verified
+    against every vanilla record.
+  - **Collision.** The width and depth in the record are copied into the
+    spawned object, and the chest is placed on terrain by the ground query, so
+    a chest carries its own collision and moving the record moves the
+    collision with it. Nothing is left behind at the old spot, so the "remove
+    the old collision" worry appears to be a non-issue - **but this is
+    inference from the data, not a play-test.** Check it first: if a ghost
+    block remains where a chest used to be, the collision is coming from
+    somewhere else and this needs rethinking.
+  - **What makes a spot safe** is the whole problem: a chest must not face a
+    wall or block a door, and no collision geometry is readable offline.
+    `tools/extract_chests.pl` therefore only offers spots whose facing can be
+    justified, and writes `src/game/randomizer/chest_data.cpp`
+    (**GENERATED**; `chest_data.h` by hand) with 226 of them, 112 outdoors:
+    - **88 vanilla** chest spots, with the game's own facing. Proven.
+    - **94 spirit** spots, dropped if within 20 units of an entrance spawn
+      position so a chest never lands in a doorway. No facing of their own,
+      so the chest is aimed at the nearest other known-walkable point in the
+      same submap and Brian's spot goes on that line.
+    - **44 made**, outdoors only, because 8 + 60 vanilla/spirit spots outdoors
+      is short of 88. A point at a third, a half or two thirds along the line
+      between two known-walkable points in the same submap no more than 140
+      units apart - both ends are ground the game itself stands something on,
+      so in open country the line between them is very likely walkable, which
+      is **a good bet, not a guarantee**, and why these are outdoors only.
+      Kept 20 units from doorways, 25 from the NPCs standing about
+      (`npcmovement`'s records carry x at +0x18, z at +0x1C) and 22 from every
+      other spot. The distance cap is the risk dial: 100 gives 22 spots, 140
+      gives 44, 180 gives 142.
+  - `shuffle_chests()` picks the maps before the spots, the same
+    largest-for-smallest trade the spirit planner uses, because **the outer
+    table has 19 map slots and the loop bound (0x13) is a code literal**.
+    Feasibility checked offline: Anywhere's best 19 maps hold 185 spots,
+    Outdoors has 16 maps holding 112, against 88 chests.
+  - The item comes from the chest item shuffle when that is on. Note that
+    `shuffle_items()` rolls `chests[]` **even when the option is off**
+    (Merrow does, to keep the RNG stream aligned), so vanilla items have to be
+    read back from `chest_data.cpp` rather than from that list.
+  - Writing is `quest64_randomizer_chests`, a native hook on 0x80011B70. Both
+    the per-submap arrays and the records are rebuilt in a block of
+    librecomp's heap and the outer table pointed at it; each map gets 32
+    submap entries (the widest map has 26, and the routine does not
+    bounds-check the submap index). Unused outer entries get map 0xFFFFFFFF.
+  - **Known rough edges:** Lost Keys' Shannon hints name the places chests
+    are in vanilla, so they go stale - noted in the spoiler. A "made" spot can
+    in principle land on the wrong side of a river or cliff, since only the
+    endpoints are known good.
+
 ### How the Stage 2 hooks work
 
 Merrow writes its code options as raw ROM byte patches. Those can't work here:
@@ -610,6 +794,45 @@ save folder (`saves/hardmode/`) and overrides the randomizer while on.
   Sheet and data come from the same `tools/enemyrandologic.pl`. See CLAUDE.md.
 - Cosmetics still missing: text content shuffle and vowels. Cloak colour is
   done (stage 4); the logo and seed digits are deliberately not ported.
+
+### Custom music: the 32 KB limit (raised 2026-09-22, **untested**)
+
+- Where it came from: `func_8002513C` takes a 0x8000-byte buffer out of the
+  audio heap for each of the two sequence players and keeps the pointers at
+  `0x8008F978 + 0x190` and `+ 0x32C`; `func_800252D8` DMAs a whole sequence
+  into the one for the player it is given (`[0x800538F0]` is the sequence
+  table, entry n at `+4 + n*8` = { ROM address, length }), so a file bigger
+  than the buffer overran the heap. The audio heap itself is `alHeapInit` at
+  0x80024704: 0x68000 bytes at 0x80331AB0.
+- Growing it in place was rejected: the game's RAM reaches 0x804FBC80 and it
+  never reads `osMemSize`, so its map is static and the audio heap is boxed
+  in. The buffers are **moved** instead. `quest64_audio_seq_buffer_0/1` in
+  `audio.cpp` sit on the two stores (0x80025188, 0x800251B8) and replace `v0`
+  with a 1 MB block from librecomp's own heap. That heap starts above
+  `mod_rdram_start` (0x81000000) in the recomp's 512 MB of RDRAM; the
+  `MEM_*` macros do not mask, `lw` sign-extends the pointer harmlessly, the
+  sequence player only reads the buffer through the CPU, and
+  `recomp::do_rom_read` has no size check. The game's own two allocations
+  still happen and go unused (64 KB of an audio heap that has the room).
+- `recomp::init_heap` runs *after* the `on_init` callback, so the blocks
+  cannot be taken at boot; the hook allocates on first use and
+  `apply_at_boot` clears the cache so a relaunch takes fresh ones.
+- `seq_buffer_size` in `audio.cpp` is now 1 MB and gates both which files the
+  menu offers and how far the ROM copy is grown for the library, so the two
+  stay consistent. `cseq::max_file_size` follows it, with
+  `cseq::hardware_file_size` kept at 0x8000 for the converter's warning.
+- **Still worth doing: back-references in the converter.** The format's
+  `FE hi lo len` back-reference is an LZ copy (distance up to 65535, length
+  up to 255, measured from the FE byte), and `cseq_writer.cpp` never emits
+  one - it only escapes literal 0xFE. The game's own 44 sequences use them
+  heavily: 8369 of them across the bank, typically saving 40-60% (seq 9 is
+  3941 bytes stored against ~15 KB of stream, seq 33 4384 against ~13 KB).
+  A greedy matcher run over the user's library estimates the big files at
+  8-31% of their current size (105 KB Doom -> ~9 KB, 98 KB Streets of Rage
+  -> ~8 KB). Running status would help again: the writer never uses it, so
+  every note carries its 0x9n status byte. Constraint to respect: libultra's
+  reader has a one-deep return, so a reference must not point at a region
+  that itself holds a marker, and the loop-end payload is read raw.
 
 ## Known gaps / ideas
 - Warp could accept an explicit X/Y/Z (`D_80085370 = -1` + pos in

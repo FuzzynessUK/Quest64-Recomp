@@ -20,8 +20,11 @@
 //   payload is read raw, so it must hold no 0xFE - the closing delta is
 //   padded (a VLQ may carry leading 0x80s) until it does not.
 //
-// Every game file plays at 480 ticks per quarter note; the game's player
-// buffer is 0x8000 bytes, so that is the size limit of a file.
+// Every game file plays at 480 ticks per quarter note. The game's own
+// sequence buffer is 0x8000 bytes, which capped a file at 32 KB; this port
+// gives each sequence player a 1 MB buffer of its own instead (audio.cpp's
+// quest64_audio_seq_buffer_0/1), so that is the limit now. On real hardware
+// or another port, keep a file under 32768 bytes.
 #pragma once
 
 #include <cstdint>
@@ -31,7 +34,8 @@
 
 namespace cseq {
     constexpr int division = 480;
-    constexpr size_t max_file_size = 0x8000;
+    constexpr size_t max_file_size = 1024 * 1024;
+    constexpr size_t hardware_file_size = 0x8000;
 
     struct Event {
         int64_t tick = 0;
