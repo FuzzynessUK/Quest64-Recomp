@@ -282,9 +282,11 @@ namespace {
         if (table == 0 || track < 0 || track >= zelda64::audio::game_track_count) {
             return;
         }
-        // The table holds ROM addresses: entry 0's, less its file offset,
-        // is the base the game added.
-        uint32_t base = static_cast<uint32_t>(MEM_W(0, table + 4)) - original_entry[0].rom;
+        // The table holds ROM addresses: alSeqFileNew added the bank's
+        // address (0xEBABD0, the constant the boot code hands
+        // func_8002513C) to each file offset. Not derived from an entry:
+        // any entry, entry 0 included, may already point at a custom file.
+        uint32_t base = seq_bank_start;
         Placed target = original_entry[track];
         if (!name.empty()) {
             std::span<const uint8_t> rom = recomp::get_rom();
@@ -683,6 +685,20 @@ void zelda64::audio::on_frame(uint8_t* rdram) {
         last_seen_track = track;
         if (announce) {
             zelda64::notify::post("Now playing: " + song_name(track));
+        }
+        // Diagnostics: what the player was handed for this track.
+        if (library_in_rom && track >= 0 && track < game_track_count) {
+            int32_t table = static_cast<int32_t>(MEM_W(0, seq_table_pointer));
+            int32_t player = 0x8008F978;
+            int32_t buffer = static_cast<int32_t>(MEM_W(0, player + 0x190));
+            live_log << "  start: track " << track << " entry 0x" << std::hex
+                     << static_cast<uint32_t>(MEM_W(0, table + 4 + track * 8)) << " len 0x"
+                     << static_cast<uint32_t>(MEM_W(0, table + 8 + track * 8)) << " buffer 0x" << buffer << ":";
+            for (int i = 0; i < 24; i++) {
+                live_log << " " << static_cast<int>(MEM_BU(0, buffer + i));
+            }
+            live_log << std::dec << "\n";
+            live_log.flush();
         }
     }
 
