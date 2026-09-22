@@ -18,12 +18,10 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomize Music</div><div class="config-tip-text">Towns: every area's music is drawn at random from the game's tracks, freshly on each launch. All: the same, plus everything the game starts by name rather than by area - the title screen, battles and bosses, the victory fanfare, the death jingle, the credits, saving - each swapped for a random track for the session. Custom: play your own music from the custom_music folder next to the game, chosen per track below (Randomise all fills every track from the folder). Track choices apply straight away, and Preview on a row starts that track now - Stop goes back to what was playing. The jingles (victory fanfare, death, the two chimes) pick from the fanfares folder next to the game instead (one-shot pieces; Randomise all draws them from there). Off, Towns and All are drawn when the game is next launched. A file is a .seq in the game's own format; q64music.exe next to the game makes one from an .ootrs pack or a MIDI, and custom_music.txt beside the settings says what was loaded.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomize Music</div><div class="config-tip-text">On shows the game's 44 music tracks below, each with what plays in its place: click a name to choose a file from the custom_music folder next to the game (jingles pick from the fanfares folder), or use the Randomise all buttons - Custom only fills every track from the folders, Game's own shuffles the game's own music between its slots, Mix draws each track from either. Choices apply straight away; Preview starts the track now and Stop preview goes back. q64music.exe next to the game converts .ootrs packs and MIDI files, and custom_music.txt beside the settings says what was loaded.</div></div>
                                         <select data-value="aud_music" id="aud_music_select" style="nav-up: #tab_audio">
                                             <option value="0">Off</option>
-                                            <option value="1">Towns</option>
-                                            <option value="2">All</option>
-                                            <option value="3">Custom</option>
+                                            <option value="1">On</option>
                                         </select>
                                     </div>
                                 </div>
@@ -45,23 +43,16 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="config-debug-option" data-if="aud_music == 3">
+                        <div class="config-debug-option" data-if="aud_music == 1">
                             <label class="config-debug-option__label">
                                 <div>Tracks</div>
                             </label>
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomise all</div><div class="config-tip-text">What Randomise all gives each track. Custom files only: every looping track gets a file from custom_music and every jingle one from fanfares (a folder that is empty leaves its tracks as they are). Some game's own too: about one track in three is left as the game's own music.</div></div>
-                                        <select data-value="aud_randomise_keeps_own" id="aud_randomise_keeps_own_select">
-                                            <option value="0">Custom files only</option>
-                                            <option value="1">Some game's own too</option>
-                                        </select>
-                                    </div>
                                     <div class="config-debug__select-wrapper" style="margin-bottom: 8dp;">
-                                        <button class="button" onclick="aud_music_random_all">Randomise all</button>
-                                        <button class="button" onclick="aud_music_clear_all">Clear all</button>
-                                        <button class="button" onclick="aud_music_rescan">Rescan folder</button>
+                                        <button class="button" onclick="aud_music_random_all:custom">Randomise all (Custom only)</button>
+                                        <button class="button" onclick="aud_music_random_all:own">Randomise all (Game's own)</button>
+                                        <button class="button" onclick="aud_music_random_all:mix">Randomise all (Mix)</button>
                                         <button class="button" onclick="aud_stop_preview">Stop preview</button>
                                     </div>
                                     <div class="config-debug__select-wrapper" data-if="aud_library_count == 0">

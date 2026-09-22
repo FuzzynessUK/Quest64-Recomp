@@ -53,9 +53,6 @@ namespace zelda64::audio {
         CustomMusic custom_music = CustomMusic::Off;
         // Track number -> library file name without `.seq`.
         std::map<int, std::string> custom_tracks;
-        // Randomise all: whether tracks may be left as the game's own
-        // (about one in three) or every track gets a file.
-        bool randomise_keeps_own = false;
     };
 
     // The game's 44 sequences, by the number the map music table and the
@@ -94,6 +91,11 @@ namespace zelda64::audio {
     // fanfare and the death jingle (track_is_fanfare), whose names are
     // stored with the "fanfares/" prefix.
     inline const std::string fanfare_prefix = "fanfares/";
+    // A choice of "game:N" plays the game's own sequence N in that slot
+    // (Randomise all (Game's own) shuffles the game's music this way).
+    inline const std::string game_prefix = "game:";
+    // -1 unless the name is a game:N choice.
+    int game_track_of(const std::string& name);
     std::filesystem::path fanfare_folder();
     std::vector<std::string> fanfare_files(int* too_big = nullptr);
     bool track_is_fanfare(int track);

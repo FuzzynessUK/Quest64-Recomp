@@ -215,6 +215,10 @@ namespace {
             if (track < 0 || track >= zelda64::audio::game_track_count || name.empty()) {
                 continue;
             }
+            if (zelda64::audio::game_track_of(name) >= 0) {
+                plan[track] = name;
+                continue;
+            }
             auto it = placed.find(name);
             if (it == placed.end()) {
                 log << "  track " << track << " (" << zelda64::audio::track_label(track) << "): \"" << name
@@ -268,8 +272,10 @@ namespace {
         session_songs.clear();
         for (const auto& [track, name] : plan) {
             uint32_t entry = seq_bank_start + 4 + static_cast<uint32_t>(track) * 8;
-            write_u32(patched, entry, placed[name].rom - seq_bank_start);
-            write_u32(patched, entry + 4, placed[name].len);
+            int own = zelda64::audio::game_track_of(name);
+            Placed source = own >= 0 ? original_entry[own] : Placed{ placed[name].rom - seq_bank_start, placed[name].len };
+            write_u32(patched, entry, source.rom);
+            write_u32(patched, entry + 4, source.len);
             log << "  track " << track << " (" << zelda64::audio::track_label(track) << ") <- " << name << "\n";
             session_songs[track] = name;
         }
@@ -291,7 +297,11 @@ namespace {
         // any entry, entry 0 included, may already point at a custom file.
         uint32_t base = seq_bank_start;
         Placed target = original_entry[track];
-        if (!name.empty()) {
+        int own = zelda64::audio::game_track_of(name);
+        if (own >= 0) {
+            target = original_entry[own];
+        }
+        else if (!name.empty()) {
             std::span<const uint8_t> rom = recomp::get_rom();
             if (!place_file(const_cast<uint8_t*>(rom.data()), rom.size(), name, live_log)) {
                 live_log.flush();
@@ -499,7 +509,6 @@ Options zelda64::audio::load_options() {
     if (o.custom_music == CustomMusic::Custom) {
         o.music_shuffle = MusicShuffle::Off;
     }
-    get("randomise_keeps_own", o.randomise_keeps_own);
     auto tracks = j.find("custom_tracks");
     if (tracks != j.end() && tracks->is_object()) {
         for (const auto& [key, value] : tracks->items()) {
@@ -527,7 +536,6 @@ void zelda64::audio::save_options(const Options& o) {
         }
     }
     j["custom_tracks"] = tracks;
-    j["randomise_keeps_own"] = o.randomise_keeps_own;
     std::ofstream out(options_path());
     out << j.dump(4);
 }
@@ -641,9 +649,18 @@ extern "C" void quest64_audio_sfx(uint8_t*, recomp_context* ctx) {
 std::string zelda64::audio::song_name(int track) {
     auto it = session_songs.find(track);
     if (it != session_songs.end()) {
-        return it->second;
+        int own = game_track_of(it->second);
+        return own >= 0 ? track_label(own) : it->second;
     }
     return track_label(track);
+}
+
+int zelda64::audio::game_track_of(const std::string& name) {
+    if (name.compare(0, game_prefix.size(), game_prefix) != 0) {
+        return -1;
+    }
+    int track = std::atoi(name.c_str() + game_prefix.size());
+    return track >= 0 && track < game_track_count ? track : -1;
 }
 
 void zelda64::audio::apply_tracks_live(const std::map<int, std::string>& tracks) {

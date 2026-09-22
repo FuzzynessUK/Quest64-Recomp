@@ -2,10 +2,11 @@ Custom Music
 ============
 
 This folder is a music library. Put .seq files here (any name; the name is
-what the menu shows), then in the game's Audio tab set Randomize Music to
-Custom and pick a file for each track in the list that appears (Randomise
-all fills every track from this folder; Clear all and Rescan folder sit
-beside it). Track choices apply straight away; Preview on a row plays the track now.
+what the menu shows), then in the game's Audio tab set Randomize Music to On and
+pick a file for each track in the list that appears, or press one of the
+Randomise all buttons: Custom only fills every track from the folders,
+Game's own shuffles the game's own music between its slots, Mix draws
+each track from either. Track choices apply straight away; Preview on a row plays the track now.
 
 A second folder, "fanfares" next to the game, is the pool for the jingles
 (victory fanfare, death, the two chimes): their rows pick from it, and Randomise all

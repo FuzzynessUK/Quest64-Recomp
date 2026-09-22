@@ -56,8 +56,13 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     calls) with the id in a0.
   - *Custom Music* (2026-09-21, play-tested once as the track_NN.seq
     version): `<exe dir>/custom_music` is a library of `.seq` files. One
-    control, Randomize Music: Off / Towns / All (the track shuffle) / Custom
-    (a picker per track; Randomise all fills them, skipping jingles 28,29,30,43, 44 rows generated
+    control, Randomize Music: Off / On (2026-09-22; Towns / All are gone from
+    the UI, `music_shuffle` stays on disk and shows as On). On: a name button
+    per track opening one shared paged picker (search box, 60 a page);
+    Randomise all (Custom only / Game's own / Mix): jingle slots 28,29,30,43
+    draw from `<exe>/fanfares` (names "fanfares/X"), the rest from
+    `custom_music`; "game:N" names point a slot at the game's own sequence N
+    (original_entry[N]), which is how Game's own shuffles, 44 rows generated
     from `track_labels[]` in `audio.cpp`, saved by file name in
     `custom_tracks`; Randomise all / Clear all / Rescan buttons). At boot
     each chosen file is appended to the ROM's free tail (0xF94348 onward is 0xFF) and

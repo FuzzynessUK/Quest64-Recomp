@@ -1143,22 +1143,20 @@ void make_audio_bindings(Rml::Context* context) {
 
     constructor.BindFunc("aud_changed", [](Rml::Variant& out) { out = audio_context.changed ? 1 : 0; });
     bind_tooltip_events(constructor);
-    // One control for the two music settings: 0 off, 1 Towns and 2 All are
-    // the shuffle of the game's own tracks, 3 is the custom library.
+    // Randomize Music: Off / On. On is the per-track table (the old Towns
+    // and All shuffles of the game's own tracks are what "Randomise all
+    // (Game's own)" does now, live); a saved Towns/All shows as On.
     constructor.BindFunc("aud_music",
         [](Rml::Variant& out) {
             const auto& e = audio_context.edited;
-            out = e.custom_music == zelda64::audio::CustomMusic::Custom ? 3 : static_cast<int>(e.music_shuffle);
+            out = e.custom_music == zelda64::audio::CustomMusic::Custom || e.music_shuffle != zelda64::audio::MusicShuffle::Off ? 1 : 0;
         },
         [](const Rml::Variant& in) {
-            int value = std::clamp(in.Get<int>(), 0, 3);
             auto& e = audio_context.edited;
             bool was_shuffle = e.music_shuffle != zelda64::audio::MusicShuffle::Off;
-            e.custom_music = value == 3 ? zelda64::audio::CustomMusic::Custom : zelda64::audio::CustomMusic::Off;
-            e.music_shuffle = value == 3 ? zelda64::audio::MusicShuffle::Off : static_cast<zelda64::audio::MusicShuffle>(value);
-            // Off <-> Custom is live; the shuffles are drawn at boot.
-            bool shuffle_now = e.music_shuffle != zelda64::audio::MusicShuffle::Off;
-            audio_option_changed(was_shuffle || shuffle_now);
+            e.custom_music = in.Get<int>() != 0 ? zelda64::audio::CustomMusic::Custom : zelda64::audio::CustomMusic::Off;
+            e.music_shuffle = zelda64::audio::MusicShuffle::Off;
+            audio_option_changed(was_shuffle);
             push_tracks_live();
         }
     );
@@ -1199,12 +1197,6 @@ void make_audio_bindings(Rml::Context* context) {
             audio_context.page += inputs.at(0).Get<int>();
             repage_music_picker();
         });
-    constructor.BindFunc("aud_randomise_keeps_own",
-        [](Rml::Variant& out) { out = audio_context.edited.randomise_keeps_own ? 1 : 0; },
-        [](const Rml::Variant& in) {
-            audio_context.edited.randomise_keeps_own = in.Get<int>() != 0;
-            audio_option_changed(false);
-        });
     static std::string track_names[zelda64::audio::game_track_count];
     for (int track = 0; track < zelda64::audio::game_track_count; track++) {
         track_names[track] = "aud_track_" + std::to_string(track) + "_name";
@@ -1213,6 +1205,10 @@ void make_audio_bindings(Rml::Context* context) {
             std::string name = it != audio_context.edited.custom_tracks.end() ? it->second : std::string("Game's own");
             if (name.compare(0, zelda64::audio::fanfare_prefix.size(), zelda64::audio::fanfare_prefix) == 0) {
                 name.erase(0, zelda64::audio::fanfare_prefix.size());
+            }
+            int own = zelda64::audio::game_track_of(name);
+            if (own >= 0) {
+                name = std::string("Game: ") + zelda64::audio::track_label(own);
             }
             out = name;
         });
@@ -2080,48 +2076,42 @@ public:
         recompui::attach_hud_preview();
     }
     void register_events(recompui::UiEventListenerInstancer& listener) override {
+        // "aud_music_random_all:custom" fills every track from the folders,
+        // ":own" shuffles the game's own music between its slots, ":mix"
+        // draws each track from either, half and half. Jingle slots only
+        // ever get jingles (the fanfares folder, or the game's own four).
         recompui::register_event(listener, "aud_music_random_all",
             [](const std::string& param, Rml::Event& event) {
                 refresh_music_library();
+                std::string mode = param;
+                if (!mode.empty() && mode[0] == ':') {
+                    mode.erase(0, 1);
+                }
                 std::mt19937 rng{ std::random_device{}() };
                 auto draw = [&rng](const std::vector<std::string>& pool) {
                     return pool[std::uniform_int_distribution<size_t>(0, pool.size() - 1)(rng)];
                 };
-                // The game's own music stays on about one in three tracks
-                // when asked; otherwise every track that can gets a file.
-                bool keep_own = audio_context.edited.randomise_keeps_own;
-                std::uniform_int_distribution<int> third(0, 2);
+                std::vector<std::string> own_loops;
+                std::vector<std::string> own_jingles;
                 for (int track = 0; track < zelda64::audio::game_track_count; track++) {
-                    if (keep_own && third(rng) == 0) {
-                        audio_context.edited.custom_tracks.erase(track);
-                        continue;
+                    (zelda64::audio::track_is_jingle(track) ? own_jingles : own_loops).push_back(zelda64::audio::game_prefix + std::to_string(track));
+                }
+                std::uniform_int_distribution<int> coin(0, 1);
+                for (int track = 0; track < zelda64::audio::game_track_count; track++) {
+                    bool jingle = zelda64::audio::track_is_jingle(track);
+                    const std::vector<std::string>& files = jingle ? audio_context.fanfares : audio_context.library;
+                    const std::vector<std::string>& own = jingle ? own_jingles : own_loops;
+                    bool from_own = mode == "own" || (mode == "mix" && (files.empty() || coin(rng) == 0));
+                    if (from_own) {
+                        audio_context.edited.custom_tracks[track] = draw(own);
                     }
-                    if (zelda64::audio::track_is_jingle(track)) {
-                        // The jingles (the victory fanfare and death, and
-                        // the two short chimes) draw from the one-shot
-                        // fanfares folder only.
-                        if (!audio_context.fanfares.empty()) {
-                            audio_context.edited.custom_tracks[track] = draw(audio_context.fanfares);
-                        }
-                    }
-                    else if (!audio_context.library.empty()) {
-                        audio_context.edited.custom_tracks[track] = draw(audio_context.library);
+                    else if (!files.empty()) {
+                        audio_context.edited.custom_tracks[track] = draw(files);
                     }
                 }
                 audio_option_changed(false);
                 push_tracks_live();
                 dirty_track_names();
-            });
-        recompui::register_event(listener, "aud_music_clear_all",
-            [](const std::string& param, Rml::Event& event) {
-                audio_context.edited.custom_tracks.clear();
-                audio_option_changed(false);
-                push_tracks_live();
-                dirty_track_names();
-            });
-        recompui::register_event(listener, "aud_music_rescan",
-            [](const std::string& param, Rml::Event& event) {
-                refresh_music_library();
             });
         // The Play button on a track row: "aud_play_track:13". Plays what
         // that track is set to right now; Stop goes back to what was on.
