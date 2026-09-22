@@ -1210,6 +1210,17 @@ void make_audio_bindings(Rml::Context* context) {
             if (own >= 0) {
                 name = std::string("Game: ") + zelda64::audio::track_label(own);
             }
+            // The button is 300dp wide; a longer name is cut here rather
+            // than clipped by the button, which would need a clip mask the
+            // renderer cannot do (it drops the scroll area's clipping).
+            constexpr size_t fit = 34;
+            if (name.size() > fit) {
+                size_t cut = fit - 3;
+                while (cut > 0 && (static_cast<unsigned char>(name[cut]) & 0xC0) == 0x80) {
+                    cut--;   // not inside a UTF-8 sequence
+                }
+                name = name.substr(0, cut) + "...";
+            }
             out = name;
         });
     }

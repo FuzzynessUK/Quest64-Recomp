@@ -2619,7 +2619,6 @@ button {
   width: 300dp;
   text-align: left;
   white-space: nowrap;
-  overflow: hidden;
 }
 
 .aud-picker {
