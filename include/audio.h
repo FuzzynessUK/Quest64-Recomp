@@ -53,6 +53,9 @@ namespace zelda64::audio {
         CustomMusic custom_music = CustomMusic::Off;
         // Track number -> library file name without `.seq`.
         std::map<int, std::string> custom_tracks;
+        // Randomise all: whether tracks may be left as the game's own
+        // (about one in three) or every track gets a file.
+        bool randomise_keeps_own = false;
     };
 
     // The game's 44 sequences, by the number the map music table and the

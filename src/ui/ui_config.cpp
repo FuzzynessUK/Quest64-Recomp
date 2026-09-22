@@ -1041,11 +1041,27 @@ struct AudioContext {
     // search text and the matches shown.
     int picker_track = -1;
     std::string filter;
-    std::vector<std::string> filtered;
+    std::vector<std::string> matches;    // every match, without the folder prefix
+    std::vector<std::string> filtered;   // the page of matches shown
+    int page = 0;
 };
 
 AudioContext audio_context;
-constexpr size_t picker_limit = 60;
+constexpr size_t picker_limit = 60;   // matches per page
+
+// The page of matches shown, from `matches`.
+void repage_music_picker() {
+    size_t pages = (audio_context.matches.size() + picker_limit - 1) / picker_limit;
+    if (pages == 0) pages = 1;
+    audio_context.page = std::clamp(audio_context.page, 0, static_cast<int>(pages) - 1);
+    size_t start = static_cast<size_t>(audio_context.page) * picker_limit;
+    audio_context.filtered.assign(audio_context.matches.begin() + std::min(start, audio_context.matches.size()),
+                                  audio_context.matches.begin() + std::min(start + picker_limit, audio_context.matches.size()));
+    if (audio_context.model_handle) {
+        audio_context.model_handle.DirtyVariable("aud_filtered");
+        audio_context.model_handle.DirtyVariable("aud_picker_page");
+    }
+}
 
 // The matches for the search text: every word typed must appear, any case.
 void refilter_music_library() {
@@ -1056,7 +1072,7 @@ void refilter_music_library() {
         std::transform(word.begin(), word.end(), word.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         words.push_back(word);
     }
-    audio_context.filtered.clear();
+    audio_context.matches.clear();
     const std::vector<std::string>& source =
         zelda64::audio::track_is_fanfare(audio_context.picker_track) ? audio_context.fanfares : audio_context.library;
     const std::string& prefix = zelda64::audio::fanfare_prefix;
@@ -1072,15 +1088,10 @@ void refilter_music_library() {
         }
         if (all) {
             // Shown without the folder prefix; aud_pick puts it back.
-            audio_context.filtered.push_back(name.compare(0, prefix.size(), prefix) == 0 ? name.substr(prefix.size()) : name);
-            if (audio_context.filtered.size() >= picker_limit) {
-                break;
-            }
+            audio_context.matches.push_back(name.compare(0, prefix.size(), prefix) == 0 ? name.substr(prefix.size()) : name);
         }
     }
-    if (audio_context.model_handle) {
-        audio_context.model_handle.DirtyVariable("aud_filtered");
-    }
+    repage_music_picker();
 }
 
 void dirty_track_names() {
@@ -1175,7 +1186,24 @@ void make_audio_bindings(Rml::Context* context) {
         [](Rml::Variant& out) { out = audio_context.filter; },
         [](const Rml::Variant& in) {
             audio_context.filter = in.Get<std::string>();
+            audio_context.page = 0;
             refilter_music_library();
+        });
+    constructor.BindFunc("aud_picker_page", [](Rml::Variant& out) {
+        size_t pages = std::max<size_t>(1, (audio_context.matches.size() + picker_limit - 1) / picker_limit);
+        out = "Page " + std::to_string(audio_context.page + 1) + " of " + std::to_string(pages)
+            + " (" + std::to_string(audio_context.matches.size()) + " matches)";
+    });
+    constructor.BindEventCallback("aud_picker_turn",
+        [](Rml::DataModelHandle model_handle, Rml::Event& event, const Rml::VariantList& inputs) {
+            audio_context.page += inputs.at(0).Get<int>();
+            repage_music_picker();
+        });
+    constructor.BindFunc("aud_randomise_keeps_own",
+        [](Rml::Variant& out) { out = audio_context.edited.randomise_keeps_own ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            audio_context.edited.randomise_keeps_own = in.Get<int>() != 0;
+            audio_option_changed(false);
         });
     static std::string track_names[zelda64::audio::game_track_count];
     for (int track = 0; track < zelda64::audio::game_track_count; track++) {
@@ -1194,6 +1222,7 @@ void make_audio_bindings(Rml::Context* context) {
         [](Rml::DataModelHandle model_handle, Rml::Event& event, const Rml::VariantList& inputs) {
             audio_context.picker_track = inputs.at(0).Get<int>();
             audio_context.filter.clear();
+            audio_context.page = 0;
             refresh_music_library();
             model_handle.DirtyVariable("aud_picker_track");
             model_handle.DirtyVariable("aud_picker_label");
@@ -2058,15 +2087,24 @@ public:
                 auto draw = [&rng](const std::vector<std::string>& pool) {
                     return pool[std::uniform_int_distribution<size_t>(0, pool.size() - 1)(rng)];
                 };
+                // The game's own music stays on about one in three tracks
+                // when asked; otherwise every track that can gets a file.
+                bool keep_own = audio_context.edited.randomise_keeps_own;
+                std::uniform_int_distribution<int> third(0, 2);
                 for (int track = 0; track < zelda64::audio::game_track_count; track++) {
-                    if (zelda64::audio::track_is_fanfare(track)) {
-                        // The victory fanfare and the death jingle draw from
-                        // the fanfares folder only.
+                    if (keep_own && third(rng) == 0) {
+                        audio_context.edited.custom_tracks.erase(track);
+                        continue;
+                    }
+                    if (zelda64::audio::track_is_jingle(track)) {
+                        // The jingles (the victory fanfare and death, and
+                        // the two short chimes) draw from the one-shot
+                        // fanfares folder only.
                         if (!audio_context.fanfares.empty()) {
                             audio_context.edited.custom_tracks[track] = draw(audio_context.fanfares);
                         }
                     }
-                    else if (!zelda64::audio::track_is_jingle(track) && !audio_context.library.empty()) {
+                    else if (!audio_context.library.empty()) {
                         audio_context.edited.custom_tracks[track] = draw(audio_context.library);
                     }
                 }

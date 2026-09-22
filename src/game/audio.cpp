@@ -445,7 +445,7 @@ std::vector<std::string> zelda64::audio::fanfare_files(int* too_big) {
 }
 
 bool zelda64::audio::track_is_fanfare(int track) {
-    return track == 30 || track == 43;
+    return track_is_jingle(track);
 }
 
 namespace {
@@ -499,6 +499,7 @@ Options zelda64::audio::load_options() {
     if (o.custom_music == CustomMusic::Custom) {
         o.music_shuffle = MusicShuffle::Off;
     }
+    get("randomise_keeps_own", o.randomise_keeps_own);
     auto tracks = j.find("custom_tracks");
     if (tracks != j.end() && tracks->is_object()) {
         for (const auto& [key, value] : tracks->items()) {
@@ -526,6 +527,7 @@ void zelda64::audio::save_options(const Options& o) {
         }
     }
     j["custom_tracks"] = tracks;
+    j["randomise_keeps_own"] = o.randomise_keeps_own;
     std::ofstream out(options_path());
     out << j.dump(4);
 }

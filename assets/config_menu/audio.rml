@@ -18,7 +18,7 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomize Music</div><div class="config-tip-text">Towns: every area's music is drawn at random from the game's tracks, freshly on each launch. All: the same, plus everything the game starts by name rather than by area - the title screen, battles and bosses, the victory fanfare, the death jingle, the credits, saving - each swapped for a random track for the session. Custom: play your own music from the custom_music folder next to the game, chosen per track below (Randomise all fills every track from the folder). Track choices apply straight away, and Preview on a row starts that track now - Stop goes back to what was playing. The victory fanfare and the death jingle pick from the fanfares folder next to the game instead (one-shot pieces; Randomise all draws them from there). Off, Towns and All are drawn when the game is next launched. A file is a .seq in the game's own format; q64music.exe next to the game makes one from an .ootrs pack or a MIDI, and custom_music.txt beside the settings says what was loaded.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomize Music</div><div class="config-tip-text">Towns: every area's music is drawn at random from the game's tracks, freshly on each launch. All: the same, plus everything the game starts by name rather than by area - the title screen, battles and bosses, the victory fanfare, the death jingle, the credits, saving - each swapped for a random track for the session. Custom: play your own music from the custom_music folder next to the game, chosen per track below (Randomise all fills every track from the folder). Track choices apply straight away, and Preview on a row starts that track now - Stop goes back to what was playing. The jingles (victory fanfare, death, the two chimes) pick from the fanfares folder next to the game instead (one-shot pieces; Randomise all draws them from there). Off, Towns and All are drawn when the game is next launched. A file is a .seq in the game's own format; q64music.exe next to the game makes one from an .ootrs pack or a MIDI, and custom_music.txt beside the settings says what was loaded.</div></div>
                                         <select data-value="aud_music" id="aud_music_select" style="nav-up: #tab_audio">
                                             <option value="0">Off</option>
                                             <option value="1">Towns</option>
@@ -51,6 +51,13 @@
                             </label>
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomise all</div><div class="config-tip-text">What Randomise all gives each track. Custom files only: every looping track gets a file from custom_music and every jingle one from fanfares (a folder that is empty leaves its tracks as they are). Some game's own too: about one track in three is left as the game's own music.</div></div>
+                                        <select data-value="aud_randomise_keeps_own" id="aud_randomise_keeps_own_select">
+                                            <option value="0">Custom files only</option>
+                                            <option value="1">Some game's own too</option>
+                                        </select>
+                                    </div>
                                     <div class="config-debug__select-wrapper" style="margin-bottom: 8dp;">
                                         <button class="button" onclick="aud_music_random_all">Randomise all</button>
                                         <button class="button" onclick="aud_music_clear_all">Clear all</button>
@@ -73,7 +80,12 @@
                                         <div class="aud-picker__list">
                                             <button class="button aud-choice" data-for="name, i : aud_filtered" data-event-click="aud_pick(i)">{{name}}</button>
                                         </div>
-                                        <div class="aud-picker__note">Type to search; the first 60 matches are listed.</div>
+                                        <div class="config-debug__select-wrapper" style="margin-top: 6dp;">
+                                            <button class="button aud-play" data-event-click="aud_picker_turn(-1)">Previous</button>
+                                            <button class="button aud-play" data-event-click="aud_picker_turn(1)">Next</button>
+                                            <div class="aud-picker__note" style="margin: 0dp 0dp 0dp 12dp;">{{aud_picker_page}}</div>
+                                        </div>
+                                        <div class="aud-picker__note">Type to search; 60 matches a page.</div>
                                     </div>
                                     <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Title screen</div><div class="config-tip-text">Track 27: Title screen. Click the name to choose a file; Preview starts the track now, as set here.</div></div>
