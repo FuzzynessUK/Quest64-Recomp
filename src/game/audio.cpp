@@ -236,6 +236,9 @@ namespace {
         log << "Custom music folder: " << folder.string() << "\n";
         std::vector<std::string> library = zelda64::audio::library_files();
         log << "  " << library.size() << " file(s) in the library\n";
+        std::vector<std::string> fanfares = zelda64::audio::fanfare_files();
+        log << "  " << fanfares.size() << " file(s) in the fanfares folder\n";
+        library.insert(library.end(), fanfares.begin(), fanfares.end());
 
         uint32_t count = (static_cast<uint32_t>(patched[seq_bank_start + 2]) << 8) | patched[seq_bank_start + 3];
         for (int track = 0; track < zelda64::audio::game_track_count && static_cast<uint32_t>(track) < count; track++) {
@@ -393,34 +396,56 @@ std::filesystem::path zelda64::audio::library_folder() {
     return std::filesystem::absolute(zelda64::get_program_path() / "custom_music");
 }
 
+std::filesystem::path zelda64::audio::fanfare_folder() {
+    return std::filesystem::absolute(zelda64::get_program_path() / "fanfares");
+}
+
 // Names are UTF-8 (path::u8string): the menu shows them, the settings
 // file stores them (a non-UTF-8 string makes the JSON writer throw), and
-// library_path turns one back into a path.
+// library_path turns one back into a path. A fanfare's name carries the
+// "fanfares/" prefix, which names the folder.
 std::filesystem::path zelda64::audio::library_path(const std::string& name) {
+    if (name.compare(0, fanfare_prefix.size(), fanfare_prefix) == 0) {
+        return fanfare_folder() / std::filesystem::u8path(name.substr(fanfare_prefix.size()) + ".seq");
+    }
     return library_folder() / std::filesystem::u8path(name + ".seq");
 }
 
-std::vector<std::string> zelda64::audio::library_files(int* too_big) {
-    std::vector<std::string> names;
-    int big = 0;
-    std::error_code ec;
-    for (const auto& entry : std::filesystem::directory_iterator(library_folder(), ec)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".seq") {
-            // A file the game's sequence buffer cannot hold is never
-            // offered; the converter says so when it writes one.
-            if (entry.file_size(ec) > seq_buffer_size) {
-                big++;
-                continue;
+namespace {
+    std::vector<std::string> seq_files_in(const std::filesystem::path& folder, const std::string& prefix, int* too_big) {
+        std::vector<std::string> names;
+        int big = 0;
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".seq") {
+                // A file the game's sequence buffer cannot hold is never
+                // offered; the converter says so when it writes one.
+                if (entry.file_size(ec) > seq_buffer_size) {
+                    big++;
+                    continue;
+                }
+                std::u8string u8 = entry.path().stem().u8string();
+                names.push_back(prefix + std::string(u8.begin(), u8.end()));
             }
-            std::u8string u8 = entry.path().stem().u8string();
-            names.emplace_back(u8.begin(), u8.end());
         }
+        std::sort(names.begin(), names.end());
+        if (too_big != nullptr) {
+            *too_big = big;
+        }
+        return names;
     }
-    std::sort(names.begin(), names.end());
-    if (too_big != nullptr) {
-        *too_big = big;
-    }
-    return names;
+}
+
+std::vector<std::string> zelda64::audio::library_files(int* too_big) {
+    return seq_files_in(library_folder(), "", too_big);
+}
+
+std::vector<std::string> zelda64::audio::fanfare_files(int* too_big) {
+    return seq_files_in(fanfare_folder(), fanfare_prefix, too_big);
+}
+
+bool zelda64::audio::track_is_fanfare(int track) {
+    return track == 30 || track == 43;
 }
 
 namespace {
@@ -519,7 +544,7 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
     std::iota(sfx_remap.begin(), sfx_remap.end(), 0);
     // The library is placed whenever the folder has files, so the menu can
     // switch tracks to it live in any mode.
-    bool custom_music = !library_files().empty();
+    bool custom_music = !library_files().empty() || !fanfare_files().empty();
     if (options.music_shuffle == MusicShuffle::Off && !options.sfx_shuffle && !custom_music) {
         return;
     }

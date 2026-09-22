@@ -1033,6 +1033,9 @@ struct AudioContext {
     // The custom_music folder's files (UTF-8 names), and how many were
     // left out for being over the game's buffer.
     std::vector<std::string> library;
+    // The fanfares folder, the pool for the victory fanfare and the death
+    // jingle (names carry the "fanfares/" prefix).
+    std::vector<std::string> fanfares;
     int too_big = 0;
     // The shared picker: which track it is choosing for (-1: closed), the
     // search text and the matches shown.
@@ -1054,7 +1057,10 @@ void refilter_music_library() {
         words.push_back(word);
     }
     audio_context.filtered.clear();
-    for (const std::string& name : audio_context.library) {
+    const std::vector<std::string>& source =
+        zelda64::audio::track_is_fanfare(audio_context.picker_track) ? audio_context.fanfares : audio_context.library;
+    const std::string& prefix = zelda64::audio::fanfare_prefix;
+    for (const std::string& name : source) {
         std::string lower = name;
         std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         bool all = true;
@@ -1065,7 +1071,8 @@ void refilter_music_library() {
             }
         }
         if (all) {
-            audio_context.filtered.push_back(name);
+            // Shown without the folder prefix; aud_pick puts it back.
+            audio_context.filtered.push_back(name.compare(0, prefix.size(), prefix) == 0 ? name.substr(prefix.size()) : name);
             if (audio_context.filtered.size() >= picker_limit) {
                 break;
             }
@@ -1086,7 +1093,10 @@ void dirty_track_names() {
 }
 
 void refresh_music_library() {
+    int big_fanfares = 0;
     audio_context.library = zelda64::audio::library_files(&audio_context.too_big);
+    audio_context.fanfares = zelda64::audio::fanfare_files(&big_fanfares);
+    audio_context.too_big += big_fanfares;
     refilter_music_library();
     if (audio_context.model_handle) {
         audio_context.model_handle.DirtyVariable("aud_library_count");
@@ -1155,7 +1165,7 @@ void make_audio_bindings(Rml::Context* context) {
     constructor.RegisterArray<std::vector<std::string>>();
     refresh_music_library();
     constructor.Bind("aud_filtered", &audio_context.filtered);
-    constructor.BindFunc("aud_library_count", [](Rml::Variant& out) { out = static_cast<int>(audio_context.library.size()); });
+    constructor.BindFunc("aud_library_count", [](Rml::Variant& out) { out = static_cast<int>(audio_context.library.size() + audio_context.fanfares.size()); });
     constructor.BindFunc("aud_library_big", [](Rml::Variant& out) { out = audio_context.too_big; });
     constructor.BindFunc("aud_picker_track", [](Rml::Variant& out) { out = audio_context.picker_track; });
     constructor.BindFunc("aud_picker_label", [](Rml::Variant& out) {
@@ -1172,7 +1182,11 @@ void make_audio_bindings(Rml::Context* context) {
         track_names[track] = "aud_track_" + std::to_string(track) + "_name";
         constructor.BindFunc(track_names[track], [track](Rml::Variant& out) {
             auto it = audio_context.edited.custom_tracks.find(track);
-            out = it != audio_context.edited.custom_tracks.end() ? it->second : std::string("Game's own");
+            std::string name = it != audio_context.edited.custom_tracks.end() ? it->second : std::string("Game's own");
+            if (name.compare(0, zelda64::audio::fanfare_prefix.size(), zelda64::audio::fanfare_prefix) == 0) {
+                name.erase(0, zelda64::audio::fanfare_prefix.size());
+            }
+            out = name;
         });
     }
     // A row's name button: open the picker for that track.
@@ -1197,7 +1211,7 @@ void make_audio_bindings(Rml::Context* context) {
                     tracks.erase(track);
                 }
                 else if (index < static_cast<int>(audio_context.filtered.size())) {
-                    tracks[track] = audio_context.filtered[index];
+                    tracks[track] = (zelda64::audio::track_is_fanfare(track) ? zelda64::audio::fanfare_prefix : std::string()) + audio_context.filtered[index];
                 }
                 audio_option_changed(false);
                 push_tracks_live();
@@ -2040,14 +2054,20 @@ public:
         recompui::register_event(listener, "aud_music_random_all",
             [](const std::string& param, Rml::Event& event) {
                 refresh_music_library();
-                if (audio_context.library.empty()) {
-                    return;
-                }
                 std::mt19937 rng{ std::random_device{}() };
-                std::uniform_int_distribution<size_t> pick(0, audio_context.library.size() - 1);
+                auto draw = [&rng](const std::vector<std::string>& pool) {
+                    return pool[std::uniform_int_distribution<size_t>(0, pool.size() - 1)(rng)];
+                };
                 for (int track = 0; track < zelda64::audio::game_track_count; track++) {
-                    if (!zelda64::audio::track_is_jingle(track)) {
-                        audio_context.edited.custom_tracks[track] = audio_context.library[pick(rng)];
+                    if (zelda64::audio::track_is_fanfare(track)) {
+                        // The victory fanfare and the death jingle draw from
+                        // the fanfares folder only.
+                        if (!audio_context.fanfares.empty()) {
+                            audio_context.edited.custom_tracks[track] = draw(audio_context.fanfares);
+                        }
+                    }
+                    else if (!zelda64::audio::track_is_jingle(track) && !audio_context.library.empty()) {
+                        audio_context.edited.custom_tracks[track] = draw(audio_context.library);
                     }
                 }
                 audio_option_changed(false);

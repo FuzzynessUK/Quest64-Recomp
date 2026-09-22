@@ -5,7 +5,13 @@ This folder is a music library. Put .seq files here (any name; the name is
 what the menu shows), then in the game's Audio tab set Randomize Music to
 Custom and pick a file for each track in the list that appears (Randomise
 all fills every track from this folder; Clear all and Rescan folder sit
-beside it). Changes take effect when the game is next launched. Layout >
+beside it). Track choices apply straight away; Preview on a row plays the track now.
+
+A second folder, "fanfares" next to the game, is the pool for the victory
+fanfare and the death jingle: their rows pick from it, and Randomise all
+draws them from it (they are left alone when it is empty). Put one-shot
+pieces there - a looping song on those two would never end. q64music puts
+a pack whose .meta says "fanfare" there by itself when converting a folder. Layout >
 Notifications > Show song name announces each track as it starts.
 
 Converting music: q64music.exe next to the game

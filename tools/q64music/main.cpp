@@ -43,6 +43,7 @@ namespace {
             "  -o <file>    output .seq (default: the song's name, next to the input)\n"
             "  -d <folder>  output folder; for a folder input the default is the\n"
             "               custom_music folder beside this exe, when there is one\n"
+            "               (fanfare packs then go to the fanfares folder beside it)\n"
             "  --prog c=p,... pin channel c (0-15) to Quest 64 program p (0-28; 9 = drums)\n"
             "  --inst f:i=p   map OoT soundfont f, instrument i, to program p\n"
             "  --map <file>   a map file: lines of \"font instrument program\" (hex or\n"
@@ -210,6 +211,7 @@ namespace {
     struct Settings {
         fs::path output;      // -o: one file only
         fs::path out_dir;
+        fs::path fanfare_dir; // where a fanfare pack goes instead, when set
         std::map<int, int> channel_program;
         std::map<int, int> map_table;
         bool once = false;
@@ -232,6 +234,7 @@ namespace {
         std::string name = input.stem().string();
         oot::Report report;
         bool is_oot = false;
+        bool fanfare = false;
 
         if (ext == ".mid" || ext == ".midi") {
             midi::Options mo;
@@ -246,6 +249,7 @@ namespace {
             if (ext == ".ootrs" || ext == ".zip") {
                 pack = read_ootrs(input);
                 name = pack.name;
+                fanfare = pack.fanfare;
                 if (pack.has_soundfont) {
                     warnings.push_back("the pack bundles its own soundfont, which cannot be used; instruments are mapped to the game's");
                 }
@@ -305,6 +309,9 @@ namespace {
         fs::path output = s.output;
         if (output.empty()) {
             fs::path dir = s.out_dir.empty() ? input.parent_path() : s.out_dir;
+            if (fanfare && !s.fanfare_dir.empty()) {
+                dir = s.fanfare_dir;
+            }
             output = dir / fs::u8path(safe_name(name) + ".seq");
         }
         std::ofstream out(output, std::ios::binary);
@@ -404,6 +411,11 @@ int main(int argc, char** argv) {
             std::error_code ec;
             if (any_folder && fs::is_directory(exe_dir / "custom_music", ec)) {
                 s.out_dir = exe_dir / "custom_music";
+                // Fanfare packs (the .meta says so) go to the game's
+                // fanfares folder, the pool for the victory and death jingles.
+                if (fs::is_directory(exe_dir / "fanfares", ec)) {
+                    s.fanfare_dir = exe_dir / "fanfares";
+                }
             }
         }
         if (!s.out_dir.empty()) {

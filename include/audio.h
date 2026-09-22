@@ -87,6 +87,13 @@ namespace zelda64::audio {
     std::filesystem::path library_folder();
     std::vector<std::string> library_files(int* too_big = nullptr);
     std::filesystem::path library_path(const std::string& name);
+    // The fanfares folder beside the game: the pool for the victory
+    // fanfare and the death jingle (track_is_fanfare), whose names are
+    // stored with the "fanfares/" prefix.
+    inline const std::string fanfare_prefix = "fanfares/";
+    std::filesystem::path fanfare_folder();
+    std::vector<std::string> fanfare_files(int* too_big = nullptr);
+    bool track_is_fanfare(int track);
 
     // Options as saved on disk; a missing file gives defaults.
     Options load_options();
