@@ -2432,6 +2432,8 @@ scrollbarhorizontal sliderbar {
   padding: 4dp 0;
   margin-top: 2dp;
   border-radius: 12dp;
+  max-height: 320dp;
+  overflow-y: auto;
 }
 .config-debug__select-wrapper select selectbox option {
   transition: color 0.05s linear-in-out, background-color 0.05s linear-in-out;

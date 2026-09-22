@@ -91,8 +91,12 @@ namespace {
         if (ulx >= hud_max_x) {
             return nullptr;
         }
-        bool hud_texture = (tile.width == 129 && tile.height == 11) || (tile.width == 63 && (tile.height == 18 || tile.height == 19))
-            || (tile.width == 57 && tile.height == 6) || (tile.width == 13 && tile.height == 13);
+        // The bar's texture is loaded only as wide as the HP or MP left
+        // (57x6 at full), and the plates likewise while the block slides
+        // in, so a HUD texture is known by its height and at most its full
+        // width.
+        bool hud_texture = (tile.width <= 129 && tile.height == 11) || (tile.width <= 63 && (tile.height == 18 || tile.height == 19))
+            || (tile.width <= 57 && tile.height == 6) || (tile.width == 13 && tile.height == 13);
         if (!hud_texture) {
             return nullptr;
         }
