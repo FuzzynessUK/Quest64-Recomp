@@ -103,7 +103,10 @@ namespace {
         if (uly >= 16 && uly <= 72) {
             return &hud_hp;
         }
-        if (uly >= 188 && uly <= 224) {
+        // Hard Mode lays the gems out as a triangle (iconPositionsTriangle
+        // in its source): the fire gem sits 22 rows above the vanilla row,
+        // at y 175, so the zone starts well above it.
+        if (uly >= 168 && uly <= 224) {
             return &hud_spirits;
         }
         return nullptr;
