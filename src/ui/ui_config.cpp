@@ -1160,6 +1160,17 @@ void make_audio_bindings(Rml::Context* context) {
             push_tracks_live();
         }
     );
+    constructor.BindFunc("aud_custom_volume",
+        [](Rml::Variant& out) { out = audio_context.edited.custom_volume; },
+        [](const Rml::Variant& in) {
+            int value = std::clamp(in.Get<int>(), 10, 100);
+            if (value == audio_context.edited.custom_volume) {
+                return;
+            }
+            audio_context.edited.custom_volume = value;
+            audio_option_changed(false);
+            zelda64::audio::set_custom_volume_live(value);
+        });
     constructor.BindFunc("aud_sfx_shuffle",
         [](Rml::Variant& out) { out = audio_context.edited.sfx_shuffle ? 1 : 0; },
         [](const Rml::Variant& in) {

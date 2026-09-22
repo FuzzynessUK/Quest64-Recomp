@@ -260,7 +260,7 @@ void zelda64::set_player_stat(PlayerStat stat, int value) {
 
 // Called from a hook at func_80026658, which every game-mode loop (field,
 // battle, menus) runs once per frame.
-extern "C" void quest64_cheats_frame(uint8_t* rdram) {
+extern "C" void quest64_cheats_frame(uint8_t* rdram, recomp_context* ctx) {
     apply_map_warp(rdram);
     sync_player_stats(rdram);
     apply_pending_item(rdram);
@@ -269,7 +269,7 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram) {
     zelda64::statfx::on_frame(rdram);
     zelda64::spellnotice::on_frame(rdram);
     zelda64::itemnotice::on_frame(rdram);
-    zelda64::audio::on_frame(rdram);
+    zelda64::audio::on_frame(rdram, ctx);
     zelda64::hardmode::on_frame(rdram);
     zelda64::speedrun::update(false);
 }

@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <filesystem>
+
+#include "recomp.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -38,6 +40,11 @@ namespace zelda64::audio {
         // cut three seconds after it starts, so a looping ambience that
         // lands on a common effect cannot run on.
         bool sfx_shuffle = false;
+        // Custom files play at this share of the game's music volume
+        // (10-100), so a loud library can be brought level with the game's
+        // own music. Applied as the player's volume is set (a hook on
+        // func_80026554), live.
+        int custom_volume = 100;
         // Replacement music. `<exe dir>/custom_music` is a library of
         // `.seq` files (compact sequences in the game's own format;
         // tools/mid2cseq.pl writes one from a MIDI), named freely. Custom
@@ -113,7 +120,9 @@ namespace zelda64::audio {
     // Game thread, once per frame: with the sound effect shuffle on, stops
     // any effect three seconds after it last started, so a shuffled loop
     // cannot run on.
-    void on_frame(uint8_t* rdram);
+    void on_frame(uint8_t* rdram, recomp_context* ctx);
+    // Live: the custom music volume changed in the menu.
+    void set_custom_volume_live(int percent);
 }
 
 #endif

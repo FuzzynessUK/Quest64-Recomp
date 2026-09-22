@@ -35,8 +35,14 @@ before_vram = 0x80024260
 # Run queued cheats (map warp, stat edits) once per frame of every game-mode loop.
 [[patches.hook]]
 func = "func_80026658"
-text = "quest64_cheats_frame(rdram); quest64_status_watch_frame(rdram);"
+text = "quest64_cheats_frame(rdram, ctx); quest64_status_watch_frame(rdram);"
 before_vram = 0x80026658
+# Custom music volume: func_80026554 sets both sequence players' volume
+# from a level in a0 (0-255); the hook scales it while a custom file plays.
+[[patches.hook]]
+func = "func_80026554"
+text = "quest64_audio_music_volume(rdram, ctx);"
+before_vram = 0x80026554
 # Faster walking: scale Brian's per-frame velocity (player struct +0x18/+0x20,
 # passed in a1) on entry to the collision/move routine and restore it before
 # the routine's single `jr $ra`, so the handlers never see the scaled value.
