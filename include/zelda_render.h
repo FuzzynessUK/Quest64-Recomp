@@ -20,8 +20,7 @@ namespace zelda64 {
         // Where the HP/MP block and the four spirits are drawn, in frame
         // pixels (240 tall, x from the window's left edge); `custom` false
         // leaves a block where the game puts it (Enhancements > HUD).
-        void set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y,
-                            bool cp_custom, float cp_x, float cp_y);
+        void set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y);
         // Widens the game's inset scissor and frame clear to the full frame
         // so the scene reaches the window's edges (Layout: Remove black borders).
         void set_borders_removed(bool value);

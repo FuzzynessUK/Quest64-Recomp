@@ -82,37 +82,12 @@ namespace {
     };
     HudBlock hud_hp;
     HudBlock hud_spirits;
-    // The compass (top-right): a dial that is a 32x32 textured quad drawn
-    // through a modelview matrix (gSPMatrix load from segment 2 + 0x11C0,
-    // then a gSPDisplayList to the quad's list) under the 2D layer's
-    // orthographic projection, plus its "N" marker, a 12x15 texture
-    // rectangle at 273,34. The rectangle moves like the others; the quad
-    // is moved by re-issuing the game's viewport under a gEXSetViewportAlign
-    // (origin LEFT, offset = the shift) around its list, the way
-    // Zelda64Recomp shifts its matrix-drawn HUD. A block's x/y is where its
-    // box's top-left sits in frame pixels from the window's left edge, so a
-    // rectangle's shift is block.x - anchor_x (anchor: the box's top-left
-    // in the vanilla 4:3 frame; 0 for the two left-hand blocks).
-    HudBlock hud_compass;
     constexpr int hud_max_x = 160;   // the fourth gem's digits reach x 107; three-digit HP goes wider
     constexpr int hud_hp_anchor_y = 24;
     constexpr int hud_sp_anchor_y = 197;
-    constexpr int hud_cp_anchor_x = 260;
-    constexpr int hud_cp_anchor_y = 32;
-    constexpr int hud_cp_min_x = 240;
-    constexpr uint32_t compass_matrix_w0 = 0x01020040;
-    constexpr uint32_t compass_matrix_w1 = 0x020011C0;
-
-    int hud_anchor_x(const HudBlock& block) { return &block == &hud_compass ? hud_cp_anchor_x : 0; }
-    int hud_anchor_y(const HudBlock& block) {
-        return &block == &hud_hp ? hud_hp_anchor_y : &block == &hud_spirits ? hud_sp_anchor_y : hud_cp_anchor_y;
-    }
 
     // Which block a texture rectangle belongs to, or null.
     HudBlock* hud_block_of(int ulx, int uly, const TileState& tile) {
-        if (ulx >= hud_cp_min_x && uly >= 20 && uly <= 70 && tile.width == 12 && tile.height == 15) {
-            return &hud_compass;
-        }
         if (ulx >= hud_max_x) {
             return nullptr;
         }
@@ -428,7 +403,7 @@ namespace {
     }
     // Replace the texture rectangle at `addr` with a copy placed at the
     // block's position: x from the window's left edge, in frame pixels.
-    void move_hud_texrect(uint8_t* rdram, int32_t addr, uint32_t w0, uint32_t w1, uint32_t st, uint32_t dsdt, const HudBlock& block) {
+    void move_hud_texrect(uint8_t* rdram, int32_t addr, uint32_t w0, uint32_t w1, uint32_t st, uint32_t dsdt, const HudBlock& block, int anchor_y) {
         int lry = w0 & 0xFFF;
         int lrx = (w0 >> 12) & 0xFFF;
         int uly = w1 & 0xFFF;
@@ -437,8 +412,8 @@ namespace {
         // 10.2 fixed point throughout; nothing left of or above the window.
         // Whole pixels only: a quarter-pixel offset makes the bar's last row
         // sample the next row of the texture atlas.
-        int dx = (static_cast<int>(std::lround(block.x.load())) - hud_anchor_x(block)) * 4;
-        int dy = (static_cast<int>(std::lround(block.y.load())) - hud_anchor_y(block)) * 4;
+        int dx = static_cast<int>(std::lround(block.x.load())) * 4;
+        int dy = (static_cast<int>(std::lround(block.y.load())) - anchor_y) * 4;
         auto shift = [](int v, int d) { return static_cast<uint32_t>(std::max(v + d, 0)); };
 
         SubList sub(rdram, 34);
@@ -456,35 +431,6 @@ namespace {
         write_w(rdram, addr + 12, 0);
         write_w(rdram, addr + 16, static_cast<uint32_t>(op_spnoop) << 24);
         write_w(rdram, addr + 20, 0);
-    }
-
-    // Replace the gSPDisplayList at `addr` that draws the compass dial with a
-    // list that draws it shifted: the game's viewport re-issued under a
-    // LEFT-origin alignment carrying the shift (10.2), the game's list, then
-    // the alignment and viewport put back. The scissor is widened meanwhile,
-    // as for the rectangles, so the dial can sit outside the 4:3 area.
-    void move_compass_list(uint8_t* rdram, int32_t addr, uint32_t list_w1) {
-        int dx = (static_cast<int>(std::lround(hud_compass.x.load())) - hud_cp_anchor_x) * 4;
-        int dy = (static_cast<int>(std::lround(hud_compass.y.load())) - hud_cp_anchor_y) * 4;
-        uint32_t viewport = resolve(0x01000000u) | 0x80000000u;   // the game's one viewport, segment 1 + 0
-        constexpr uint32_t viewport_w0 = 0x03800010;   // gSPViewport (G_MOVEMEM, G_MV_VIEWPORT)
-        constexpr uint32_t ex_viewport_align = 0x000007;
-
-        SubList sub(rdram, 40);
-        sub.enable_ex();
-        sub.wide_scissor();
-        sub.cmd((ex_opcode << 24) | ex_viewport_align, ex_origin_left);
-        sub.cmd((static_cast<uint32_t>(dx) & 0xFFFFu) << 16 | (static_cast<uint32_t>(dy) & 0xFFFFu), 0);
-        sub.cmd(viewport_w0, viewport);
-        sub.cmd(static_cast<uint32_t>(op_dl) << 24, list_w1);
-        sub.cmd((ex_opcode << 24) | ex_viewport_align, ex_origin_none);
-        sub.cmd(0, 0);
-        sub.cmd(viewport_w0, viewport);
-        sub.restore_scissor();
-        sub.end();
-
-        write_w(rdram, addr, static_cast<uint32_t>(op_dl) << 24);
-        write_w(rdram, addr + 4, static_cast<uint32_t>(sub.start));
     }
 
     void walk(uint8_t* rdram, int32_t addr, int depth, int& budget, int32_t branch_addr = 0) {
@@ -525,14 +471,6 @@ namespace {
                 case op_dl: {
                     uint32_t physical = resolve(w1);
                     int32_t target = static_cast<int32_t>(physical | 0x80000000u);
-                    // The compass dial's list: the one entered right after
-                    // its matrix is loaded.
-                    if (physical < 0x400000 && enabled.load() && hud_compass.custom.load() && ((w0 >> 16) & 0xFF) == 0
-                        && read_w(rdram, addr - 8) == compass_matrix_w0 && read_w(rdram, addr - 4) == compass_matrix_w1) {
-                        walk(rdram, target, depth + 1, budget, addr);   // still tracked (tiles etc.)
-                        move_compass_list(rdram, addr, w1);
-                        break;
-                    }
                     // Only follow lists in the game's 4MB; ours live above it
                     // and have already been handled.
                     if (physical < 0x400000) {
@@ -617,7 +555,8 @@ namespace {
                     else if (op == op_texrect && (h1_w0 >> 24) == op_rdphalf_1 && (h2_w0 >> 24) == op_rdphalf_2) {
                         HudBlock* block = hud_block_of(ulx >> 2, (w1 & 0xFFF) >> 2, tiles[tile]);
                         if (block != nullptr && block->custom.load()) {
-                            move_hud_texrect(rdram, addr, w0, w1, read_w(rdram, addr + 12), read_w(rdram, addr + 20), *block);
+                            move_hud_texrect(rdram, addr, w0, w1, read_w(rdram, addr + 12), read_w(rdram, addr + 20), *block,
+                                block == &hud_hp ? hud_hp_anchor_y : hud_sp_anchor_y);
                         }
                     }
                     // Skip the two RDPHALF commands regardless.
@@ -641,17 +580,13 @@ void zelda64::renderer::set_borders_removed(bool value) {
     remove_borders.store(value);
 }
 
-void zelda64::renderer::set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y,
-                                       bool cp_custom, float cp_x, float cp_y) {
+void zelda64::renderer::set_hud_layout(bool hp_custom, float hp_x, float hp_y, bool sp_custom, float sp_x, float sp_y) {
     hud_hp.x.store(hp_x);
     hud_hp.y.store(hp_y);
     hud_hp.custom.store(hp_custom);
     hud_spirits.x.store(sp_x);
     hud_spirits.y.store(sp_y);
     hud_spirits.custom.store(sp_custom);
-    hud_compass.x.store(cp_x);
-    hud_compass.y.store(cp_y);
-    hud_compass.custom.store(cp_custom);
 }
 
 void zelda64::renderer::request_widescreen_frame_dump() {

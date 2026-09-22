@@ -759,7 +759,6 @@ struct HudBox {
     bool* custom;
     float* x;
     float* y;
-    float anchor_x;   // the box's top-left in the vanilla 4:3 frame
     float anchor_y;
     float w;
     float h;
@@ -767,7 +766,7 @@ struct HudBox {
     float drag_mouse[2] = { 0.0f, 0.0f };
     float drag_origin[2] = { 0.0f, 0.0f };
 };
-extern HudBox hud_boxes[3];
+extern HudBox hud_boxes[2];
 void hud_box_position(const HudBox& box, float& x, float& y);
 void push_hud_layout();
 void dirty_timer_position();
@@ -911,8 +910,6 @@ void make_enhancements_bindings(Rml::Context* context) {
     bind_hud_field("enh_hud_hp_y", 0, true);
     bind_hud_field("enh_hud_sp_x", 1, false);
     bind_hud_field("enh_hud_sp_y", 1, true);
-    bind_hud_field("enh_hud_cp_x", 2, false);
-    bind_hud_field("enh_hud_cp_y", 2, true);
     constructor.BindFunc("enh_remove_borders",
         [](Rml::Variant& out) { out = enhancements_context.edited.remove_borders ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1855,19 +1852,14 @@ namespace {
     constexpr float hud_sp_anchor_y = 197.0f;
     constexpr float hud_sp_w = 108.0f;
     constexpr float hud_sp_h = 17.0f;
-    constexpr float hud_cp_anchor_x = 260.0f;
-    constexpr float hud_cp_anchor_y = 32.0f;
-    constexpr float hud_cp_w = 40.0f;
-    constexpr float hud_cp_h = 44.0f;
     constexpr float frame_h = 240.0f;
     constexpr float frame_w_43 = 320.0f;
     constexpr float preview_h_dp = 180.0f;
 
 }
-HudBox hud_boxes[3] = {
-    { "hud_hp_box", &enhancements_context.edited.hud_hp_custom, &enhancements_context.edited.hud_hp_x, &enhancements_context.edited.hud_hp_y, 0.0f, hud_hp_anchor_y, hud_hp_w, hud_hp_h },
-    { "hud_sp_box", &enhancements_context.edited.hud_sp_custom, &enhancements_context.edited.hud_sp_x, &enhancements_context.edited.hud_sp_y, 0.0f, hud_sp_anchor_y, hud_sp_w, hud_sp_h },
-    { "hud_cp_box", &enhancements_context.edited.hud_cp_custom, &enhancements_context.edited.hud_cp_x, &enhancements_context.edited.hud_cp_y, hud_cp_anchor_x, hud_cp_anchor_y, hud_cp_w, hud_cp_h },
+HudBox hud_boxes[2] = {
+    { "hud_hp_box", &enhancements_context.edited.hud_hp_custom, &enhancements_context.edited.hud_hp_x, &enhancements_context.edited.hud_hp_y, hud_hp_anchor_y, hud_hp_w, hud_hp_h },
+    { "hud_sp_box", &enhancements_context.edited.hud_sp_custom, &enhancements_context.edited.hud_sp_x, &enhancements_context.edited.hud_sp_y, hud_sp_anchor_y, hud_sp_w, hud_sp_h },
 };
 namespace {
 
@@ -1884,8 +1876,7 @@ namespace {
 }
 void push_hud_layout() {
     const zelda64::enhancements::Options& e = enhancements_context.edited;
-    zelda64::renderer::set_hud_layout(e.hud_hp_custom, e.hud_hp_x, e.hud_hp_y, e.hud_sp_custom, e.hud_sp_x, e.hud_sp_y,
-                                      e.hud_cp_custom, e.hud_cp_x, e.hud_cp_y);
+    zelda64::renderer::set_hud_layout(e.hud_hp_custom, e.hud_hp_x, e.hud_hp_y, e.hud_sp_custom, e.hud_sp_x, e.hud_sp_y);
 }
 
 // Where a box sits, in frame pixels from the window's left edge.
@@ -1895,7 +1886,7 @@ void hud_box_position(const HudBox& box, float& x, float& y) {
         y = *box.y;
     }
     else {
-        x = (frame_width() - frame_w_43) / 2.0f + box.anchor_x;
+        x = (frame_width() - frame_w_43) / 2.0f;
         y = box.anchor_y;
     }
 }
@@ -1945,7 +1936,7 @@ namespace {
             if (event.GetId() == Rml::EventId::Dragend) {
                 box->dragging = false;
                 enhancements_option_changed(false);
-                for (const char* name : { "enh_hud_hp_x", "enh_hud_hp_y", "enh_hud_sp_x", "enh_hud_sp_y", "enh_hud_cp_x", "enh_hud_cp_y" }) {
+                for (const char* name : { "enh_hud_hp_x", "enh_hud_hp_y", "enh_hud_sp_x", "enh_hud_sp_y" }) {
                     enhancements_context.model_handle.DirtyVariable(name);
                 }
             }
@@ -1966,9 +1957,9 @@ void recompui::update_hud_preview() {
     // The X/Y fields show the default position while a block is not
     // custom, and that depends on the window; refresh them when it moves.
     {
-        static int shown[6] = { -1, -1, -1, -1, -1, -1 };
-        static const char* const names[6] = { "enh_hud_hp_x", "enh_hud_hp_y", "enh_hud_sp_x", "enh_hud_sp_y", "enh_hud_cp_x", "enh_hud_cp_y" };
-        for (int b = 0; b < 3; b++) {
+        static int shown[4] = { -1, -1, -1, -1 };
+        static const char* const names[4] = { "enh_hud_hp_x", "enh_hud_hp_y", "enh_hud_sp_x", "enh_hud_sp_y" };
+        for (int b = 0; b < 2; b++) {
             float x, y;
             hud_box_position(hud_boxes[b], x, y);
             int now[2] = { static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)) };
@@ -2171,12 +2162,6 @@ public:
         recompui::register_event(listener, "hud_reset_sp",
             [](const std::string& param, Rml::Event& event) {
                 enhancements_context.edited.hud_sp_custom = false;
-                push_hud_layout();
-                enhancements_option_changed(false);
-            });
-        recompui::register_event(listener, "hud_reset_cp",
-            [](const std::string& param, Rml::Event& event) {
-                enhancements_context.edited.hud_cp_custom = false;
                 push_hud_layout();
                 enhancements_option_changed(false);
             });
