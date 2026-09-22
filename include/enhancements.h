@@ -72,6 +72,10 @@ namespace zelda64::enhancements {
         bool hud_sp_custom = false;
         float hud_sp_x = 0.0f;
         float hud_sp_y = 0.0f;
+        // The compass (top-right dial and its N marker).
+        bool hud_cp_custom = false;
+        float hud_cp_x = 0.0f;
+        float hud_cp_y = 0.0f;
 
         // The Japanese release bursts a colour over Brian when a stat rises
         // (red HP, blue MP, yellow defense, green agility); the US build has

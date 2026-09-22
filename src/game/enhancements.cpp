@@ -131,6 +131,9 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("hud_sp_custom", o.hud_sp_custom);
     get("hud_sp_x", o.hud_sp_x);
     get("hud_sp_y", o.hud_sp_y);
+    get("hud_cp_custom", o.hud_cp_custom);
+    get("hud_cp_x", o.hud_cp_x);
+    get("hud_cp_y", o.hud_cp_y);
     get("stat_up_effect", o.stat_up_effect);
     get("spell_notice", o.spell_notice);
     get("song_notice", o.song_notice);
@@ -167,6 +170,9 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["hud_sp_custom"] = o.hud_sp_custom;
     j["hud_sp_x"] = o.hud_sp_x;
     j["hud_sp_y"] = o.hud_sp_y;
+    j["hud_cp_custom"] = o.hud_cp_custom;
+    j["hud_cp_x"] = o.hud_cp_x;
+    j["hud_cp_y"] = o.hud_cp_y;
     j["stat_up_effect"] = o.stat_up_effect;
     j["spell_notice"] = o.spell_notice;
     j["song_notice"] = o.song_notice;
@@ -199,7 +205,8 @@ const zelda64::enhancements::Options& zelda64::enhancements::active_options() {
 void zelda64::enhancements::apply_at_boot(uint8_t* rdram) {
     const Options& options = active_options();
     zelda64::renderer::set_hud_layout(options.hud_hp_custom, options.hud_hp_x, options.hud_hp_y,
-        options.hud_sp_custom, options.hud_sp_x, options.hud_sp_y);
+        options.hud_sp_custom, options.hud_sp_x, options.hud_sp_y,
+        options.hud_cp_custom, options.hud_cp_x, options.hud_cp_y);
     zelda64::renderer::set_borders_removed(options.remove_borders);
     std::vector<Write> writes = build_writes(options);
     if (writes.empty()) {

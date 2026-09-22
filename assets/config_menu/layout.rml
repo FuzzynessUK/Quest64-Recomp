@@ -25,6 +25,7 @@
                                             <div id="hud_area" class="hud-area"></div>
                                             <div id="hud_hp_box" class="hud-box">HP/MP</div>
                                             <div id="hud_sp_box" class="hud-box">Spirits</div>
+                                            <div id="hud_cp_box" class="hud-box">Compass</div>
                                             <div id="hud_notice_box" class="hud-box hud-box--notice">Notifications</div>
                                         </div>
                                     </div>
@@ -38,10 +39,16 @@
                                         <input type="text" id="enh_hud_sp_x_input" data-value="enh_hud_sp_x" maxlength="5" style="margin-right: 8dp;" />
                                         <input type="text" id="enh_hud_sp_y_input" data-value="enh_hud_sp_y" maxlength="5" />
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Compass X / Y</div><div class="config-tip-text">The compass's position in the game's pixels: X from the window's left edge, Y from the top (the picture is 240 tall). Typing a number moves it; the drag box and these agree.</div></div>
+                                        <input type="text" id="enh_hud_cp_x_input" data-value="enh_hud_cp_x" maxlength="5" style="margin-right: 8dp;" />
+                                        <input type="text" id="enh_hud_cp_y_input" data-value="enh_hud_cp_y" maxlength="5" />
+                                    </div>
                                 </div>
                                 <div class="config-debug__option-trigger">
                                     <button class="button" onclick="hud_reset_hp">HP/MP default</button>
                                     <button class="button" onclick="hud_reset_sp">Spirits default</button>
+                                    <button class="button" onclick="hud_reset_cp">Compass default</button>
                                 </div>
                             </div>
                         </div>
