@@ -803,6 +803,36 @@ namespace {
     // from, and which slot is us, so our own finds do not say "from".
     std::map<int, std::string> player_names;
     int our_slot = -1;
+    // Which game each slot is playing, and every game's item ids by name.
+    // An item found here for somebody else belongs to their game, not this
+    // one, so naming it takes the server's data package - all the room
+    // sends in the message itself is numbers ("1 found their 1365511683").
+    std::map<int, std::string> slot_game;
+    std::map<std::string, std::map<int64_t, std::string>> item_names_by_game;
+
+    // What to call an item belonging to `slot`. Called with server_mutex held.
+    std::string item_name_for(int slot, int64_t item) {
+        auto game = slot_game.find(slot);
+        if (game != slot_game.end()) {
+            auto names = item_names_by_game.find(game->second);
+            if (names != item_names_by_game.end()) {
+                auto found = names->second.find(item);
+                if (found != names->second.end()) {
+                    return found->second;
+                }
+            }
+        }
+        // Whose game it is was not known, or the id was not in it. Ids are
+        // handed out per game and the room only holds a few, so looking
+        // through the rest still beats showing a number at somebody.
+        for (const auto& [name, names] : item_names_by_game) {
+            auto found = names.find(item);
+            if (found != names.end()) {
+                return found->second;
+            }
+        }
+        return "item " + std::to_string(item);
+    }
 
     std::thread worker;
     std::atomic<bool> worker_should_run{ false };
@@ -949,6 +979,37 @@ namespace {
                             { "slot_data", true },
                         };
                         ws.send_text(json::array({ connect }).dump());
+
+                        // And the names for everything in the room. Only the
+                        // games actually being played - asking for none at
+                        // all fetches every game Archipelago knows about.
+                        json games = json::array();
+                        if (packet.contains("games") && packet["games"].is_array()) {
+                            games = packet["games"];
+                        }
+                        json wanted = { { "cmd", "GetDataPackage" }, { "games", games } };
+                        ws.send_text(json::array({ wanted }).dump());
+                    }
+                    else if (cmd == "DataPackage") {
+                        if (packet.contains("data") && packet["data"].contains("games") &&
+                            packet["data"]["games"].is_object()) {
+                            std::lock_guard lock{ server_mutex };
+                            const json& games = packet["data"]["games"];
+                            for (auto game = games.begin(); game != games.end(); ++game) {
+                                if (!game.value().contains("item_name_to_id")) {
+                                    continue;
+                                }
+                                const json& ids = game.value()["item_name_to_id"];
+                                std::map<int64_t, std::string>& names = item_names_by_game[game.key()];
+                                for (auto it = ids.begin(); it != ids.end(); ++it) {
+                                    if (it.value().is_number_integer()) {
+                                        names[it.value().get<int64_t>()] = it.key();
+                                    }
+                                }
+                            }
+                            log_line("item names for " + std::to_string(item_names_by_game.size()) +
+                                     " game(s)");
+                        }
                     }
                     else if (cmd == "Connected") {
                         authenticated = true;
@@ -987,6 +1048,18 @@ namespace {
                                     }
                                     if (!name.empty()) {
                                         player_names[who["slot"].get<int>()] = name;
+                                    }
+                                }
+                            }
+                            // Which game each slot plays, so an item sent to
+                            // one of them can be looked up in the right game.
+                            if (packet.contains("slot_info") && packet["slot_info"].is_object()) {
+                                slot_game.clear();
+                                for (auto it = packet["slot_info"].begin();
+                                     it != packet["slot_info"].end(); ++it) {
+                                    std::string game = it.value().value("game", "");
+                                    if (!game.empty()) {
+                                        slot_game[std::atoi(it.key().c_str())] = game;
                                     }
                                 }
                             }
@@ -1090,19 +1163,27 @@ namespace {
                         if (!line.empty()) {
                             log_line("  " + line);
                         }
-                        // The other direction: something found here that
-                        // belongs to another player. The item is in that
-                        // player's game, not this one, so its name can only
-                        // come from the server - which is what this text is.
-                        // Our own receipts are announced from ReceivedItems
-                        // instead, where the name can be a tidier one.
-                        if (packet.value("type", "") == "ItemSend" && !line.empty() &&
+                        // The other direction: a check found here holding
+                        // something that belongs to another player. The
+                        // message itself is only numbers, so the name comes
+                        // from the data package and the player from the room
+                        // - our own receipts are announced from ReceivedItems
+                        // instead, where the name is this game's own.
+                        if (packet.value("type", "") == "ItemSend" &&
                             packet.contains("item") && packet["item"].is_object()) {
                             int finder = packet["item"].value("player", -1);
                             int receiver = packet.value("receiving", -1);
+                            int64_t what = packet["item"].value("item", static_cast<int64_t>(0));
                             std::lock_guard lock{ server_mutex };
                             if (finder == our_slot && receiver != our_slot) {
-                                zelda64::notify::post(line, zelda64::notify::Kind::ApSent);
+                                auto who = player_names.find(receiver);
+                                std::string name = who != player_names.end()
+                                    ? who->second
+                                    : "player " + std::to_string(receiver);
+                                zelda64::notify::post(
+                                    "You have sent \"" + item_name_for(receiver, what) +
+                                        "\" to \"" + name + "\"",
+                                    zelda64::notify::Kind::ApSent);
                             }
                         }
                     }
