@@ -24,7 +24,7 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="aud_music == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Battle music</div><div class="config-tip-text">Normal is the game's own behaviour: a random battle swaps to the battle track and swaps back afterwards, which restarts whatever was playing from its beginning. Keep the current track never starts the battle track at all, so the music you were listening to simply carries on through the fight - and the swap back is dropped too, or it would restart a track that never stopped. Resume where it left off lets the battle music play, but notes how far through the field track you were and jumps back to that point when the fight ends, instead of starting it again. Boss music is unaffected by any of these.</div></div>
                                         <select data-value="aud_battle_music" id="aud_battle_music_select">
                                             <option value="0">Normal</option>
