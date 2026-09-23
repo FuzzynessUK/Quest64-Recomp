@@ -527,7 +527,7 @@ struct CheatsContext {
     // Get Item list, and the master switch for the whole tab.
     int item_index = 0;
     std::vector<std::string> item_names;
-    bool all_cheats_enabled = true;
+    bool all_cheats_enabled = false;   // matches cheats_on in debug.cpp
 
     // What the sliders show. Follows the game's value except right after the
     // user moves a slider, when it holds the new value until the game reports

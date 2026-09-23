@@ -106,7 +106,7 @@ namespace zelda64::enhancements {
         // The notification stack itself (all three above). Off hides and
         // silences them; never_expire keeps messages until pushed out;
         // notify_max is how many show at once (1-10). All live.
-        bool notifications = true;
+        bool notifications = false;
         bool notify_never_expire = false;
         int notify_max = 5;
         // Where the stack sits: 0 top left, 1 top middle, 2 top right,

@@ -292,7 +292,9 @@ namespace {
     constexpr int32_t inventory_empty = 0xFF;
     constexpr int32_t no_pending_item = -1;
 
-    std::atomic<bool> cheats_on = true;
+    // Off until the Cheats tab's master switch is turned on. Nothing saves
+    // it, so every launch starts with them off.
+    std::atomic<bool> cheats_on = false;
     std::atomic<bool> no_encounters = false;
     // Cached each frame so the menu can read it without touching RDRAM off
     // the game thread.
