@@ -152,7 +152,9 @@ namespace {
     // Diagnostics: every distinct rectangle seen, written once.
     std::mutex log_mutex;
     std::set<std::tuple<int, int, int, int, int>> logged_rects;
-    bool log_rects = true;
+    // Calibration aid: off while playing. It had grown a 14 MB file by the
+    // time anyone noticed.
+    bool log_rects = false;
 
     uint32_t read_w(uint8_t* rdram, int32_t addr) {
         return static_cast<uint32_t>(MEM_W(0, addr));

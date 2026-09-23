@@ -199,6 +199,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/randomizer/enemy_progression_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/enhancements.cpp
     ${CMAKE_SOURCE_DIR}/src/game/audio.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/archipelago.cpp
     ${CMAKE_SOURCE_DIR}/src/game/statfx.cpp
     ${CMAKE_SOURCE_DIR}/src/game/easierquest.cpp
     ${CMAKE_SOURCE_DIR}/src/game/statuswatch.cpp

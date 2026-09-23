@@ -10,11 +10,30 @@
 // ones go. Any feature on the game thread posts a line; the UI thread draws
 // them (recompui::update_notifications, assets/notifications.rml).
 namespace zelda64::notify {
+    // What a line is about. A kind lets the overlay treat repeats of the
+    // same thing as one line - a new song name taking the place of the one
+    // showing rather than stacking under it - where the setting for that
+    // kind asks for it. Anything left unlabelled always stacks.
+    enum class Kind {
+        Any,
+        Song,
+        // Archipelago traffic. Posted whatever the setting says and dropped
+        // by the overlay instead, so the Notifications setting takes effect
+        // as it is changed rather than on the next launch.
+        ApReceived,   // an item this slot was sent
+        ApSent,       // an item found here that belongs to someone else
+    };
+
+    struct Message {
+        std::string text;
+        Kind kind = Kind::Any;
+    };
+
     // Game thread (or any thread): queue a line for the overlay.
-    void post(std::string text);
+    void post(std::string text, Kind kind = Kind::Any);
 
     // UI thread: the lines posted since the last call, oldest first.
-    std::vector<std::string> take();
+    std::vector<Message> take();
 }
 
 #endif

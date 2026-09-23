@@ -11,6 +11,7 @@
 #include "zelda_config.h"
 #include "zelda_debug.h"
 #include "zelda_game.h"
+#include "archipelago.h"
 #include "randomizer.h"
 #include "audio.h"
 #include "enhancements.h"
@@ -953,11 +954,24 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed();
         }
     );
+    // Off / On / On (one at a time), two settings behind the one select.
     constructor.BindFunc("enh_song_notice",
-        [](Rml::Variant& out) { out = enhancements_context.edited.song_notice ? 1 : 0; },
+        [](Rml::Variant& out) {
+            const zelda64::enhancements::Options& o = enhancements_context.edited;
+            out = !o.song_notice ? 0 : o.song_notice_one ? 2 : 1;
+        },
         [](const Rml::Variant& in) {
-            enhancements_context.edited.song_notice = in.Get<int>() != 0;
+            int mode = in.Get<int>();
+            enhancements_context.edited.song_notice = mode != 0;
+            enhancements_context.edited.song_notice_one = mode == 2;
             enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_ap_notice",
+        [](Rml::Variant& out) { out = enhancements_context.edited.ap_notice; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.ap_notice = std::clamp(in.Get<int>(), 0, 2);
+            enhancements_option_changed(false);   // live, like the rest of this group
         }
     );
     constructor.BindFunc("enh_spell_notice",
@@ -1171,6 +1185,17 @@ void make_audio_bindings(Rml::Context* context) {
             audio_option_changed(false);
             zelda64::audio::set_custom_volume_live(value);
         });
+    constructor.BindFunc("aud_battle_music",
+        [](Rml::Variant& out) { out = audio_context.edited.battle_music; },
+        [](const Rml::Variant& in) {
+            int value = std::clamp(in.Get<int>(), 0, 2);
+            if (value == audio_context.edited.battle_music) {
+                return;
+            }
+            audio_context.edited.battle_music = value;
+            // Live: the hook reads active_options() every request.
+            audio_option_changed(false);
+        });
     constructor.BindFunc("aud_sfx_shuffle",
         [](Rml::Variant& out) { out = audio_context.edited.sfx_shuffle ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1270,6 +1295,10 @@ void make_audio_bindings(Rml::Context* context) {
     audio_context.model_handle = constructor.GetModelHandle();
 }
 
+// The connector's settings as the menu has them. Loaded once, then kept in
+// step with archipelago.json by every edit.
+zelda64::archipelago::Options archipelago_edited = zelda64::archipelago::load_options();
+
 void make_randomizer_bindings(Rml::Context* context) {
     using zelda64::randomizer::Options;
     Rml::DataModelConstructor constructor = context->CreateDataModel("randomizer_model");
@@ -1296,9 +1325,70 @@ void make_randomizer_bindings(Rml::Context* context) {
         [](Rml::Variant& out) { out = randomizer_context.preset_name; },
         [](const Rml::Variant& in) { randomizer_context.preset_name = in.Get<std::string>(); }
     );
+    // The Archipelago connector. Its settings live in archipelago.json, not
+    // randomizer.json. Editing a field only updates the saved copy - it does
+    // not dial the server, so typing a password or flipping the switch on
+    // can't fire off a connection attempt with whatever is half-typed. Only
+    // the Connect button does that.
+    {
+        using zelda64::archipelago::apply_options;
+        using zelda64::archipelago::save_options;
+        auto edit = [](auto change) {
+            zelda64::archipelago::Options o = archipelago_edited;
+            change(o);
+            archipelago_edited = o;
+            save_options(o);
+        };
+        constructor.BindFunc("ap_server",
+            [](Rml::Variant& out) { out = archipelago_edited.server; },
+            [edit](const Rml::Variant& in) { edit([&](auto& o) { o.server = in.Get<std::string>(); }); });
+        constructor.BindFunc("ap_slot",
+            [](Rml::Variant& out) { out = archipelago_edited.slot; },
+            [edit](const Rml::Variant& in) { edit([&](auto& o) { o.slot = in.Get<std::string>(); }); });
+        constructor.BindFunc("ap_password",
+            [](Rml::Variant& out) { out = archipelago_edited.password; },
+            [edit](const Rml::Variant& in) { edit([&](auto& o) { o.password = in.Get<std::string>(); }); });
+        constructor.BindFunc("ap_status",
+            [](Rml::Variant& out) { out = zelda64::archipelago::status_line(); });
+        constructor.BindFunc("ap_connected",
+            [](Rml::Variant& out) {
+                out = zelda64::archipelago::status() != zelda64::archipelago::Status::Off ? 1 : 0;
+            });
+        // The two buttons are the on switch: there is no separate one. What
+        // they set is remembered, because Archipelago mode is decided at
+        // boot - the chests are emptied and the gift NPCs found before a
+        // game starts - so connecting once means the next launch comes up
+        // ready to connect again.
+        auto connect = [](bool on) {
+            zelda64::archipelago::Options o = archipelago_edited;
+            o.enabled = on;
+            archipelago_edited = o;
+            apply_options(o);
+        };
+        constructor.BindEventCallback("ap_connect",
+            [connect](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { connect(true); });
+        constructor.BindEventCallback("ap_disconnect",
+            [connect](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) { connect(false); });
+    }
+
     bind_randomizer_field(constructor, "rnd_mode", &Options::mode);
     bind_randomizer_field(constructor, "rnd_seed", &Options::seed);
-    bind_randomizer_field(constructor, "rnd_spell_shuffle", &Options::spell_shuffle);
+    // One control for the spell shuffle and the boss spells: 0 off, 1 the
+    // shuffle on its own, 2-4 the shuffle plus one of the boss spell mixes.
+    // The two settings stay separate in randomizer.json, so an older file
+    // and the presets still load.
+    constructor.BindFunc("rnd_spell_shuffle",
+        [](Rml::Variant& out) {
+            const Options& o = randomizer_context.edited;
+            out = o.spell_shuffle ? (o.boss_spells == 0 ? 1 : o.boss_spells + 1) : 0;
+        },
+        [](const Rml::Variant& in) {
+            int value = std::clamp(in.Get<int>(), 0, 4);
+            randomizer_context.edited.spell_shuffle = value != 0;
+            randomizer_context.edited.boss_spells = value >= 2 ? value - 1 : 0;
+            randomizer_option_changed();
+        }
+    );
     bind_randomizer_field(constructor, "rnd_hinted_spell_names", &Options::hinted_spell_names);
     bind_randomizer_field(constructor, "rnd_linear_spell_names", &Options::linear_spell_names);
     bind_randomizer_field(constructor, "rnd_early_healing", &Options::early_healing);
@@ -1312,7 +1402,6 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_max_accuracy_all", &Options::max_accuracy_all);
     bind_randomizer_field(constructor, "rnd_soul_search", &Options::soul_search);
     bind_randomizer_field(constructor, "rnd_invalidity", &Options::invalidity);
-    bind_randomizer_field(constructor, "rnd_boss_spells", &Options::boss_spells);
     bind_randomizer_field(constructor, "rnd_spirit_shuffle", &Options::spirit_shuffle);
     bind_randomizer_field(constructor, "rnd_chest_shuffle", &Options::chest_shuffle);
     bind_randomizer_field(constructor, "rnd_chests", &Options::chests);
@@ -1701,10 +1790,32 @@ namespace {
     struct Notice {
         Rml::Element* element;
         std::chrono::steady_clock::time_point shown_at;
+        zelda64::notify::Kind kind = zelda64::notify::Kind::Any;
     };
     std::vector<Notice> notices;
     constexpr float notice_hold = 3.0f;
     constexpr float notice_fade = 0.5f;
+}
+
+// The connector runs on its own thread, so the menu only finds out what it
+// is doing by asking. Called once a frame next to the other overlays: it
+// marks the status line dirty when the text or the connected state has
+// actually changed. Nothing here dials the server - that only happens when
+// the Connect button is pressed, never just because the game launched with
+// the switch left on from a previous session.
+void recompui::update_archipelago() {
+    static std::string shown;
+    static zelda64::archipelago::Status shown_status = zelda64::archipelago::Status::Off;
+    std::string now = zelda64::archipelago::status_line();
+    zelda64::archipelago::Status now_status = zelda64::archipelago::status();
+    if (now != shown || now_status != shown_status) {
+        shown = now;
+        shown_status = now_status;
+        if (randomizer_context.model_handle) {
+            randomizer_context.model_handle.DirtyVariable("ap_status");
+            randomizer_context.model_handle.DirtyVariable("ap_connected");
+        }
+    }
 }
 
 void recompui::update_notifications() {
@@ -1725,6 +1836,21 @@ void recompui::update_notifications() {
     // as they are changed.
     const zelda64::enhancements::Options& live = enhancements_context.edited;
     int position = std::clamp(live.notify_position, 0, 8);
+
+    // How wide the floating box may be. A notice is one unwrapped line
+    // that hugs its text, so one wider than the box overflows it to the
+    // right - and with the box pinned by its right edge, that put long
+    // song names off the screen. Giving it the whole window lets the line
+    // grow leftwards from that edge instead. 700dp is the old fixed width,
+    // kept as the fallback if the context has no size yet.
+    int box_width = 700;
+    if (Rml::Context* context = document->GetContext()) {
+        int window = context->GetDimensions().x;
+        int margin = static_cast<int>(16.0f * context->GetDensityIndependentPixelRatio());
+        if (window > margin * 2 + 64) {
+            box_width = window - margin * 2;
+        }
+    }
 
     // Top left is the column under the timer; anywhere else is the floating
     // box, pinned to its edge or corner with the lines aligned to match.
@@ -1749,7 +1875,7 @@ void recompui::update_notifications() {
         static const int timer_as_notify[6] = { 0, 2, 6, 8, 1, 7 };
         bool timer_here = live.speedrun_timer
             && timer_as_notify[std::clamp(live.timer_position, 0, 5)] == position;
-        int wanted_layout = position + (timer_here ? 16 : 0);
+        int wanted_layout = position + (timer_here ? 16 : 0) + box_width * 32;
         static int applied = -1;
         if (applied != wanted_layout) {
             applied = wanted_layout;
@@ -1766,10 +1892,15 @@ void recompui::update_notifications() {
                 floating->SetProperty(v.substr(0, v.find(':')), v.substr(v.find(':') + 2));
                 v = edges[position][1];
                 floating->SetProperty(v.substr(0, v.find(':')), v.substr(v.find(':') + 2));
+                // The box was a fixed 700dp, and a notice wider than that
+                // overflowed it to the right - off the screen, because the
+                // box was pinned by its right edge. Widening it to the
+                // window lets a long line grow leftwards instead.
                 if (std::string(edges[position][1]) == "left: 50%") {
-                    floating->SetProperty("margin-left", "-350dp");   // half the 700dp box
+                    floating->SetProperty("margin-left", std::to_string(-box_width / 2) + "px");
                 }
                 floating->SetProperty("text-align", edges[position][2]);
+                floating->SetProperty("width", std::to_string(box_width) + "px");
             }
             // Carry whatever is showing over to the new container.
             for (Notice& notice : notices) {
@@ -1792,9 +1923,28 @@ void recompui::update_notifications() {
     };
     auto drop_front = [&]() { remove_notice(0); };
 
-    for (std::string& text : zelda64::notify::take()) {
+    for (const zelda64::notify::Message& message : zelda64::notify::take()) {
         if (!live.notifications) {
             continue;
+        }
+        // Archipelago traffic is posted whatever the setting says and sorted
+        // out here, so changing it takes effect at once: 0 shows none of it,
+        // 1 only what was sent to this slot, 2 what is found here for other
+        // players as well.
+        if ((message.kind == zelda64::notify::Kind::ApReceived && live.ap_notice < 1) ||
+            (message.kind == zelda64::notify::Kind::ApSent && live.ap_notice < 2)) {
+            continue;
+        }
+        // One song at a time: the name of the track starting takes the
+        // place of the one already showing rather than stacking under it.
+        // Read from the edited copy like the rest of this group, so the
+        // setting takes effect as it is changed.
+        if (message.kind == zelda64::notify::Kind::Song && live.song_notice_one) {
+            for (size_t i = notices.size(); i-- > 0;) {
+                if (notices[i].kind == message.kind) {
+                    remove_notice(i);
+                }
+            }
         }
         // A row per message so each line's box hugs its text and follows
         // the container's alignment.
@@ -1802,10 +1952,10 @@ void recompui::update_notifications() {
         row->SetClass("notice-row", true);
         Rml::ElementPtr made = document->CreateElement("div");
         made->SetClass("notice", true);
-        made->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
+        made->SetInnerRML(Rml::StringUtilities::EncodeRml(message.text));
         Rml::Element* element = row->AppendChild(std::move(made));
         container->AppendChild(std::move(row));
-        notices.push_back({ element, now });
+        notices.push_back({ element, now, message.kind });
     }
     if (!live.notifications) {
         while (!notices.empty()) {
@@ -2783,6 +2933,12 @@ public:
                 cheats_context.all_cheats_enabled = in.Get<int>() != 0;
                 zelda64::set_cheats_enabled(cheats_context.all_cheats_enabled);
             });
+
+        // Live, like everything else on this tab: the hook reads the flag
+        // on the next frame, so battles stop as soon as it is switched.
+        constructor.BindFunc("cheat_no_encounters",
+            [](Rml::Variant& out) { out = zelda64::disable_encounters() ? 1 : 0; },
+            [](const Rml::Variant& in) { zelda64::set_disable_encounters(in.Get<int>() != 0); });
 
         constructor.BindFunc("cheat_stats_available", [](Rml::Variant& out) { out = cheats_context.shown_stats_available; });
         for (const auto& [name, stat] : cheat_stat_names) {

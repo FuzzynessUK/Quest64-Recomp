@@ -20,6 +20,14 @@ namespace zelda64::speedrun {
     bool running();
     bool finished();
 
+    // The time so far in milliseconds, whether the run is going or finished.
+    long long elapsed();
+    // What the next run should start from. Set when a save is read back off
+    // the Controller Pak, and taken by start(), so continuing a file picks
+    // the timer up where it stood when that file was written rather than at
+    // zero. Cleared once used.
+    void carry(long long ms);
+
     // The elapsed time, formatted per the configured detail level. Keeps its
     // final value once the run has finished.
     std::string display();

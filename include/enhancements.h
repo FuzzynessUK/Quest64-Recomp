@@ -89,7 +89,19 @@ namespace zelda64::enhancements {
 
         // "Now playing: <song>" whenever the main music player starts a
         // track (zelda64::audio::on_frame; custom music by file name).
+        // song_notice_one keeps one of them on screen at a time: a new song
+        // takes the place of the one showing instead of stacking under it,
+        // which is what keeps a walk through several areas - or Never
+        // Expire - from filling the corner with song names. Two settings
+        // behind one control, the way the timer's are.
         bool song_notice = false;
+        bool song_notice_one = false;
+
+        // Archipelago traffic, when the connector is on: 0 nothing, 1 only
+        // what this slot is sent, 2 that and what is found here for someone
+        // else. The overlay drops what the setting does not want, so this is
+        // live like the rest of the Notifications group.
+        int ap_notice = 1;
 
         // The notification stack itself (all three above). Off hides and
         // silences them; never_expire keeps messages until pushed out;

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <map>
 #include <set>
+#include <numeric>
 #include <optional>
 #include <random>
 
@@ -1051,23 +1052,56 @@ namespace {
             for (int map : maps) {
                 pool.insert(pool.end(), by_map[map].begin(), by_map[map].end());
             }
-            if (static_cast<int>(pool.size()) < chests_data::chest_count) {
-                log("Chests: only " + std::to_string(pool.size()) + " spots reachable in " +
-                    std::to_string(maps.size()) + " maps, which is fewer than the " +
-                    std::to_string(chests_data::chest_count) + " chests; left where they were.");
-                return;
+
+            // Outdoors there are only 68 spots for 88 chests, so the ones
+            // that do not fit stay exactly where they are. Which chests move
+            // is drawn at random; a chest that stays keeps its own spot, so
+            // that spot has to come out of the pool before anything else is
+            // put on it.
+            std::vector<int> order(chests_data::chest_count);
+            std::iota(order.begin(), order.end(), 0);
+            rng.shuffle(order);
+            int movable = std::min(static_cast<int>(pool.size()), chests_data::chest_count);
+            std::vector<bool> moves(chests_data::chest_count, false);
+            for (int i = 0; i < movable; i++) {
+                moves[order[i]] = true;
+            }
+            if (movable < chests_data::chest_count) {
+                pool.erase(std::remove_if(pool.begin(), pool.end(), [&](const chests_data::Spot* spot) {
+                    for (const chests_data::Chest& chest : chests_data::chests) {
+                        if (moves[chest.id]) {
+                            continue;
+                        }
+                        if (chest.map == spot->map && chest.submap == spot->submap &&
+                            chest.x == spot->x && chest.z == spot->z) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }), pool.end());
+                log("Chests: " + std::to_string(pool.size()) + " spots for " +
+                    std::to_string(chests_data::chest_count) + " chests, so " +
+                    std::to_string(chests_data::chest_count - static_cast<int>(pool.size())) +
+                    " stay where they are.");
             }
             rng.shuffle(pool);
 
+            size_t next = 0;
             for (int i = 0; i < chests_data::chest_count; i++) {
                 const chests_data::Chest& chest = chests_data::chests[i];
-                const chests_data::Spot* spot = pool[i];
                 // The item comes from the item shuffle when it is on; its
                 // list is rolled either way, so vanilla has to be read back
                 // from the chest itself rather than taken from there.
                 int item = options.chests != ListMode::Off ? chests[i] : chest.item;
-                chest_placements.push_back({ spot->map, spot->submap, chest.id, static_cast<uint8_t>(item),
-                                             spot->x, spot->z, spot->facing, spot->ox, spot->oz });
+                if (moves[i] && next < pool.size()) {
+                    const chests_data::Spot* spot = pool[next++];
+                    chest_placements.push_back({ spot->map, spot->submap, chest.id, static_cast<uint8_t>(item),
+                                                 spot->x, spot->z, spot->facing, spot->ox, spot->oz });
+                }
+                else {
+                    chest_placements.push_back({ chest.map, chest.submap, chest.id, static_cast<uint8_t>(item),
+                                                 chest.x, chest.z, chest.facing, chest.ox, chest.oz });
+                }
             }
         }
 
@@ -1087,10 +1121,28 @@ namespace {
                     (entry.second == 1 ? " chest" : " chests"));
             }
             for (const zelda64::randomizer::ChestPlacement& chest : chest_placements) {
-                char buf[160];
-                std::snprintf(buf, sizeof buf, "    chest %d (%s): %s, room %d at (%.0f, %.0f)",
+                // Name the kind of spot it landed on: an interpolated one put
+                // a chest inside a fence in Melrode, so which sort a chest is
+                // standing on is the first thing worth knowing about it.
+                const char* kind = "moved";
+                const chests_data::Chest& home = chests_data::chests[chest.id];
+                if (home.map == chest.map && home.submap == chest.submap &&
+                    home.x == chest.x && home.z == chest.z) {
+                    kind = "left alone";
+                }
+                else {
+                    for (const chests_data::Spot& spot : chests_data::spots) {
+                        if (spot.map == chest.map && spot.submap == chest.submap &&
+                            spot.x == chest.x && spot.z == chest.z) {
+                            kind = spot.kind == chests_data::Kind::Vanilla ? "a chest spot" : "a spirit spot";
+                            break;
+                        }
+                    }
+                }
+                char buf[192];
+                std::snprintf(buf, sizeof buf, "    chest %d (%s): %s, room %d at (%.0f, %.0f) - %s",
                               chest.id, item_name(chest.item).c_str(),
-                              zelda64::map_name(chest.map), chest.submap, chest.x, chest.z);
+                              zelda64::map_name(chest.map), chest.submap, chest.x, chest.z, kind);
                 log(buf);
             }
             if (options.lost_keys != 0) {

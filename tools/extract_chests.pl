@@ -30,16 +30,15 @@
 #              point in the same submap and Brian stands on that line.
 #              Dropped if it is within DOOR_CLEAR of an entrance, so a chest
 #              never lands in a doorway.
-#   made       outdoor maps only, and only because there are not enough of
-#              the other two out of doors (8 + 60 against 88 chests). A point
-#              along the line between two known-walkable points in the same
-#              submap, no more than PAIR_MAX apart, at a third, a half and
-#              two thirds of the way. Both ends are ground the game itself
-#              stands something on, so in open country the line between them
-#              is very likely walkable too - which is a good bet, not a
-#              guarantee, and the reason these are outdoors only. Kept clear
-#              of doorways, of the NPCs standing about (npcmovement's records
-#              carry x at +0x18, z at +0x1C) and of each other.
+#
+# A third kind, "made" - a point interpolated along the line between two
+# known-walkable points outdoors - was tried on 2026-09-22 and taken out again
+# the same day. It put a chest inside a fence in Melrode: a line between two
+# walkable points can cross one, and nothing offline can see that. Only
+# positions the game itself uses are offered now, which leaves 68 spots
+# outdoors against 88 chests, so "outdoors only" fills what it can and the
+# rest of the chests stay where they are - which is why a chest carries its
+# own position below.
 #
 # The map table at RAM 0x80054F10 turns a map-data pointer into a ROM offset:
 # +4 ROM start, +8 ROM end, +0xC RAM destination, +0x18 submap headers,
@@ -212,40 +211,11 @@ for my $key (sort keys %walkable) {
                        facing => $facing, ox => $ox, oz => $oz, kind => 'spirit' };
     }
 }
-my $made = 0;
-for my $key (sort keys %walkable) {
-    my ($m, $s) = split /\./, $key;
-    next unless $outdoor{$m};
-    my @known = @{ $walkable{$key} };
-    my @here;
-    for my $i (0 .. $#known) {
-        for my $j ($i + 1 .. $#known) {
-            my $d = dist($known[$i], $known[$j]);
-            next if $d < PAIR_MIN || $d > PAIR_MAX;
-            for my $t (0.5, 1 / 3, 2 / 3) {
-                my $p = [ $known[$i][0] + ($known[$j][0] - $known[$i][0]) * $t,
-                          $known[$i][1] + ($known[$j][1] - $known[$i][1]) * $t ];
-                next unless clear_of($p, $doors{$key} || [], DOOR_CLEAR);
-                next unless clear_of($p, $npcs{$m} || [], NPC_CLEAR);
-                next unless clear_of($p, \@known, SPOT_CLEAR);
-                next unless clear_of($p, \@here, SPOT_CLEAR);
-                push @here, $p;
-                my ($facing, $ox, $oz) = aim($m, $s, $p);
-                next unless defined $facing;
-                push @spots, { map => $m, submap => $s, x => $p->[0], z => $p->[1],
-                               facing => $facing, ox => $ox, oz => $oz, kind => 'made' };
-                $made++;
-            }
-        }
-    }
-}
-
 my %by_kind;
 $by_kind{ $_->{kind} }++ for @spots;
 my $outdoor_spots = grep { $outdoor{ $_->{map} } } @spots;
-printf STDERR "88 chests; spots: %d vanilla, %d spirit, %d made = %d (%d outdoors)\n",
-    $by_kind{vanilla} // 0, $by_kind{spirit} // 0, $by_kind{made} // 0, scalar @spots, $outdoor_spots;
-die "not enough outdoor spots for 88 chests\n" if $outdoor_spots < 88;
+printf STDERR "88 chests; spots: %d vanilla, %d spirit = %d spots (%d outdoors)\n",
+    $by_kind{vanilla} // 0, $by_kind{spirit} // 0, scalar @spots, $outdoor_spots;
 
 @spots = sort { $a->{map} <=> $b->{map} || $a->{submap} <=> $b->{submap} || $a->{x} <=> $b->{x} || $a->{z} <=> $b->{z} } @spots;
 
@@ -256,14 +226,16 @@ print <<"HEADER";
 //
 // The game's 88 chests, and @{[ scalar @spots ]} places one can go (@{[ $outdoor_spots ]} of them out of
 // doors): @{[ $by_kind{vanilla} // 0 ]} the game's own chest spots, @{[ $by_kind{spirit} // 0 ]} spirit spots clear of any
-// doorway, and @{[ $by_kind{made} // 0 ]} along the lines between known-walkable points outdoors.
+// doorway - all of them positions the game itself uses.
 #include "chest_data.h"
 
 namespace merrow::chests {
     const std::vector<Chest> chests = {
 HEADER
 
-printf("        { %2d, %2d, %3d, 0x%06X, %2d },\n", $_->{map}, $_->{submap}, $_->{id}, $_->{rom}, $_->{item}) for @chests;
+printf("        { %2d, %2d, %3d, 0x%06X, %2d, %12.4ff, %12.4ff, %9.5ff, %12.4ff, %12.4ff },\n",
+       $_->{map}, $_->{submap}, $_->{id}, $_->{rom}, $_->{item},
+       $_->{x}, $_->{z}, $_->{facing}, $_->{ox}, $_->{oz}) for @chests;
 
 print <<'MIDDLE';
     };
@@ -271,7 +243,7 @@ print <<'MIDDLE';
     const std::vector<Spot> spots = {
 MIDDLE
 
-my %kind_name = (vanilla => 'Kind::Vanilla', spirit => 'Kind::Spirit', made => 'Kind::Made');
+my %kind_name = (vanilla => 'Kind::Vanilla', spirit => 'Kind::Spirit');
 printf("        { %2d, %2d, %12.4ff, %12.4ff, %9.5ff, %12.4ff, %12.4ff, %s, %s },\n",
        $_->{map}, $_->{submap}, $_->{x}, $_->{z}, $_->{facing}, $_->{ox}, $_->{oz},
        $kind_name{ $_->{kind} }, $outdoor{ $_->{map} } ? 'true' : 'false') for @spots;

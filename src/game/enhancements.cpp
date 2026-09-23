@@ -134,7 +134,9 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("stat_up_effect", o.stat_up_effect);
     get("spell_notice", o.spell_notice);
     get("song_notice", o.song_notice);
+    get("song_notice_one", o.song_notice_one);
     get("item_notice", o.item_notice);
+    get("ap_notice", o.ap_notice);
     get("notifications", o.notifications);
     get("notify_never_expire", o.notify_never_expire);
     get("notify_max", o.notify_max);
@@ -170,7 +172,9 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["stat_up_effect"] = o.stat_up_effect;
     j["spell_notice"] = o.spell_notice;
     j["song_notice"] = o.song_notice;
+    j["song_notice_one"] = o.song_notice_one;
     j["item_notice"] = o.item_notice;
+    j["ap_notice"] = o.ap_notice;
     j["notifications"] = o.notifications;
     j["notify_never_expire"] = o.notify_never_expire;
     j["notify_max"] = o.notify_max;

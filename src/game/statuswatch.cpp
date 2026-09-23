@@ -19,6 +19,18 @@ namespace {
     constexpr int max_enemies = 8;
     constexpr int max_lines = 6000;
     constexpr int mute_after = 8;   // changes per battle before an offset goes quiet
+    // Off while playing. It scans 0x200 bytes of Brian's block and of every
+    // enemy struct every frame of every battle, from pointers taken raw out of
+    // a0, and writes a line per changed byte. Set true to get it back.
+    constexpr bool watch_enabled = false;
+
+    // The game's RDRAM. A base outside it would send MEM_BU far past the end
+    // of the buffer, so a struct pointer is checked before it is read - a0 is
+    // taken on trust otherwise.
+    bool is_rdram(int32_t address) {
+        uint32_t a = static_cast<uint32_t>(address);
+        return a >= 0x80000000u && a <= 0x80800000u - watch_size;
+    }
 
     struct Block {
         const char* name;
@@ -54,7 +66,7 @@ namespace {
     }
 
     void scan(uint8_t* rdram, Block& b) {
-        if (b.base == 0) {
+        if (b.base == 0 || !is_rdram(b.base)) {
             return;
         }
         uint8_t now[watch_size];
@@ -81,7 +93,13 @@ namespace {
 // func_80008FE0 at 0x8000908C, monster set-up at the start of a battle:
 // a0 is the enemy's battle struct.
 extern "C" void quest64_status_watch_enemy(uint8_t*, recomp_context* ctx) {
+    if (!watch_enabled) {
+        return;
+    }
     int32_t base = static_cast<int32_t>(ctx->r4);
+    if (!is_rdram(base)) {
+        return;
+    }
     for (int i = 0; i < enemy_count; i++) {
         if (enemies[i].base == base) {
             return;
@@ -98,6 +116,9 @@ extern "C" void quest64_status_watch_enemy(uint8_t*, recomp_context* ctx) {
 
 // Once per frame from the cheats frame hook.
 extern "C" void quest64_status_watch_frame(uint8_t* rdram) {
+    if (!watch_enabled) {
+        return;
+    }
     frame++;
     bool in_battle = (MEM_HU(0, gBattleState) & 1) != 0;
     if (in_battle && !was_in_battle) {

@@ -320,6 +320,41 @@ source is checked out next to it at `D:\Games\reference\merrow` for reference.
     in principle land on the wrong side of a river or cliff, since only the
     endpoints are known good.
 
+#### Interpolated spots: tried and removed (2026-09-22, same day)
+
+Both randomizers briefly offered a third kind of spot - a point a third, a
+half or two thirds along the line between two known-walkable points in the
+same submap. The reasoning was that both ends are ground the game itself uses,
+so the line between them should be walkable too.
+
+**It is not.** A line between two walkable points crosses a fence, and nothing
+readable offline can see that. User-tested and it put a chest inside a low
+stone wall in Melrode - reachable, but half-buried. On that seed **35 of 88
+chests** were on interpolated spots, including the Fire Ruby, Eletale's Book,
+the Dark Gaol Key, a Wind Jade and the Earth Orb: progression items a run
+cannot finish without, one bad roll away from being lost.
+
+Removed from both. The spot lists are back to positions the game itself uses:
+
+- spirits: 637 (98 vanilla spirit spots + 539 entrance spawn positions)
+- chests: 182 (88 vanilla chest spots + 94 spirit spots clear of a doorway),
+  of which **68 are outdoors**, so "Outdoors only" moves 68 and the other 20
+  stay exactly where they are. `Chest` in `chest_data.cpp` now carries its own
+  x, z, facing and opening position so a chest that is not moved can stay put,
+  and its spot is taken out of the pool first so nothing else lands on it.
+
+The spoiler now names the kind of spot each chest is on ("a chest spot", "a
+spirit spot", "left alone"), which is what made this diagnosable.
+
+**Residual risk, not removed:** a spirit spot is open ground where a floating
+orb sits, with no clearance guaranteed for a chest's solid body, so a chest on
+one can still touch scenery. Only the 88 vanilla chest spots are fully proven.
+If that turns out to matter too, the honest options are to drop spirit spots
+for chests (leaving a pure permutation of 88 places) or to validate placements
+against the game's own collision at run time, which needs a wall query that
+has not been found yet - `func_8000EE60` answers ground height, not occupancy.
+
+
 ### How the Stage 2 hooks work
 
 Merrow writes its code options as raw ROM byte patches. Those can't work here:

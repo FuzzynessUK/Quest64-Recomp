@@ -24,8 +24,16 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Battle music</div><div class="config-tip-text">Normal is the game's own behaviour: a random battle swaps to the battle track and swaps back afterwards, which restarts whatever was playing from its beginning. Keep the current track never starts the battle track at all, so the music you were listening to simply carries on through the fight - and the swap back is dropped too, or it would restart a track that never stopped. Resume where it left off lets the battle music play, but notes how far through the field track you were and jumps back to that point when the fight ends, instead of starting it again. Boss music is unaffected by any of these.</div></div>
+                                        <select data-value="aud_battle_music" id="aud_battle_music_select">
+                                            <option value="0">Normal</option>
+                                            <option value="1">Keep the current track</option>
+                                            <option value="2">Resume where it left off</option>
+                                        </select>
+                                    </div>
                                     <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list" data-if="aud_music == 1">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Custom volume: {{aud_custom_volume}}%</div><div class="config-tip-text">How loud custom files play, as a share of the game's music volume, so a loud library can be brought level with the game's own music (which is not affected). Applies straight away, to the track playing too.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Custom volume: {{aud_custom_volume}}%</div><div class="config-tip-text">Every custom file is measured when it loads and played at a gain that brings it to the level of the game's own music, so one song is not twice as loud as the next; custom_music.txt beside the settings lists what each was measured at. This slider then sets how loud custom music sits against the game's as a whole (the game's own music is not affected). Applies straight away, to the track playing too.</div></div>
                                         <input
                                             class="nav-vert"
                                             id="aud_custom_volume_input"

@@ -43,7 +43,10 @@ namespace zelda64::audio {
         // Custom files play at this share of the game's music volume
         // (10-100), so a loud library can be brought level with the game's
         // own music. Applied as the player's volume is set (a hook on
-        // func_80026554), live.
+        // func_80026554), live. On top of it each file carries its own
+        // measured gain, so the slider is a taste for custom music as a
+        // whole rather than the only thing standing between a quiet song
+        // and a loud one.
         int custom_volume = 100;
         // Replacement music. `<exe dir>/custom_music` is a library of
         // `.seq` files (compact sequences in the game's own format;
@@ -58,6 +61,18 @@ namespace zelda64::audio {
         // what was rejected and why, goes to custom_music.txt beside the
         // settings.
         CustomMusic custom_music = CustomMusic::Off;
+        // What happens to the music when a random battle starts.
+        // 0 normal: the game swaps to the battle track and swaps back
+        //   afterwards, restarting whatever was playing from its beginning.
+        // 1 keep: the battle track is never started, so the field music
+        //   simply carries on through the fight. The restore afterwards is
+        //   dropped too, or it would restart the track that never stopped.
+        // 2 resume: the battle track plays, but where the field track had
+        //   got to is noted on the way in and put back afterwards, so it
+        //   carries on from that point rather than from the top.
+        // Boss music is left alone by all of them.
+        int battle_music = 0;
+
         // Track number -> library file name without `.seq`.
         std::map<int, std::string> custom_tracks;
     };

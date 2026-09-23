@@ -14,6 +14,7 @@
 #include "spellnotice.h"
 #include "itemnotice.h"
 #include "audio.h"
+#include "archipelago.h"
 #include "librecomp/helpers.hpp"
 
 namespace {
@@ -268,6 +269,10 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram, recomp_context* ctx) {
     zelda64::enhancements::on_frame(rdram);
     zelda64::statfx::on_frame(rdram);
     zelda64::spellnotice::on_frame(rdram);
+    // Before the item notice: in Archipelago mode a gift NPC's item is
+    // taken straight back, and doing it first means it is never announced.
+    // Items the server sends are placed here too, so those still are.
+    zelda64::archipelago::on_frame(rdram);
     zelda64::itemnotice::on_frame(rdram);
     zelda64::audio::on_frame(rdram, ctx);
     zelda64::hardmode::on_frame(rdram);
@@ -288,6 +293,7 @@ namespace {
     constexpr int32_t no_pending_item = -1;
 
     std::atomic<bool> cheats_on = true;
+    std::atomic<bool> no_encounters = false;
     // Cached each frame so the menu can read it without touching RDRAM off
     // the game thread.
     std::atomic<int32_t> live_current_map = -1;
@@ -313,6 +319,26 @@ void zelda64::set_cheats_enabled(bool enabled) {
 
 bool zelda64::cheats_enabled() {
     return cheats_on.load();
+}
+
+void zelda64::set_disable_encounters(bool disabled) {
+    no_encounters.store(disabled);
+}
+
+bool zelda64::disable_encounters() {
+    return no_encounters.load();
+}
+
+// func_8001C5F4 is the field encounter check, and nothing else: it adds the
+// distance walked (0x8007BA5C) to a running total at 0x8008C574, and once
+// that passes the threshold it raises the odds at 0x8008C578 by 50, rolls
+// get_rand(2000) against them and starts a battle if the roll comes under.
+// Every path ends by zeroing the total again. So skipping the whole function
+// stops encounters without leaving anything half-done - the total stops
+// growing rather than filling up behind the cheat's back, which is what
+// makes it safe to switch off in the middle of a walk.
+extern "C" int quest64_cheat_no_encounters() {
+    return cheats_on.load() && no_encounters.load();
 }
 
 const std::vector<std::string>& zelda64::item_names() {

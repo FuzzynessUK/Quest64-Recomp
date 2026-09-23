@@ -14,12 +14,19 @@ namespace merrow::chests {
         uint8_t id;
         uint32_t rom;
         uint8_t item;
+        // Where it is in vanilla, so a chest that is not moved can stay put.
+        float x;
+        float z;
+        float facing;
+        float ox;
+        float oz;
     };
 
-    // How a spot's facing was arrived at, which is how far it can be
-    // trusted: Vanilla is the game's own, Spirit and Made are aimed at the
-    // nearest other known-walkable point in the room.
-    enum class Kind : uint8_t { Vanilla, Spirit, Made };
+    // How a spot's facing was arrived at: Vanilla is the game's own, Spirit
+    // is aimed at the nearest other known-walkable point in the room. A third
+    // kind, interpolated between walkable points, was tried and removed - it
+    // put a chest inside a fence.
+    enum class Kind : uint8_t { Vanilla, Spirit };
 
     struct Spot {
         uint8_t map;

@@ -61,7 +61,7 @@ before_vram = 0x80005A08
 # queued or direct, ends in func_80025B8C with its id in a0.
 [[patches.hook]]
 func = "func_800267F8"
-text = "quest64_audio_bgm(rdram, ctx);"
+text = "if (quest64_audio_skip_bgm(rdram, ctx)) return; quest64_audio_bgm(rdram, ctx);"
 before_vram = 0x800267F8
 [[patches.hook]]
 func = "func_80025B8C"
@@ -205,6 +205,55 @@ func = "func_801000A8_ovl_title"
 text = "quest64_speedrun_title_frame();"
 before_vram = 0x801000A8
 
+# Carrying the run time in the save file. The game's two Controller Pak
+# wrappers, both (port, file_no, offset, nbytes, buffer) with the fifth on
+# the caller's stack: func_80031A44 writes, func_800319E0 reads. The write
+# hook files the time under a checksum of the bytes being saved; the read
+# pair looks it up again once the buffer has been filled. All three sit on
+# the first instruction of their function, before the prologue, except the
+# read's second half which sits after osPfsReadWriteFile has returned.
+# The "you got ..." box a chest opens. func_80006604 is reached from exactly
+# one place, the chest branch of func_80002F60 (0x80003448), so refusing the
+# whole call takes that box away and leaves every other message alone. The
+# chest has already been opened and its flag set by then, and the clean-up
+# after the call still runs.
+[[patches.hook]]
+func = "func_80006604"
+text = "if (quest64_archipelago_hide_chest_text(rdram)) return;"
+before_vram = 0x80006604
+
+# Boss Souls. func_8000B530 is the whole of how a boss gets into the world:
+# as a map loads it walks gBossData (0x803A9AD0, eight 0x18-byte entries in
+# story order) and, for the one whose map and submap match, asks
+# func_8000B9D8 whether that boss has already been beaten. A yes returns from
+# the function there and then - nothing is DMA'd to gBossVAddr, nothing is
+# placed, the boss index stays 0 - which is exactly the state wanted for a
+# boss whose Soul has not arrived.
+#
+# 0x8000B58C is the instruction that tests the answer, right after the call's
+# delay slot: v0 is the answer, s0 is still the boss's index. Hooking here
+# rather than on func_8000B9D8 itself leaves that routine's other caller,
+# func_800086E4, alone - it asks the same question for something unrelated.
+[[patches.hook]]
+func = "func_8000B530"
+text = "quest64_archipelago_boss_soul(rdram, ctx);"
+before_vram = 0x8000B58C
+
+[[patches.hook]]
+func = "func_80031A44"
+text = "quest64_speedrun_pak_write(rdram, ctx);"
+before_vram = 0x80031A44
+
+[[patches.hook]]
+func = "func_800319E0"
+text = "quest64_speedrun_pak_read_begin(rdram, ctx);"
+before_vram = 0x800319E0
+
+[[patches.hook]]
+func = "func_800319E0"
+text = "quest64_speedrun_pak_read_end(rdram, ctx);"
+before_vram = 0x80031A34
+
 # Hard Mode (Landmine36's hack, see src/game/hardmode/). One hook per
 # instruction the hack rewrites in the game's code; hooks.cpp documents each.
 # All of them return immediately unless Hard Mode is active. Sites the hack
@@ -295,7 +344,7 @@ text = "quest64_hardmode_scripted_message_1(rdram, ctx);"
 before_vram = 0x80007B1C
 [[patches.hook]]
 func = "UpdateBGM"
-text = "quest64_hardmode_death_jingle(rdram, ctx); quest64_audio_bgm(rdram, ctx);"
+text = "if (quest64_audio_skip_bgm(rdram, ctx)) return; quest64_hardmode_death_jingle(rdram, ctx); quest64_audio_bgm(rdram, ctx);"
 before_vram = 0x800267B8
 [[patches.hook]]
 func = "func_80008FE0"
@@ -315,7 +364,7 @@ text = "quest64_hardmode_night_stats_c(rdram, ctx);"
 before_vram = 0x80009244
 [[patches.hook]]
 func = "func_80009818"
-text = "quest64_hardmode_battle_exp(rdram, ctx);"
+text = "quest64_hardmode_battle_exp(rdram, ctx); quest64_archipelago_kill(rdram, ctx);"
 before_vram = 0x800098D8
 [[patches.hook]]
 func = "func_80009818"
@@ -444,3 +493,11 @@ before_vram = 0x80008F5C
 func = "func_80011B70"
 text = "quest64_randomizer_chests(rdram, ctx);"
 before_vram = 0x80011B70
+
+# Cheats tab, Disable Encounters. func_8001C5F4 is the field encounter check
+# and nothing else, so skipping it stops battles starting without leaving the
+# distance walked piling up behind the cheat. Live, like the rest of the tab.
+[[patches.hook]]
+func = "func_8001C5F4"
+text = "if (quest64_cheat_no_encounters()) return;"
+before_vram = 0x8001C5F4

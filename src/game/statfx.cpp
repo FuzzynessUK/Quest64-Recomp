@@ -46,6 +46,8 @@ namespace {
     // Calibration log, statfx_debug.txt next to the settings: a line a
     // second while the effect is on, to check the projection against what
     // is seen on screen. Capped so it cannot grow without bound.
+    // Calibration aid, off while playing: set log_enabled to true to get it back.
+    constexpr bool log_enabled = false;
     constexpr int log_every_frames = 60;
     constexpr int log_max_lines = 600;
     int log_frame = 0;
@@ -153,6 +155,9 @@ namespace {
     }
 
     void log_state(uint8_t* rdram, float x, float y, float z, const Anchor& a) {
+        if (!log_enabled) {
+            return;
+        }
         if (++log_frame < log_every_frames || log_lines >= log_max_lines) {
             return;
         }

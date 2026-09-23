@@ -14,10 +14,11 @@ namespace merrow::spirits {
         uint8_t count;
     };
 
-    // Where a spot came from, which is how far it can be trusted: Spirit is
-    // one the game already floats a spirit on, Entrance one it stands Brian
-    // on, and Made a point off the short line between two of those.
-    enum class Kind : uint8_t { Spirit, Entrance, Made };
+    // Where a spot came from: Spirit is one the game already floats a spirit
+    // on, Entrance one it stands Brian on. Both are positions the game itself
+    // uses. A third kind interpolated between them was tried and removed -
+    // the same trick put a chest inside a fence.
+    enum class Kind : uint8_t { Spirit, Entrance };
 
     // A place a spirit can be put: an x and a z in a submap, which the game
     // drops onto the ground itself.

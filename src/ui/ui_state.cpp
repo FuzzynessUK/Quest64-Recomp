@@ -788,6 +788,7 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
         recompui::update_speedrun_model();
         recompui::update_stat_effects();
         recompui::update_notifications();
+        recompui::update_archipelago();
 
         int width = swap_chain_framebuffer->getWidth();
         int height = swap_chain_framebuffer->getHeight();

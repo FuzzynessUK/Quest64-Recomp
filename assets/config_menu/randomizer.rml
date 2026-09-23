@@ -13,6 +13,34 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
+                                <div>Archipelago</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Server</div><div class="config-tip-text">Where the room is, as host:port - a room on archipelago.gg is the address and port the room page shows, and a room you host yourself is usually localhost:38281. Port 38281 is assumed if you leave it off. Whether the room wants a secure connection is worked out for you; put ws:// or wss:// in front to insist on one.</div></div>
+                                        <input type="text" id="ap_server_input" data-value="ap_server" maxlength="64" />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Slot name</div><div class="config-tip-text">The name from your yaml - the one the room lists as your player. It has to match exactly.</div></div>
+                                        <input type="text" id="ap_slot_input" data-value="ap_slot" maxlength="32" />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Password</div><div class="config-tip-text">Only if the room has one. Leave it empty otherwise.</div></div>
+                                        <input type="text" id="ap_password_input" data-value="ap_password" maxlength="64" />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>{{ap_status}}</div></div>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" data-event-click="ap_connect()" data-if="ap_connected == 0">Connect</button>
+                                    <button class="button" data-event-click="ap_disconnect()" data-if="ap_connected == 1">Disconnect</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
                                 <div>Randomizer</div>
                             </label>
                             <div class="config-debug__option-split">
@@ -86,10 +114,13 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle spells</div><div class="config-tip-text">Shuffles the properties of all 60 spells among their slots: element, unlock level and menu position stay put, everything else moves. Combinations known to crash are avoided.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle spells</div><div class="config-tip-text">Shuffles the properties of all 60 spells among their slots: element, unlock level and menu position stay put, everything else moves. Combinations known to crash are avoided. The "with boss spells" settings also put nine of the bosses' own spells into the pool, as Bubble does with Nepty's: each takes over a player spell's slot, so that spell is gone from the run. Recommended is the mix Merrow suggests, Similar swaps each boss spell for the one it most resembles, Any picks at random. Exit, Escape and Return are never taken.</div></div>
                                         <select data-value="rnd_spell_shuffle" id="rnd_spell_shuffle_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
+                                            <option value="2">With boss spells</option>
+                                            <option value="3">Boss spells, similar</option>
+                                            <option value="4">Boss spells, any</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
@@ -146,15 +177,6 @@
                                         <select data-value="rnd_bubble" id="rnd_bubble_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boss spells</div><div class="config-tip-text">Puts nine of the bosses' own spells into the pool, as Bubble already does with Nepty's. Each one takes over a player spell's slot, keeping its unlock level and menu position, so that spell is gone from the run. Recommended is the mix Merrow suggests; Replace similar swaps each boss spell for the one it most resembles; Replace any picks at random. Exit, Escape and Return are never taken.</div></div>
-                                        <select data-value="rnd_boss_spells" id="rnd_boss_spells_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">Recommended</option>
-                                            <option value="2">Replace similar</option>
-                                            <option value="3">Replace any</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
@@ -536,7 +558,7 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Chest locations</div><div class="config-tip-text">Moves the 88 chests, keeping whatever is inside each one. A chest has a front, so only spots where the facing can be justified are used: the game's own 88 chest spots, spirit spots that are clear of any doorway, and points along the line between two places the game walks you outdoors. The chest carries its own collision, so nothing is left behind. Outdoors only keeps them to the fields, towns and forests. The spoiler lists every chest.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Chest locations</div><div class="config-tip-text">Moves the 88 chests, keeping whatever is inside each one. A chest has a front and a solid body, so only places the game itself puts something are used: its own 88 chest spots, and spirit spots that are clear of a doorway. The chest carries its own collision, so nothing is left behind. Outdoors only keeps them to the fields, towns and forests, where there are 68 such places, so the other 20 chests stay where they are. The spoiler lists every chest and what sort of spot it is on.</div></div>
                                         <select data-value="rnd_chest_shuffle" id="rnd_chest_shuffle_select">
                                             <option value="0">Off</option>
                                             <option value="1">Anywhere</option>

@@ -70,6 +70,13 @@ namespace zelda64 {
     void set_cheats_enabled(bool enabled);
     bool cheats_enabled();
 
+    // Disable Encounters. Takes effect straight away, like the rest of the
+    // tab: the hook on func_8001C5F4 skips the whole encounter check, so the
+    // distance Brian has walked never builds up and turning it off again
+    // leaves the count where it was rather than springing a battle.
+    void set_disable_encounters(bool disabled);
+    bool disable_encounters();
+
     // Every item the game has, indexed by item id (0x00-0x19).
     const std::vector<std::string>& item_names();
     // Queue `item_id` into the first free inventory slot on the next frame.

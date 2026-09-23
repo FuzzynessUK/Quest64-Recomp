@@ -4,17 +4,17 @@
 
 namespace {
     std::mutex queue_mutex;
-    std::vector<std::string> queue;
+    std::vector<zelda64::notify::Message> queue;
 }
 
-void zelda64::notify::post(std::string text) {
+void zelda64::notify::post(std::string text, Kind kind) {
     std::lock_guard<std::mutex> lock(queue_mutex);
-    queue.push_back(std::move(text));
+    queue.push_back({ std::move(text), kind });
 }
 
-std::vector<std::string> zelda64::notify::take() {
+std::vector<zelda64::notify::Message> zelda64::notify::take() {
     std::lock_guard<std::mutex> lock(queue_mutex);
-    std::vector<std::string> out;
+    std::vector<Message> out;
     out.swap(queue);
     return out;
 }

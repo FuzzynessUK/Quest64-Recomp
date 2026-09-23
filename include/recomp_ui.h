@@ -83,6 +83,8 @@ namespace recompui {
     // The JP stat-up burst: spawns and moves its particles. Every frame.
     void update_stat_effects();
     // The notification stack (include/notify.h): appends, holds and fades. Every frame.
+    // Keeps the Archipelago status line in the menu current.
+    void update_archipelago();
     void update_notifications();
     // The HUD layout preview on the Enhancements tab: hooks its drag boxes
     // once the document is loaded, and sizes/places them every frame the

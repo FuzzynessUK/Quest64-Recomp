@@ -101,10 +101,19 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show song name</div><div class="config-tip-text">"Now playing: ..." appears whenever the music changes: the area or event the game's own track belongs to, or the file name of a custom song from the Audio tab.</div></div>
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show Archipelago items</div><div class="config-tip-text">What the Archipelago connector announces while it is connected. Received only shows what other players find for you, and what this game finds for itself: "Received Fire Ruby from Bob". Sent and received adds the other direction - an item found here that belongs to someone else. Applies straight away; it shows nothing at all unless the connector is on.</div></div>
+                                        <select data-value="enh_ap_notice" id="enh_ap_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Received only</option>
+                                            <option value="2">Sent and received</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show song name</div><div class="config-tip-text">"Now playing: ..." appears whenever the music changes: the area or event the game's own track belongs to, or the file name of a custom song from the Audio tab. One at a time keeps a single song name on screen: the track starting takes the place of the one showing instead of stacking under it, so walking through several areas - or leaving messages on Never Expire - does not fill the corner with them.</div></div>
                                         <select data-value="enh_song_notice" id="enh_song_notice_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
+                                            <option value="2">On (one at a time)</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">

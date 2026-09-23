@@ -16,8 +16,12 @@ detailed record; this file is the working guide.
 Four user-facing additions on top of the base port, all reached from the config
 menu (F5 Cheats, F6 Randomizer, Enhancements tab):
 
-- **Cheats tab** — warp, stat sliders, Get Item, and a master on/off that
-  gates everything on the tab.
+- **Cheats tab** — warp, stat sliders, Get Item, Disable encounters, and a
+  master on/off that gates everything on the tab. Everything here is live:
+  Disable encounters is a hook on `func_8001C5F4` (the field encounter check
+  and nothing else) that skips the whole function, so the distance walked
+  never piles up behind the cheat and switching it off mid-walk does not
+  spring a battle.
 - **Randomizer tab** — a port of Merrow (MIT). One On/Off toggle at the top;
   everything else on the tab is hidden (`data-if="rnd_mode == 1"`) while it
   is off. Note "Shuffle final Shannons" is Merrow's checkbox with Merrow's
@@ -26,7 +30,10 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
   Lost Keys (both rulesets), Shannon hints, the cosmetic palettes, Merrow's
   table/stat shuffles, **Boss spells** (2026-09-22, a port of Merrow PR #6:
   nine of the bosses' spells take over player spell slots, the same mechanism
-  the Bubble option uses), **Spirit locations** (2026-09-22: moves the 98
+  the Bubble option uses; no longer its own menu entry - "Shuffle spells" is
+  one select, Off / On / With boss spells / Boss spells, similar / Boss
+  spells, any, and `spell_shuffle` + `boss_spells` stay separate on disk, the
+  way the speedrun timer's two settings do), **Spirit locations** (2026-09-22: moves the 98
   spirits; every position is one the game already stands something on, or a
   point on a short line between two of them), **Chest locations** (2026-09-22:
   moves the 88 chests, keeping what is inside; only spots whose facing can be
