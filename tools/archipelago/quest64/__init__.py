@@ -136,6 +136,7 @@ class Q64World(World):
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
             "giftsanity": bool(self.options.giftsanity),
+            "wingsmith_wings": bool(self.options.wingsmith_wings),
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),

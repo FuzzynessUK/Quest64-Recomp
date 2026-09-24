@@ -381,6 +381,13 @@ class Giftsanity(DefaultOnToggle):
     display_name = "Giftsanity"
 
 
+class WingsmithWings(Toggle):
+    """The six wingsmiths still hand over their wings, on top of their
+    Archipelago check. Only matters with giftsanity on; each gives its wings
+    once, the first time you talk to them."""
+    display_name = "Wingsmiths Give Wings"
+
+
 class Enemysanity(Toggle):
     """Defeating a kind of regular monster is an Archipelago check. One check
     per kind, sent the first time you beat one of them and never again -
@@ -491,6 +498,7 @@ class Q64Options(PerGameCommonOptions):
     shuffle_orbs: ShuffleOrbs
     chestsanity: Chestsanity
     giftsanity: Giftsanity
+    wingsmith_wings: WingsmithWings
     enemysanity: Enemysanity
     spiritsanity: Spiritsanity
     extra_level_ups: ExtraLevelUps
@@ -742,6 +750,7 @@ class Q64World(World):
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
             "giftsanity": bool(self.options.giftsanity),
+            "wingsmith_wings": bool(self.options.wingsmith_wings),
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),
@@ -787,6 +796,12 @@ $game:
   giftsanity:
     'true': 1
     'false': 0
+
+  # With giftsanity on, the six wingsmiths still hand over their wings as
+  # well as sending their check (once each).
+  wingsmith_wings:
+    'false': 1
+    'true': 0
   enemysanity:
     'true': 0
     'false': 1

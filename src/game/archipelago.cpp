@@ -827,6 +827,9 @@ namespace {
     int mammon_portal = 0;   // 0 vanilla, 1 bosses, 2 monsters, 3 both
     // 0 off, 1 the seven before Mammon, 2 with Mammon as well.
     std::atomic<int> boss_souls{ 0 };
+    // The yaml's wingsmith_wings: a wingsmith hands over its wings as well
+    // as sending its check.
+    std::atomic<bool> wingsmith_wings{ false };
     // Bit n (1-8) set once that boss's Soul has arrived. Read from the boss
     // spawn hook, which runs on the game thread, so it is an atomic rather
     // than something the mutex guards. The server sends every item again on
@@ -1116,6 +1119,7 @@ namespace {
                                     slot["boss_souls"].is_number_integer()) {
                                     boss_souls.store(slot["boss_souls"].get<int>());
                                 }
+                                wingsmith_wings.store(slot.value("wingsmith_wings", false));
                                 if (slot.contains("settings") && slot["settings"].is_object()) {
                                     seed_settings_live = slot["settings"];
                                     rando_seed_live = slot.value("rando_seed", int64_t{ 0 });
@@ -2554,10 +2558,14 @@ extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* c
         }
         giver_sent[i] = true;
         ctx->r2 = 0;
-        skip_next_add = true;
+        // A wingsmith (its item one of the six wings, 0x0E-0x13) keeps its
+        // wings when the yaml says so; every other gift stays out of the bag.
+        int item = MEM_BU(7, record);
+        bool keep = wingsmith_wings.load() && item >= 0x0E && item <= 0x13;
+        skip_next_add = !keep;
         zelda64::archipelago::send_check(location);
         log_line("giver " + std::to_string(i) + " checked on map " + std::to_string(map) +
-                 " (item " + std::to_string(MEM_BU(7, record)) + " kept out of the bag)");
+                 " (item " + std::to_string(item) + (keep ? " handed over too)" : " kept out of the bag)"));
         return;
     }
 }

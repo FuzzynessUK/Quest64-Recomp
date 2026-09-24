@@ -28,6 +28,12 @@ Quest 64 Recompiled:
   giftsanity:
     'true': 1
     'false': 0
+
+  # With giftsanity on, the six wingsmiths still hand over their wings as
+  # well as sending their check (once each).
+  wingsmith_wings:
+    'false': 1
+    'true': 0
   enemysanity:
     'true': 0
     'false': 1
