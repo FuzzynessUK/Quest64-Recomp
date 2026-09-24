@@ -58,12 +58,14 @@ void zelda64::itemnotice::on_frame(uint8_t* rdram) {
         return;
     }
 
+    // A stacked bag (Stack items) holds its extra copies as counts rather
+    // than slots, so the bag is counted through the enhancements, which read
+    // either layout.
+    int counted[256];
+    zelda64::enhancements::bag_counts(rdram, counted);
     std::array<int, item_ids> current{};
-    for (int slot = 0; slot < inventory_slots; slot++) {
-        int id = MEM_BU(0, gInventory + slot);
-        if (id != inventory_empty) {
-            current[id]++;
-        }
+    for (int id = 0; id < item_ids; id++) {
+        current[id] = counted[id];
     }
     if (primed) {
         for (int id = 0; id < item_ids; id++) {

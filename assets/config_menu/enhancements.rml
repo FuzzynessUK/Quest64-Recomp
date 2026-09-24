@@ -58,6 +58,13 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Stack items</div><div class="config-tip-text">Hard Mode's item menu: several of the same potion, bread, leaves, drink, flute, bell, Replica, shoes or amulet take a single place in the bag, and the item's description ends with how many you have, (03). Up to 99 of each. The item names and everything else are the game's own. Turning it off puts the bag back to one place per item. Always on when playing Archipelago; Hard Mode stacks by itself.</div></div>
+                                        <select data-value="enh_stack_items" id="enh_stack_items_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>

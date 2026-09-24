@@ -81,6 +81,12 @@ namespace zelda64 {
     const std::vector<std::string>& item_names();
     // Queue `item_id` into the first free inventory slot on the next frame.
     void give_item(int item_id);
+
+    // Hard Mode's own item list, indexed by item id (0x00-0x1F): the vanilla
+    // 26 under its names, plus the six it adds. Given only while the game
+    // running is Hard Mode - those six ids mean nothing to the vanilla game.
+    const std::vector<std::string>& hard_mode_item_names();
+    void give_hard_mode_item(int item_id);
 }
 
 #endif

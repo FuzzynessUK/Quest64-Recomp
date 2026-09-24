@@ -60,6 +60,14 @@ namespace zelda64::enhancements {
         // Mode, which sets its own walk speed.
         bool faster_walk = false;
 
+        // Stack items, Hard Mode's item menu ported to the vanilla game:
+        // several of the same consumable take one place in the bag, and its
+        // description ends with how many there are, "(03)". Names and the
+        // item tables are the vanilla ones; see itemstack in enhancements.cpp.
+        // Forced on in Archipelago. Not on top of Hard Mode, which stacks by
+        // itself.
+        bool stack_items = false;
+
         // HUD layout (the HUD group): the HP/MP block and the four spirits,
         // dragged in the tab's preview. Frame pixels, x from the window's
         // left edge; custom false is the game's own place. Applied live.
@@ -149,6 +157,18 @@ namespace zelda64::enhancements {
     int element_cap(uint8_t* rdram);
     // Every one of Brian's four elements is at element_cap().
     bool elements_all_maxed(uint8_t* rdram);
+
+    // How many of each item id (0-255) the bag holds, counting a stack as
+    // all of its items. Works on a plain bag and a stacked one.
+    void bag_counts(uint8_t* rdram, int (&counts)[256]);
+
+    // An item list is on screen: the field item menu (menu mask bit 0) or
+    // the pause screen, whose item page lists the bag (gGameMode 2, which
+    // closing it turns back to 1). Nothing puts items in the bag or
+    // rearranges it while this holds - Archipelago items and the Get item
+    // cheats wait, and Stack items waits - so the list cannot change under
+    // the cursor; it all happens the frame the menu closes.
+    bool item_menu_open(uint8_t* rdram);
 
     // Warps the player to the start of the area they are in, the way the
     // Exit spell does, without needing the spell or the MP. Takes effect on

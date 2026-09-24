@@ -85,6 +85,27 @@
                         </div>
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
+                                <div style="font-size: 16dp;">Get item (Hard Mode)</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Item</div></div>
+                                        <select data-value="cheat_hm_item_index" id="cheat_hm_item_index_select">
+                                            <option data-for="name, i : cheat_hm_item_names" data-attr-value="i">{{name}}</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" style="font-size: 14dp; width: 100%; white-space: normal;"><div>Hard Mode's items, including the six it adds. Only works in a game started in Hard Mode.</div></div>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="cheat_give_hm_item">Add</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">The game starts at Melrode Monastery, submap 17.
                                 Submaps are described by where their exits lead and
                                 entrances by where the game enters through them, so

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <mutex>
 #include <optional>
 #include "zelda_debug.h"
@@ -290,7 +291,6 @@ namespace {
     constexpr int32_t gInventory = 0x8008CF78;
     constexpr int inventory_slots = 150;
     constexpr int32_t inventory_empty = 0xFF;
-    constexpr int32_t no_pending_item = -1;
 
     // Off until the Cheats tab's master switch is turned on. Nothing saves
     // it, so every launch starts with them off.
@@ -299,17 +299,31 @@ namespace {
     // Cached each frame so the menu can read it without touching RDRAM off
     // the game thread.
     std::atomic<int32_t> live_current_map = -1;
-    std::atomic<int32_t> pending_item = no_pending_item;
+    // Items the Get item buttons have asked for, oldest first. A queue rather
+    // than one slot: they are held while an item list is on screen, and every
+    // press made meanwhile has to survive until it closes.
+    std::mutex pending_mutex;
+    std::deque<int32_t> pending_items;
 
     void apply_pending_item(uint8_t* rdram) {
-        int32_t item = pending_item.exchange(no_pending_item);
-        if (item == no_pending_item || !cheats_on.load()) {
+        // Held while an item list is on screen, and all given as it closes.
+        if (zelda64::enhancements::item_menu_open(rdram)) {
             return;
         }
-        for (int slot = 0; slot < inventory_slots; slot++) {
-            if (MEM_BU(0, gInventory + slot) == inventory_empty) {
-                MEM_B(0, gInventory + slot) = static_cast<int8_t>(item);
-                return;
+        std::deque<int32_t> items;
+        {
+            std::lock_guard lock{ pending_mutex };
+            items.swap(pending_items);
+        }
+        if (!cheats_on.load()) {
+            return;
+        }
+        for (int32_t item : items) {
+            for (int slot = 0; slot < inventory_slots; slot++) {
+                if (MEM_BU(0, gInventory + slot) == inventory_empty) {
+                    MEM_B(0, gInventory + slot) = static_cast<int8_t>(item);
+                    break;
+                }
             }
         }
     }
@@ -351,7 +365,35 @@ void zelda64::give_item(int item_id) {
     if (item_id < 0 || static_cast<size_t>(item_id) >= merrow::data::itemcapitalcase.size()) {
         return;
     }
-    pending_item.store(item_id);
+    std::lock_guard lock{ pending_mutex };
+    pending_items.push_back(item_id);
+}
+
+// Read out of the Hard Mode ROM's item-name block (ROM 0xD4B3C0 in the
+// patched game, v0.9.8.3A), in item-id order. The first 26 are the vanilla
+// items under the hack's names (the gems are Amber, Opal, Aquamarine and
+// Garnet there); 0x1A-0x1F are the ones it adds.
+const std::vector<std::string>& zelda64::hard_mode_item_names() {
+    static const std::vector<std::string> names = {
+        "Spirit Light", "Baked Bread", "Honey Bread", "Celtland Potion",
+        "Dragon's Potion", "Dew Drop", "Mint Leaves", "Heroes Drink",
+        "Silent Flute", "Celine's Bell", "Replica", "Giant's Shoes",
+        "Magic Amulet", "Spirit Amulet", "White Wings", "Yellow Wings",
+        "Blue Wings", "Green Wings", "Red Wings", "Black Wings",
+        "Amber", "Opal", "Aquamarine", "Garnet",
+        "Eletale's Book", "Dark Gaol Key", "Secret Potion", "Healing Brew",
+        "Tonic", "Philo's Stone", "Coral Wings", "Magic Source",
+    };
+    return names;
+}
+
+void zelda64::give_hard_mode_item(int item_id) {
+    if (!zelda64::hardmode::active() || item_id < 0 ||
+        static_cast<size_t>(item_id) >= hard_mode_item_names().size()) {
+        return;
+    }
+    std::lock_guard lock{ pending_mutex };
+    pending_items.push_back(item_id);
 }
 
 

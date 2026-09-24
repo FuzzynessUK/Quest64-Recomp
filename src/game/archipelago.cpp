@@ -1649,6 +1649,8 @@ void zelda64::archipelago::apply_seed_settings(zelda64::enhancements::Options& o
     o.stat_up_effect = setting("jp_stat_up_effect") != 0;
     o.exit_from_anywhere = setting("exit_from_anywhere") != 0;
     o.faster_walk = setting("fast_walking") != 0;
+    // Always, in Archipelago: a multiworld hands out a lot of the same item.
+    o.stack_items = true;
     o.one_hit_ko = false;
     o.hard_mode = false;
     o.easier_quest = false;
@@ -2005,8 +2007,9 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
     // Hand over whatever the server has sent that this save has not had.
     // Nothing happens until a file is loaded: items put in the bag before
     // that are written over by the save coming in, and the mark would have
-    // moved past them for nothing.
-    if (MEM_W(0, gNextMap) != -1) {
+    // moved past them for nothing. Nor while an item list is on screen: they
+    // wait for it to close, so the list never changes under the cursor.
+    if (MEM_W(0, gNextMap) != -1 && !zelda64::enhancements::item_menu_open(rdram)) {
         for (;;) {
             int64_t item = 0;
             {

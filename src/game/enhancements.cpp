@@ -18,6 +18,7 @@
 #include "json/json.hpp"
 #include "librecomp/game.hpp"
 #include "recomp.h"
+#include "librecomp/addresses.hpp"
 
 namespace data = merrow::data;
 using zelda64::enhancements::Options;
@@ -126,6 +127,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("exit_from_anywhere", o.exit_from_anywhere);
     get("longer_magic_barrier", o.longer_magic_barrier);
     get("faster_walk", o.faster_walk);
+    get("stack_items", o.stack_items);
     get("remove_borders", o.remove_borders);
     get("hud_hp_custom", o.hud_hp_custom);
     get("hud_hp_x", o.hud_hp_x);
@@ -164,6 +166,7 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["exit_from_anywhere"] = o.exit_from_anywhere;
     j["longer_magic_barrier"] = o.longer_magic_barrier;
     j["faster_walk"] = o.faster_walk;
+    j["stack_items"] = o.stack_items;
     j["remove_borders"] = o.remove_borders;
     j["hud_hp_custom"] = o.hud_hp_custom;
     j["hud_hp_x"] = o.hud_hp_x;
@@ -284,8 +287,296 @@ extern "C" void quest64_enh_spirit_cap(uint8_t* rdram, recomp_context* ctx) {
     ctx->r4 = 0x100;
 }
 
+// ---- Stack items ---------------------------------------------------------
+//
+// Hard Mode's item menu, redone for the vanilla game. The bag, gInventory
+// (0x8008CF78, 150 bytes, 0xFF empty), is kept in Hard Mode's own layout:
+//
+//   bytes 0-74    one entry per item: a stackable item once, however many
+//                 there are; anything else once per copy
+//   75 + id       for a stackable id: 0x80 | the copies beyond the first,
+//                 or 0xFF when there is only the one
+//   the rest      0xFF
+//
+// A vanilla item id is at most 0x19, so a stacked bag can never be mistaken
+// for a plain one. Nothing in the game's own code changes: whatever adds an
+// item (a chest, a shop, a drop, Archipelago, the cheats) puts it in the
+// first free slot as usual, and using one takes its entry out as usual - the
+// frame after, the bag is put back into this shape, which merges a new copy
+// into its stack and brings a used one's entry back with one fewer. The
+// list is kept in item-id order (Hard Mode sorts too), so an entry stays
+// where it was when one of a stack is used. Not while the item menu is open.
+//
+// The count is shown the way Hard Mode shows it: at the end of the item's
+// description, "(03)". The description is copied into memory of our own
+// with room for the number and the text table's pointer (0x803A9954, entry
+// 32 + id; entries 0-31 are the names) aimed at the copy. Names, the item
+// data and every other text are left exactly as they are.
+//
+// Turning the option off puts a stacked bag back into one slot per item.
+// Hard Mode does all of this itself, so none of it runs there.
+namespace {
+    constexpr int32_t bag = 0x8008CF78;
+    constexpr int bag_slots = 150;
+    constexpr int list_slots = 75;
+    constexpr int stack_base = 75;
+    constexpr int stack_ids = 32;
+    constexpr int bag_empty = 0xFF;
+    constexpr int max_stack = 99;
+    // Hard Mode's stackable set among the vanilla items: the consumables,
+    // the flute, the bell, the Replica, the shoes and the two amulets.
+    constexpr int stackable_last = 0x0D;
+    constexpr int32_t item_text_table = 0x803A9954;
+    constexpr int description_entry = 32;
+    constexpr int32_t item_menu_mask = 0x8007B2E4;
+    constexpr uint32_t item_menu_bit = 0x1;
+    constexpr int32_t game_mode = 0x8007B2E0;
+    constexpr int32_t next_map = 0x80084EE4;
+
+    bool stackable(int id) { return id >= 0 && id <= stackable_last; }
+
+    bool in_game(uint8_t* rdram) {
+        int mode = MEM_HU(0, game_mode);
+        return mode != 2 && mode != 4 && static_cast<int32_t>(MEM_W(0, next_map)) != -1;
+    }
+
+    // Reads the bag in either layout into a count per id. False if it holds
+    // something neither layout would (then it is left alone).
+    bool read_bag(uint8_t* rdram, int (&counts)[256], std::vector<int>* order) {
+        for (int& c : counts) c = 0;
+        for (int slot = 0; slot < bag_slots; slot++) {
+            int b = MEM_BU(slot, bag);
+            if (b == bag_empty) {
+                continue;
+            }
+            if (b & 0x80) {
+                if (slot < stack_base || slot >= stack_base + stack_ids) {
+                    return false;
+                }
+                counts[slot - stack_base] += b & 0x7F;
+                continue;
+            }
+            counts[b]++;
+            if (order) order->push_back(b);
+        }
+        return true;
+    }
+
+    void stack_bag(uint8_t* rdram) {
+        int counts[256];
+        if (!read_bag(rdram, counts, nullptr)) {
+            return;
+        }
+        uint8_t shaped[bag_slots];
+        std::memset(shaped, bag_empty, sizeof shaped);
+        int n = 0;
+        for (int id = 0; id < 0x80; id++) {
+            if (counts[id] == 0) {
+                continue;
+            }
+            int entries = stackable(id) ? 1 : counts[id];
+            if (n + entries > list_slots) {
+                return;   // more than the list holds: leave the bag as it is
+            }
+            for (int k = 0; k < entries; k++) {
+                shaped[n++] = static_cast<uint8_t>(id);
+            }
+            if (stackable(id)) {
+                int extra = std::min(counts[id], max_stack) - 1;
+                if (extra > 0) {
+                    shaped[stack_base + id] = static_cast<uint8_t>(0x80 | extra);
+                }
+            }
+        }
+        for (int slot = 0; slot < bag_slots; slot++) {
+            if (MEM_BU(slot, bag) != shaped[slot]) {
+                for (int s = 0; s < bag_slots; s++) {
+                    MEM_B(s, bag) = static_cast<int8_t>(shaped[s]);
+                }
+                return;
+            }
+        }
+    }
+
+    // The option is off: a bag that was stacked goes back to a slot a copy.
+    void unstack_bag(uint8_t* rdram) {
+        bool stacked = false;
+        for (int id = 0; id < stack_ids && !stacked; id++) {
+            stacked = (MEM_BU(stack_base + id, bag) & 0x80) != 0 && MEM_BU(stack_base + id, bag) != bag_empty;
+        }
+        if (!stacked) {
+            return;
+        }
+        int counts[256];
+        if (!read_bag(rdram, counts, nullptr)) {
+            return;
+        }
+        uint8_t flat[bag_slots];
+        std::memset(flat, bag_empty, sizeof flat);
+        int n = 0;
+        for (int id = 0; id < 0x80 && n < bag_slots; id++) {
+            for (int k = 0; k < counts[id] && n < bag_slots; k++) {
+                flat[n++] = static_cast<uint8_t>(id);
+            }
+        }
+        for (int s = 0; s < bag_slots; s++) {
+            MEM_B(s, bag) = static_cast<int8_t>(flat[s]);
+        }
+    }
+
+    // The descriptions with a count on the end, one per stackable item.
+    int32_t counted_text[stackable_last + 1] = {};
+    int32_t digits_at[stackable_last + 1] = {};
+
+    void show_counts(uint8_t* rdram) {
+        int counts[256];
+        if (!read_bag(rdram, counts, nullptr)) {
+            return;
+        }
+        for (int id = 0; id <= stackable_last; id++) {
+            int32_t entry = item_text_table + 4 * (description_entry + id);
+            int32_t now = static_cast<int32_t>(MEM_W(0, entry));
+            if (counted_text[id] == 0 || now != counted_text[id]) {
+                // First time, or the table has been loaded afresh: copy the
+                // description as it is now and point the table at the copy.
+                if ((static_cast<uint32_t>(now) >> 24) != 0x80) {
+                    continue;
+                }
+                constexpr int longest = 240;
+                int len = 0;
+                while (len < longest && MEM_BU(len, now) != 0xFF) {
+                    len++;
+                }
+                if (counted_text[id] == 0) {
+                    void* mem = recomp::alloc(rdram, longest + 16);
+                    if (mem == nullptr) {
+                        return;
+                    }
+                    counted_text[id] = static_cast<int32_t>(
+                        static_cast<uint32_t>(reinterpret_cast<uint8_t*>(mem) - rdram) + 0x80000000u);
+                }
+                // The count is " x15": a space, x in the letter set (0x82),
+                // then two digits in the digit set (0x80). Four characters, so
+                // it goes at the end of a line with room for it - the last
+                // one if it can, as Hard Mode puts it - or on a line of its
+                // own when the description has fewer than three and none has
+                // room. Hard Mode's "(15)" is seven characters and runs past
+                // the box on the vanilla descriptions.
+                const uint8_t tag[] = { 0x7F, 0x82, 0x17, 0x80, 0x00, 0x00 };
+                constexpr int tag_width = 4;
+                constexpr int box_width = 20;   // characters a description line holds
+                std::vector<uint8_t> text;
+                for (int i = 0; i < len; i++) {
+                    text.push_back(static_cast<uint8_t>(MEM_BU(i, now)));
+                }
+                // Lines are split by 0xE0; bytes of 0x80 and up are control
+                // codes and take no room.
+                std::vector<size_t> line_end;
+                std::vector<int> line_width;
+                int width = 0;
+                for (size_t i = 0; i < text.size(); i++) {
+                    if (text[i] == 0xE0) {
+                        line_end.push_back(i);
+                        line_width.push_back(width);
+                        width = 0;
+                    }
+                    else if (text[i] < 0x80) {
+                        width++;
+                    }
+                }
+                line_end.push_back(text.size());
+                line_width.push_back(width);
+                int pick = -1;
+                for (int l = static_cast<int>(line_end.size()) - 1; l >= 0 && pick < 0; l--) {
+                    if (line_width[l] + tag_width <= box_width) {
+                        pick = l;
+                    }
+                }
+                // The character set in use where the tag goes (0x80 digits and
+                // signs, 0x81 capitals, 0x82 small letters), put back after
+                // it so the rest of the text reads as it did.
+                auto set_at = [&text](size_t pos) {
+                    uint8_t set = 0x81;
+                    for (size_t i = 0; i < pos; i++) {
+                        if (text[i] == 0x80 || text[i] == 0x81 || text[i] == 0x82) set = text[i];
+                    }
+                    return set;
+                };
+                size_t at;
+                if (pick >= 0) {
+                    at = line_end[pick];
+                    uint8_t restore = set_at(at);
+                    text.insert(text.begin() + static_cast<long>(at), restore);
+                    text.insert(text.begin() + static_cast<long>(at), tag, tag + sizeof tag);
+                }
+                else if (line_end.size() < 3) {
+                    // A line of its own, without the leading space.
+                    at = text.size();
+                    text.push_back(0xE0);
+                    text.insert(text.end(), tag + 1, tag + sizeof tag);
+                    at += 1;
+                }
+                else {
+                    // Every line is full: the shortest one takes it.
+                    int shortest = 0;
+                    for (int l = 1; l < static_cast<int>(line_width.size()); l++) {
+                        if (line_width[l] < line_width[shortest]) shortest = l;
+                    }
+                    at = line_end[shortest];
+                    uint8_t restore = set_at(at);
+                    text.insert(text.begin() + static_cast<long>(at), restore);
+                    text.insert(text.begin() + static_cast<long>(at), tag, tag + sizeof tag);
+                }
+                text.push_back(0xFF);
+                int32_t out = counted_text[id];
+                for (size_t i = 0; i < text.size(); i++) {
+                    MEM_B(static_cast<int32_t>(i), out) = static_cast<int8_t>(text[i]);
+                }
+                // The two digits are the tag's last two bytes; `at` is where
+                // the tag starts (the line-of-its-own tag has no space).
+                size_t tag_len = (pick < 0 && line_end.size() < 3) ? sizeof tag - 1 : sizeof tag;
+                digits_at[id] = out + static_cast<int32_t>(at + tag_len - 2);
+                MEM_W(0, entry) = out;
+            }
+            int count = std::min(counts[id], max_stack);
+            MEM_B(0, digits_at[id]) = static_cast<int8_t>(count / 10);
+            MEM_B(1, digits_at[id]) = static_cast<int8_t>(count % 10);
+        }
+    }
+}
+
+bool zelda64::enhancements::item_menu_open(uint8_t* rdram) {
+    return (static_cast<uint32_t>(MEM_W(0, item_menu_mask)) & item_menu_bit) != 0 ||
+           MEM_HU(0, game_mode) == 2;
+}
+
+void zelda64::enhancements::bag_counts(uint8_t* rdram, int (&counts)[256]) {
+    if (!read_bag(rdram, counts, nullptr)) {
+        // Something neither layout would hold: count plain ids and nothing else.
+        for (int& c : counts) c = 0;
+        for (int slot = 0; slot < bag_slots; slot++) {
+            int b = MEM_BU(slot, bag);
+            if (b != bag_empty && b < 0x80) {
+                counts[b]++;
+            }
+        }
+    }
+}
+
 void zelda64::enhancements::on_frame(uint8_t* rdram) {
     const Options& options = active_options();
+
+    if (!zelda64::hardmode::active() && in_game(rdram)) {
+        if (options.stack_items) {
+            if (!item_menu_open(rdram)) {
+                stack_bag(rdram);
+            }
+            show_counts(rdram);
+        }
+        else {
+            unstack_bag(rdram);
+        }
+    }
 
     // The element-choice screen (bit 3 of the menu mask 0x8007B2E4) opened
     // with every element already at the cap - a natural level-up, a spirit

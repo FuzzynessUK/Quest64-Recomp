@@ -527,6 +527,8 @@ struct CheatsContext {
     // Get Item list, and the master switch for the whole tab.
     int item_index = 0;
     std::vector<std::string> item_names;
+    int hm_item_index = 0;
+    std::vector<std::string> hm_item_names;
     bool all_cheats_enabled = false;   // matches cheats_on in debug.cpp
 
     // What the sliders show. Follows the game's value except right after the
@@ -876,6 +878,13 @@ void make_enhancements_bindings(Rml::Context* context) {
         }
     );
 
+    constructor.BindFunc("enh_stack_items",
+        [](Rml::Variant& out) { out = enhancements_context.edited.stack_items ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.stack_items = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
     constructor.BindFunc("enh_faster_walk",
         [](Rml::Variant& out) { out = enhancements_context.edited.faster_walk ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -2455,6 +2464,10 @@ public:
             [](const std::string& param, Rml::Event& event) {
                 zelda64::give_item(cheats_context.item_index);
             });
+        recompui::register_event(listener, "cheat_give_hm_item",
+            [](const std::string& param, Rml::Event& event) {
+                zelda64::give_hard_mode_item(cheats_context.hm_item_index);
+            });
 
         recompui::register_event(listener, "reset_game",
             [](const std::string& param, Rml::Event& event) {
@@ -2978,6 +2991,9 @@ public:
         cheats_context.item_names = zelda64::item_names();
         constructor.Bind("cheat_item_names", &cheats_context.item_names);
         constructor.Bind("cheat_item_index", &cheats_context.item_index);
+        cheats_context.hm_item_names = zelda64::hard_mode_item_names();
+        constructor.Bind("cheat_hm_item_names", &cheats_context.hm_item_names);
+        constructor.Bind("cheat_hm_item_index", &cheats_context.hm_item_index);
         constructor.BindFunc("cheat_all_enabled",
             [](Rml::Variant& out) { out = cheats_context.all_cheats_enabled ? 1 : 0; },
             [](const Rml::Variant& in) {
