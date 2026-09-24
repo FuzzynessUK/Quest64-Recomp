@@ -49,14 +49,16 @@ Quest 64 Recompiled:
   # pool.
   extra_level_ups: 0
 
-  # What it takes to open the way into Mammon's World. The last door of the
-  # final staircase always wants the Eletale's Book; this asks for more on
-  # top of it.
+  # What it takes to open the way into Mammon's World. In the vanilla game
+  # the last door of the final staircase wants the Eletale's Book; any other
+  # choice replaces the Book - the door opens once the condition is met, the
+  # Book leaves the pool and the Shannon who hands it over becomes a gift
+  # check of her own.
   #
-  # vanilla       the book, and nothing else - the game's own gate
-  # all_bosses    every boss before Mammon as well: Solvaring, Zelse, Nepty,
+  # vanilla       the Book, the game's own gate
+  # all_bosses    every boss before Mammon: Solvaring, Zelse, Nepty,
   #               Shilf, Fargo, Guilty and Beigis
-  # all_monsters  one of each of the 67 kinds of regular monster as well.
+  # all_monsters  one of each of the 67 kinds of regular monster.
   #               Turns enemysanity on, because the server is what keeps the
   #               count - a monster leaves nothing in the save to read back
   # both          all of it
@@ -71,7 +73,10 @@ Quest 64 Recompiled:
   # beaten. The Soul is an Archipelago item, not one the game knows about, so
   # it can be anywhere in the multiworld. Whether a boss is there is settled
   # as his arena loads, so a Soul that arrives while you are standing in one
-  # takes effect the next time you walk in.
+  # takes effect the next time you walk in. With Souls on, everything the
+  # four gems lock (doors, boats, teleporters) is open from the start;
+  # the Dark Gaol Key still locks the endgame, and so does the Eletale's
+  # Book unless mammon_portal replaces it.
   #
   # off           every boss is where the game puts him
   # bosses        the seven before Mammon need Souls
@@ -84,5 +89,124 @@ Quest 64 Recompiled:
   goal:
     mammon: 1
 
+  # ==== Randomizer
+  # These three groups are the game's own settings. When the game is
+  # connected to the room as it starts, it plays with these instead of
+  # its menus, and hides the Randomizer and Enhancements menus.
+
+  # Shuffled Spells: Shuffles which spell each element teaches, with the spell
+  # damage rebalance, Invalidity, and the fixes that keep shuffled spell
+  # combinations from crashing.
+  shuffle_spells:
+    'false': 1
+    'true': 0
+
+  # Early Healing: A healing spell is guaranteed early.
+  early_healing:
+    'false': 1
+    'true': 0
+
+  # Enemy Randomizer: Any monster set can land in any area, and every monster
+  # is scaled to the area it appears in.
+  enemy_randomizer:
+    'false': 1
+    'true': 0
+
+  # Shuffle Boss Order: The seven bosses before Mammon swap arenas.
+  shuffle_boss_order:
+    'false': 1
+    'true': 0
+
+  # Randomize Guilty Element: Guilty takes a random element instead of his
+  # own.
+  random_guilty_element:
+    'false': 1
+    'true': 0
+
+  # Faster Areas: Fast Monastery, Fast Blue Cave, Fast Shamwood and Fast
+  # Mammon's World together: the long empty stretches are skipped.
+  faster_areas:
+    'false': 1
+    'true': 0
+
+  # Wings Never Expire: Using a pair of wings does not use them up.
+  wings_never_expire:
+    'false': 1
+    'true': 0
+
+  # No Enemy Drop Limit: Monsters keep dropping items past the vanilla limit.
+  no_enemy_drop_limit:
+    'false': 1
+    'true': 0
+
+  # Element Cap 99: Each element can be raised to 99 instead of 50, by
+  # spirits, level-ups and Level Up items alike.
+  element_cap_99:
+    'false': 1
+    'true': 0
+
+  # ==== Enhancements
+
+  # JP Healing Amounts: Healing Lv2 restores 16 HP instead of 8, as in the
+  # Japanese release.
+  jp_healing:
+    'false': 1
+    'true': 0
+
+  # JP Magic Barrier: Magic Barrier holds two turns longer, as in the Japanese
+  # release.
+  jp_magic_barrier:
+    'false': 1
+    'true': 0
+
+  # JP Stat Up Effect: A colour burst over Brian when a stat rises, as in the
+  # Japanese release.
+  jp_stat_up_effect:
+    'false': 1
+    'true': 0
+
+  # Exit from Anywhere: The bound Exit Spell control warps out of an area
+  # without the spell or the MP.
+  exit_from_anywhere:
+    'false': 1
+    'true': 0
+
+  # Fast Walking: Brian walks 50% faster.
+  fast_walking:
+    'false': 1
+    'true': 0
+
+  # Text Improvements: Merrow's clearer wording for a number of the game's
+  # messages.
+  text_improvements:
+    'false': 1
+    'true': 0
+
+  # ==== Cosmetics
+
+  # Text Palette: The colour of the text boxes.
+  text_palette:
+    off: 1
+    random: 0
+
+  # Staff Palette: The colour of Brian's staff.
+  staff_palette:
+    off: 1
+    random: 0
+
+  # Cloak Colour: The colour of Brian's cloak.
+  cloak_colour:
+    off: 1
+    random: 0
+
+  # Brian's Clothes: The colours of Brian's clothes.
+  brian_clothes:
+    off: 1
+    random: 0
+
+  # Spell Palettes: The colours of the spell effects.
+  spell_palettes:
+    off: 1
+    random: 0
   progression_balancing: 50
   accessibility: full

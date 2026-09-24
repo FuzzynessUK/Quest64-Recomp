@@ -99,8 +99,9 @@ namespace zelda64::enhancements {
 
         // Archipelago traffic, when the connector is on: 0 nothing, 1 only
         // what this slot is sent, 2 that and what is found here for someone
-        // else. The overlay drops what the setting does not want, so this is
-        // live like the rest of the Notifications group.
+        // else, 3 all of that and every item passing between other players.
+        // The overlay drops what the setting does not want, so this is live
+        // like the rest of the Notifications group.
         int ap_notice = 1;
 
         // The notification stack itself (all three above). Off hides and
@@ -142,6 +143,12 @@ namespace zelda64::enhancements {
     void apply_at_boot(uint8_t* rdram);
     // The RAM-level part, run once per frame from the cheats hook.
     void on_frame(uint8_t* rdram);
+
+    // The highest an element can be raised right now: Hard Mode's current
+    // cap, or 99 with the randomizer's element uncap, or the game's 50.
+    int element_cap(uint8_t* rdram);
+    // Every one of Brian's four elements is at element_cap().
+    bool elements_all_maxed(uint8_t* rdram);
 
     // Warps the player to the start of the area they are in, the way the
     // Exit spell does, without needing the spell or the MP. Takes effect on

@@ -547,3 +547,7 @@ void quest64_hardmode_lookat(uint8_t*, recomp_context* ctx) {
 }
 
 }
+
+int zelda64::hardmode::element_cap(uint8_t* rdram) {
+    return ::element_cap(rdram);
+}

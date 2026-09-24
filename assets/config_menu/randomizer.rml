@@ -6,7 +6,7 @@
             <div class="config__wrapper">
                 <div class="config-debug">
                     <div class="config-debug__scroll">
-                        <div class="config-debug-option" data-if="rnd_changed">
+                        <div class="config-debug-option" data-if="rnd_changed && ap_locked == 0">
                             <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Changed settings apply when the game is next launched.</div>
                             </label>
@@ -39,6 +39,12 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="config-debug-option" data-if="ap_locked == 1">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Connected to Archipelago: the randomizer settings come from your YAML. Connect before starting the game so it boots with them.</div>
+                            </label>
+                        </div>
+                        <div data-if="ap_locked == 0">
                         <div class="config-debug-option">
                             <label class="config-debug-option__label">
                                 <div>Randomizer</div>
@@ -763,6 +769,7 @@
                             <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Port of Merrow by Hangedman. A spoiler log is written next to the settings files.</div>
                             </label>
+                        </div>
                         </div>
                         </div>
                     </div>

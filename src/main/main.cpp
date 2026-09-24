@@ -358,6 +358,9 @@ gpr get_entrypoint_address();
 // and, when it is on, replaces the randomizer: both rewrite the same monster,
 // spell and spirit tables, and the randomizer would undo the hack's.
 void quest64_on_init(uint8_t* rdram, recomp_context* ctx) {
+    // First of all: whether this launch plays with the Archipelago seed's
+    // settings, which every boot patch below reads through active_options().
+    zelda64::archipelago::settle_seed_settings();
     zelda64::hardmode::apply_at_boot(rdram);
     if (!zelda64::hardmode::active()) {
         zelda64::randomizer::apply_at_boot(rdram);

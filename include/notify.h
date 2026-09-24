@@ -22,6 +22,7 @@ namespace zelda64::notify {
         // as it is changed rather than on the next launch.
         ApReceived,   // an item this slot was sent
         ApSent,       // an item found here that belongs to someone else
+        ApRoom,       // an item passing between two other players
     };
 
     struct Message {

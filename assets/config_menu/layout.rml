@@ -101,11 +101,12 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show Archipelago items</div><div class="config-tip-text">What the Archipelago connector announces while it is connected. Show only your items announces what arrives for you, wherever it was found: "Received Fire Ruby from Bob". Show all players adds the other direction - a check found here holding something that belongs to someone else: "You have sent "Progressive Sword" to "Bob"". Applies straight away; it shows nothing at all unless the connector is on.</div></div>
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show Archipelago items</div><div class="config-tip-text">What the Archipelago connector announces while it is connected. Show only your items announces what arrives for you, wherever it was found: "Received Fire Ruby from Bob". Show all players adds the other direction - a check found here holding something that belongs to someone else: "You have sent "Progressive Sword" to "Bob"". Show all items in the room adds every item sent between anyone else as well, the way the room's log shows it: "Bob sent "Hookshot" to "Alice"". Applies straight away; it shows nothing at all unless the connector is on.</div></div>
                                         <select data-value="enh_ap_notice" id="enh_ap_notice_select">
                                             <option value="0">Off</option>
                                             <option value="1">Show only your items</option>
                                             <option value="2">Show all players</option>
+                                            <option value="3">Show all items in the room</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">

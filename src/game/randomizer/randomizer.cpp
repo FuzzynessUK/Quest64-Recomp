@@ -10,6 +10,7 @@
 
 #include "randomizer.h"
 #include "easierquest.h"
+#include "archipelago.h"
 #include "merrow_data.h"
 #include "merrow_mapdata.h"
 #include "boss_spells.h"
@@ -2800,6 +2801,17 @@ const zelda64::randomizer::Options& zelda64::randomizer::active_options() {
     // so that the boot writes and every native hook see the same thing.
     if (zelda64::easierquest::active()) {
         return zelda64::easierquest::preset();
+    }
+    // A launch connected to Archipelago as it booted plays with the seed's
+    // settings from the yaml, not the menu's.
+    if (zelda64::archipelago::seed_settings_in_effect()) {
+        static Options seed;
+        static bool seed_built = false;
+        if (!seed_built) {
+            zelda64::archipelago::apply_seed_settings(seed);
+            seed_built = true;
+        }
+        return seed;
     }
     if (!active_loaded) {
         active = load_options();

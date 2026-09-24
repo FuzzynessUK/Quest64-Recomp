@@ -37,7 +37,19 @@ monster_regions = ["Overworld", "Early", "Mid", "Late"]
 
 def set_rules(world, player):
     mw = world.multiworld
+    # With Boss Souls on, a boss may not be there to drop his gem, so the
+    # game opens every lock the four gems keep shut (the doors, boats and
+    # teleporters Merrow's "Unlock progression locks" opens) once it is
+    # connected. Only the book and the key still gate anything then.
+    gems = {"Earth Orb", "Wind Jade", "Water Jewel", "Fire Ruby"}
+    open_gems = world.options.boss_souls.value >= 1
+    # A mammon_portal condition opens the last door in the Book's place.
+    book_opens_nothing = world.options.mammon_portal.value != 0
     for region_name, item in region_requires.items():
+        if open_gems and item in gems:
+            continue
+        if book_opens_nothing and item == "Eletale's Book":
+            continue
         region = mw.get_region(region_name, player)
         for entrance in region.entrances:
             set_rule(entrance, lambda state, i=item: state.has(i, player))
@@ -51,7 +63,7 @@ def set_rules(world, player):
             set_rule(mw.get_location(location, player),
                      lambda state, s=soul: state.has(s, player))
 
-    # What the portal waits on, over and above the Eletale's Book. "Every
+    # What the portal waits on instead of the Eletale's Book. "Every
     # boss beaten" is written as every boss's check being reachable, which
     # already accounts for his Soul if Souls are on.
     mode = world.options.mammon_portal.value

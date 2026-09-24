@@ -147,7 +147,7 @@ text = "quest64_randomizer_element_all_maxed(ctx);"
 before_vram = 0x80007964
 [[patches.hook]]
 func = "func_80002F60"
-text = "quest64_randomizer_element_spirit_grab(ctx); quest64_hardmode_spirit_cap(rdram, ctx);"
+text = "quest64_randomizer_element_spirit_grab(ctx); quest64_hardmode_spirit_cap(rdram, ctx); quest64_enh_spirit_cap(rdram, ctx);"
 before_vram = 0x800032D8
 # The four per-element gates, all the same shape.
 [[patches.hook]]
@@ -205,6 +205,14 @@ func = "func_801000A8_ovl_title"
 text = "quest64_speedrun_title_frame();"
 before_vram = 0x801000A8
 
+# Where the Controller Pak menu was opened from (a0: 4 = a save NPC in the
+# field, 0 = the main menu's Load), so an in-game save menu listing the
+# files is not taken for a file being loaded.
+[[patches.hook]]
+func = "func_8002B510"
+text = "quest64_speedrun_pak_menu_open(ctx);"
+before_vram = 0x8002B510
+
 # Carrying the run time in the save file. The game's two Controller Pak
 # wrappers, both (port, file_no, offset, nbytes, buffer) with the fifth on
 # the caller's stack: func_80031A44 writes, func_800319E0 reads. The write
@@ -221,6 +229,35 @@ before_vram = 0x801000A8
 func = "func_80006604"
 text = "if (quest64_archipelago_hide_chest_text(rdram)) return;"
 before_vram = 0x80006604
+
+# Archipelago: the chest being opened (t9) is emptied just before its item is
+# read (`lh $t2, 0x50($t9)`), and only while connected, so an unconnected
+# game keeps every chest's own item.
+[[patches.hook]]
+func = "func_80002F60"
+text = "quest64_archipelago_empty_chest(rdram, ctx);"
+before_vram = 0x80003444
+
+# Archipelago: a spirit picked up while connected does not open the spirit
+# screen. The grab stores the mask with the screen's bit set just before
+# 0x80003318, which every path through it reaches; the hook clears the bit.
+[[patches.hook]]
+func = "func_80002F60"
+text = "quest64_archipelago_spirit_grab(rdram);"
+before_vram = 0x80003318
+
+# Archipelago gift NPCs. func_800086E4 (talking to an NPC) asks whether the
+# bag holds a giver's item at 0x8000880C and uses the answer at 0x80008814;
+# the hook answers for the check instead of the bag. The add at 0x80008850
+# is then skipped at func_800212A0's entry so no item lands in the bag.
+[[patches.hook]]
+func = "func_800086E4"
+text = "quest64_archipelago_giver_talk(rdram, ctx);"
+before_vram = 0x80008814
+[[patches.hook]]
+func = "func_800212A0"
+text = "if (quest64_archipelago_skip_gift_item(rdram, ctx)) return;"
+before_vram = 0x800212A0
 
 # Boss Souls. func_8000B530 is the whole of how a boss gets into the world:
 # as a map loads it walks gBossData (0x803A9AD0, eight 0x18-byte entries in

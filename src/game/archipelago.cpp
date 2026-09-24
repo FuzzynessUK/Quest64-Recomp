@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <deque>
@@ -16,6 +17,8 @@
 #include <vector>
 
 #include "archipelago.h"
+#include "enhancements.h"
+#include "randomizer.h"
 #include "notify.h"
 #include "randomizer/chest_data.h"
 #include "randomizer/merrow_data.h"
@@ -755,13 +758,25 @@ namespace {
     // queue until there is a server to tell. Playing on through a dropped
     // connection, or before logging in, then costs nothing.
     std::atomic<bool> ap_enabled{ false };
-    // Whether this launch came up in Archipelago mode. Connecting without
-    // it is not the same thing: the chests are emptied and the gift NPCs
-    // located at boot, so a game that started without it is only half in the
-    // seed however well the socket works.
-    bool booted_with_ap = false;
+    // Whether the game plays by the seed's rules right now: empty chests, no
+    // spirit screen, gifts taken back, Souls and the portal gate. Only while
+    // the server has accepted us - enabled but not connected (or dropped)
+    // plays exactly as the original game, and only the watching goes on.
+    bool playing_seed() {
+        return ap_enabled.load() && current_status.load() == zelda64::archipelago::Status::Connected;
+    }
+    // The gift NPCs, the portal door and the boss-item locks are found in
+    // the ROM once, the first time Archipelago mode is on - but never before
+    // the game has booted: the menu applies the saved settings at start-up,
+    // before the ROM is loaded, and a search of an empty ROM finds nothing
+    // and would still count as done.
+    bool located = false;
+    bool rom_ready = false;
+    void locate_once();
     // Defined with the game side, at the end of the file.
     void forget_sent_checks();
+    // Defined with the seed settings, near goal_reached.
+    void note_seed_settings();
     // How an item is written in a notice. Defined with the boss names.
     std::string pretty_item(int64_t item);
     // Works the held Souls out from the whole of server_items. Unlike the
@@ -791,6 +806,24 @@ namespace {
     std::vector<int64_t> server_items;
     int items_applied = 0;
     std::set<int64_t> checked_locations;
+    // Every location this slot has, done or not: checked_locations plus the
+    // Connected packet's missing_locations. A gift NPC whose location is not
+    // in it (giftsanity off) is left to give its own item.
+    std::set<int64_t> slot_locations;
+    // The yaml's settings for the game itself (slot_data "settings") and the
+    // seed its randomizer rolls with, as last received. Null until a
+    // Connected packet carries them.
+    json seed_settings_live;
+    int64_t rando_seed_live = 0;
+
+    // Whether a location is part of this seed. Chests, spirits and gift NPCs
+    // are only changed while theirs is: with chestsanity or spiritsanity off
+    // in the yaml, a chest opens and gives its own item as usual and a
+    // spirit brings up the level-up screen.
+    bool seed_has(int64_t group, int index) {
+        std::lock_guard lock{ server_mutex };
+        return slot_locations.count(zelda64::archipelago::id_base + group + index) != 0;
+    }
     int mammon_portal = 0;   // 0 vanilla, 1 bosses, 2 monsters, 3 both
     // 0 off, 1 the seven before Mammon, 2 with Mammon as well.
     std::atomic<int> boss_souls{ 0 };
@@ -1024,11 +1057,21 @@ namespace {
                         // the only record that they were ever beaten.
                         {
                             std::lock_guard lock{ server_mutex };
+                            slot_locations.clear();
                             if (packet.contains("checked_locations") &&
                                 packet["checked_locations"].is_array()) {
                                 for (const json& id : packet["checked_locations"]) {
                                     if (id.is_number_integer()) {
                                         checked_locations.insert(id.get<int64_t>());
+                                        slot_locations.insert(id.get<int64_t>());
+                                    }
+                                }
+                            }
+                            if (packet.contains("missing_locations") &&
+                                packet["missing_locations"].is_array()) {
+                                for (const json& id : packet["missing_locations"]) {
+                                    if (id.is_number_integer()) {
+                                        slot_locations.insert(id.get<int64_t>());
                                     }
                                 }
                             }
@@ -1073,6 +1116,10 @@ namespace {
                                     slot["boss_souls"].is_number_integer()) {
                                     boss_souls.store(slot["boss_souls"].get<int>());
                                 }
+                                if (slot.contains("settings") && slot["settings"].is_object()) {
+                                    seed_settings_live = slot["settings"];
+                                    rando_seed_live = slot.value("rando_seed", int64_t{ 0 });
+                                }
                             }
                             log_line("the server has " + std::to_string(checked_locations.size()) +
                                      " check(s) for this slot; mammon_portal = " +
@@ -1081,6 +1128,7 @@ namespace {
                         }
                         set_status(zelda64::archipelago::Status::Connected,
                                    "Connected as " + options.slot);
+                        note_seed_settings();
                     }
                     else if (cmd == "RoomUpdate") {
                         // Sent when anything the room knows changes, including
@@ -1175,15 +1223,29 @@ namespace {
                             int receiver = packet.value("receiving", -1);
                             int64_t what = packet["item"].value("item", static_cast<int64_t>(0));
                             std::lock_guard lock{ server_mutex };
+                            auto name_of = [&](int slot) {
+                                auto who = player_names.find(slot);
+                                return who != player_names.end() ? who->second
+                                                                 : "player " + std::to_string(slot);
+                            };
                             if (finder == our_slot && receiver != our_slot) {
-                                auto who = player_names.find(receiver);
-                                std::string name = who != player_names.end()
-                                    ? who->second
-                                    : "player " + std::to_string(receiver);
                                 zelda64::notify::post(
                                     "You have sent \"" + item_name_for(receiver, what) +
-                                        "\" to \"" + name + "\"",
+                                        "\" to \"" + name_of(receiver) + "\"",
                                     zelda64::notify::Kind::ApSent);
+                            }
+                            else if (finder != our_slot && receiver != our_slot) {
+                                // The rest of the room's traffic, for the
+                                // "all items in the room" setting. What
+                                // arrives here is announced from
+                                // ReceivedItems, so it is not repeated.
+                                std::string item = item_name_for(receiver, what);
+                                zelda64::notify::post(
+                                    finder == receiver
+                                        ? name_of(finder) + " found their \"" + item + "\""
+                                        : name_of(finder) + " sent \"" + item + "\" to \"" +
+                                              name_of(receiver) + "\"",
+                                    zelda64::notify::Kind::ApRoom);
                             }
                         }
                     }
@@ -1331,14 +1393,8 @@ const zelda64::archipelago::Options& zelda64::archipelago::active_options() {
 
 void zelda64::archipelago::apply_options(const Options& options) {
     save_options(options);
-    // Connecting is not enough on its own the first time: what a chest holds
-    // and where the gift NPCs are is settled as the game boots. Say so
-    // rather than letting a seed quietly half-work - the setting is saved,
-    // so a restart is all it takes.
-    if (options.enabled && !booted_with_ap) {
-        log_line("connecting, but this launch did not start in Archipelago mode: the chests "
-                 "still hold their own items and the gift NPCs are not being watched. Restart.");
-        zelda64::notify::post("Archipelago: restart the game for the seed to work properly");
+    if (options.enabled) {
+        locate_once();
     }
     ap_enabled.store(options.enabled);
     {
@@ -1454,6 +1510,150 @@ namespace {
 // The two halves are defined at the end of the file, with the level-up
 // counter they have to reset.
 
+// ---------------------------------------------------------------- seed settings
+
+namespace {
+    std::atomic<bool> settled{ false };
+    std::atomic<bool> in_effect{ false };
+    json seed_settings_boot;
+    int64_t rando_seed_boot = 0;
+
+    int setting(const char* name) {
+        if (!seed_settings_boot.is_object() || !seed_settings_boot.contains(name)) {
+            return 0;
+        }
+        const json& v = seed_settings_boot[name];
+        if (v.is_boolean()) {
+            return v.get<bool>() ? 1 : 0;
+        }
+        return v.is_number_integer() ? v.get<int>() : 0;
+    }
+}
+
+// Called by the worker once a Connected packet has been read. A launch that
+// is already running cannot take the settings any more - the ROM was
+// patched at boot - so it says so rather than quietly playing without them.
+namespace {
+void note_seed_settings() {
+    if (!settled.load()) {
+        return;   // the boot has not happened yet and will take them itself
+    }
+    json live;
+    int64_t seed = 0;
+    {
+        std::lock_guard lock{ server_mutex };
+        live = seed_settings_live;
+        seed = rando_seed_live;
+    }
+    if (live.is_null()) {
+        return;
+    }
+    if (!in_effect.load()) {
+        log_line("the seed's settings arrived after the game had started: restart the game to use them");
+        zelda64::notify::post("Archipelago: restart the game to play with this seed's settings");
+    }
+    else if (live != seed_settings_boot || seed != rando_seed_boot) {
+        log_line("this slot's settings differ from the ones the game started with: restart the game");
+        zelda64::notify::post("Archipelago: a different seed's settings - restart the game");
+    }
+}
+}
+
+void zelda64::archipelago::settle_seed_settings() {
+    if (settled.exchange(true)) {
+        return;
+    }
+    if (!load_options().enabled) {
+        return;
+    }
+    // Connecting from the launcher is the way to do it; this only covers a
+    // connection that is still on its way when Start is pressed.
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    while (current_status.load() == Status::Connecting && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    if (current_status.load() != Status::Connected) {
+        log_line("not connected as the game started: it plays with the menus' settings");
+        return;
+    }
+    {
+        std::lock_guard lock{ server_mutex };
+        seed_settings_boot = seed_settings_live;
+        rando_seed_boot = rando_seed_live;
+    }
+    if (seed_settings_boot.is_null()) {
+        log_line("connected, but the slot sent no settings (an older apworld): the menus' settings are used");
+        return;
+    }
+    in_effect.store(true);
+    log_line("playing with the seed's settings: " + seed_settings_boot.dump() +
+             ", randomizer seed " + std::to_string(rando_seed_boot));
+}
+
+bool zelda64::archipelago::seed_settings_in_effect() {
+    return in_effect.load();
+}
+
+bool zelda64::archipelago::settings_locked() {
+    return in_effect.load() || current_status.load() == Status::Connected;
+}
+
+// The randomizer the seed plays with: vanilla except for what the yaml
+// switched on. The item lists stay off - what is where is the server's to
+// say - and so do the spirit and chest movers, Lost Keys and the door
+// options, which the connector handles its own way (Boss Souls).
+void zelda64::archipelago::apply_seed_settings(zelda64::randomizer::Options& o) {
+    using zelda64::randomizer::ListMode;
+    o = zelda64::randomizer::Options{};
+    o.mode = zelda64::randomizer::Mode::Randomizer;
+    o.seed = std::to_string(rando_seed_boot);
+    o.chests = ListMode::Off;
+    o.drops = ListMode::Off;
+    o.gifts = ListMode::Off;
+    o.wingsmiths = ListMode::Off;
+    o.boss_rewards_shuffler = false;
+
+    bool spells = setting("shuffle_spells") != 0;
+    o.spell_shuffle = spells;
+    o.hinted_spell_names = spells;
+    o.spell_rebalance = spells;
+    o.invalidity = spells;
+    o.spell_overrides = spells;
+    o.early_healing = setting("early_healing") != 0;
+    o.enemy_randomizer = setting("enemy_randomizer") != 0;
+    o.boss_order = setting("shuffle_boss_order") != 0;
+    o.boss_element = setting("random_guilty_element") != 0;
+    bool fast = setting("faster_areas") != 0;
+    o.fast_monastery = fast;
+    o.fast_blue_cave = fast;
+    o.fast_shamwood = fast;
+    o.fast_mammon = fast;
+    o.wings_never_expire = setting("wings_never_expire") != 0;
+    o.drop_limit_disabled = setting("no_enemy_drop_limit") != 0;
+    o.element_uncap = setting("element_cap_99") != 0;
+    o.text_improvements = setting("text_improvements") != 0;
+    o.text_palette = setting("text_palette") != 0 ? 1 : 0;   // 1 is random
+    o.staff_palette = setting("staff_palette") != 0;
+    o.cloak_palette = setting("cloak_colour") != 0;
+    o.brian_palette = setting("brian_clothes") != 0;
+    o.spell_palette = setting("spell_palettes") != 0;
+}
+
+// The enhancements: the six the yaml decides, and the three that would
+// change the game underneath the seed (One Hit KO, Hard Mode, Easy Mode) off.
+// Everything else - the timer, the notices, N64 mode, the HUD layout - is
+// the player's own and stays as the menus have it.
+void zelda64::archipelago::apply_seed_settings(zelda64::enhancements::Options& o) {
+    o.jp_healing = setting("jp_healing") != 0;
+    o.longer_magic_barrier = setting("jp_magic_barrier") != 0;
+    o.stat_up_effect = setting("jp_stat_up_effect") != 0;
+    o.exit_from_anywhere = setting("exit_from_anywhere") != 0;
+    o.faster_walk = setting("fast_walking") != 0;
+    o.one_hit_ko = false;
+    o.hard_mode = false;
+    o.easier_quest = false;
+}
+
 void zelda64::archipelago::goal_reached() {
     std::lock_guard lock{ queue_mutex };
     goal_pending = true;
@@ -1506,7 +1706,6 @@ namespace {
     // order (Solvaring first, Mammon last). gBossData is in the same order,
     // so a boss's number is his index there plus one, and that is the number
     // his check and his Soul both use.
-    constexpr int monster_count = 75;
     constexpr int boss_first = 67;
     constexpr int boss_count = 8;
     const char* const boss_names[boss_count] = {
@@ -1637,9 +1836,6 @@ namespace {
     std::vector<bool> enemy_sent(boss_first, false);
     std::vector<bool> boss_sent(boss_count, false);
     std::atomic<int> level_ups_waiting{ 0 };
-    // Set while the spirit screen is up because we asked for it, so the
-    // suppression below can tell our own menu from one a spirit opened.
-    bool level_up_open = false;
 
     bool flag_set(uint8_t* rdram, int32_t base, int id) {
         return (MEM_BU(0, base + (id >> 3)) & (1u << (id & 7))) != 0;
@@ -1681,9 +1877,14 @@ namespace {
     // Holds the last door of the final staircase shut until the yaml's
     // condition is met, by giving it a key that does not exist. The door is
     // the game's own, so refusing it is the game's own refusal - no
-    // transition is begun and nothing has to be unwound. Once the condition
-    // is met the record goes back to exactly what the ROM says, so the
-    // Eletale's Book still has to be found as well.
+    // transition is begun and nothing has to be unwound.
+    //
+    // Once the condition is met the door is simply open: the condition takes
+    // the Eletale's Book's place rather than adding to it, so the Shannon
+    // who hands the Book over is just another gift check. Open is Merrow's
+    // unlocked value for this very record (unlockedDoorData entry 16): kind
+    // 01, flags 01 (no item wanted), item 0.
+    constexpr uint8_t portal_open_flags = 0x01;
     void guard_portal(uint8_t* rdram) {
         if (portal_ram == 0 || mammon_portal == 0) {
             return;
@@ -1697,7 +1898,8 @@ namespace {
         // and a map file that ever moves would otherwise have this scribbling
         // on whatever is there instead. The flags byte and the destination
         // are ours to compare because neither is ever written here.
-        if (static_cast<uint8_t>(MEM_BU(0, portal_ram + 0x15)) != portal_flags ||
+        uint8_t flags_now = static_cast<uint8_t>(MEM_BU(0, portal_ram + 0x15));
+        if ((flags_now != portal_flags && flags_now != portal_open_flags) ||
             static_cast<uint32_t>(MEM_W(0, portal_ram + 0x20)) != portal_tail) {
             static bool said = false;
             if (!said) {
@@ -1714,8 +1916,14 @@ namespace {
             return;
         }
         PortalProgress progress = portal_progress();
-        MEM_H(0, portal_ram + 0x16) =
-            static_cast<int16_t>(progress.open() ? portal_item : portal_no_key);
+        if (progress.open()) {
+            MEM_B(0, portal_ram + 0x15) = static_cast<int8_t>(portal_open_flags);
+            MEM_H(0, portal_ram + 0x16) = 0;
+        }
+        else {
+            MEM_B(0, portal_ram + 0x15) = static_cast<int8_t>(portal_flags);
+            MEM_H(0, portal_ram + 0x16) = static_cast<int16_t>(portal_no_key);
+        }
 
         // Say so when it changes, and once each time the moor is walked into,
         // so the reason the door will not open is never a mystery. The notice
@@ -1744,20 +1952,6 @@ namespace {
                     std::to_string(progress.monsters_needed) + " monsters";
         }
         zelda64::notify::post("Mammon's World is sealed: " + what);
-    }
-
-    // Takes one back out again: the gift NPCs still hand their item over,
-    // because that is how the gift is noticed at all, so in Archipelago mode
-    // it is removed the same frame. This runs before the "Received ..."
-    // notice does, so nothing is announced either.
-    bool take_item(uint8_t* rdram, int item) {
-        for (int slot = 0; slot < inventory_slots; slot++) {
-            if (MEM_BU(0, gInventory + slot) == item) {
-                MEM_B(0, gInventory + slot) = static_cast<int8_t>(inventory_empty);
-                return true;
-            }
-        }
-        return false;
     }
 
     // Puts an item in the bag. func_8000FFE8 searches the whole list rather
@@ -1790,8 +1984,8 @@ namespace {
     // Defined with the rest of the gift-NPC watch, at the end of the file.
     void locate_givers(const std::vector<uint8_t>& rom);
     void locate_portal(const std::vector<uint8_t>& rom);
-    void watch_givers(uint8_t* rdram);
-    void forget_bag();
+    void locate_boss_locks(const std::vector<uint8_t>& rom);
+    void open_boss_locks(uint8_t* rdram);
 }
 
 void zelda64::archipelago::on_frame(uint8_t* rdram) {
@@ -1800,8 +1994,13 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
     }
     scan_flags(rdram, chest_flags, chest_count, chest_sent, group_chest, "chest");
     scan_flags(rdram, spirit_flags, spirit_count, spirit_sent, group_spirit, "spirit");
-    watch_givers(rdram);
+    if (!playing_seed()) {
+        // Not connected: the original game. The door is the game's own, a
+        // gift NPC gives as usual and a spirit opens its screen.
+        return;
+    }
     guard_portal(rdram);
+    open_boss_locks(rdram);
 
     // Hand over whatever the server has sent that this save has not had.
     // Nothing happens until a file is loaded: items put in the bag before
@@ -1839,29 +2038,33 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
             }
             bool taken = give_item(rdram, static_cast<int>(vanilla));
             log_line("gave item " + std::to_string(vanilla) + (taken ? "" : " but the bag is full"));
-            // What we just put in the bag is not a gift from anyone: forget
-            // the count so the next frame re-reads it instead of seeing an
-            // arrival.
-            forget_bag();
         }
     }
 
-    // The spirit screen, both ways round.
+    // The spirit screen. A spirit no longer opens it (that is stopped at the
+    // grab, quest64_archipelago_spirit_grab), but it is also the game's own
+    // level-up screen: EXP from monsters opens it through the same bit
+    // (func_800074A0, 0x8000799C). So it is never taken down here - doing
+    // that turned ordinary level-ups off - and while it is up, whoever
+    // opened it, a Level Up from the server waits its turn.
     uint32_t mask = static_cast<uint32_t>(MEM_W(0, menu_mask));
     if (mask & menu_spirit) {
-        // A spirit opened it: take it straight back down, so picking one up
-        // is only the spirit disappearing and the check being sent. The
-        // screen we asked for ourselves is left alone.
-        if (!level_up_open) {
-            MEM_W(0, menu_mask) = static_cast<int32_t>(mask & ~menu_spirit);
-        }
         return;
     }
-    level_up_open = false;
     // Hand over a Level Up when there is somewhere to put it: not in a
     // battle, and not while any other menu is up, which covers the pause
     // screen and the item menu without having to know their bits.
     if (level_ups_waiting.load() <= 0) {
+        return;
+    }
+    // Every element at its cap: the element-choice screen would have nothing
+    // to raise and could not be left, so a Level Up has nowhere to go. The
+    // cap never comes down again, so they are let go rather than kept.
+    if (zelda64::enhancements::elements_all_maxed(rdram)) {
+        int dropped = level_ups_waiting.exchange(0);
+        log_line(std::to_string(dropped) + " Level Up(s) dropped: every element is at its maximum");
+        zelda64::notify::post("Every element is at its maximum: Level Up not needed",
+                              zelda64::notify::Kind::ApReceived);
         return;
     }
     if (mask != 0 || (MEM_HU(0, gBattleState) & 1)) {
@@ -1880,39 +2083,55 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
         return;
     }
     level_ups_waiting.fetch_sub(1);
-    level_up_open = true;
     MEM_W(0, menu_mask) = static_cast<int32_t>(mask | menu_spirit);
     zelda64::notify::post("Level Up: choose an element", zelda64::notify::Kind::ApReceived);
     log_line("opened the spirit screen for a Level Up; " +
              std::to_string(level_ups_waiting.load()) + " still waiting");
 }
 
-// Boot. The chests keep their own contents in the ROM - a byte at +33 of
-// each 36-byte record - and with the connector on they are emptied: 255 is
-// the game's own "nothing", the value Merrow's shuffle uses for an empty
-// chest, so the game already knows what to do with it. The check still
-// fires, because that comes from the chest's opened flag rather than from
-// what was inside.
+// Boot. Nothing in the ROM changes any more: a chest is emptied as it is
+// opened, and only while connected (quest64_archipelago_empty_chest), so an
+// unconnected game is the original one.
 void zelda64::archipelago::apply_at_boot(uint8_t* rdram) {
+    (void)rdram;
     ap_enabled.store(load_options().enabled);
-    booted_with_ap = ap_enabled.load();
-    if (!ap_enabled.load()) {
+    rom_ready = true;
+    if (ap_enabled.load()) {
+        locate_once();
+    }
+}
+
+namespace {
+    void locate_once() {
+        if (located || !rom_ready) {
+            return;
+        }
+        std::span<const uint8_t> rom = recomp::get_rom();
+        if (rom.empty()) {
+            return;
+        }
+        located = true;
+        std::vector<uint8_t> copy(rom.begin(), rom.end());
+        locate_givers(copy);
+        locate_portal(copy);
+        locate_boss_locks(copy);
+    }
+}
+
+// func_80002F60's chest branch, at 0x80003444: `lh $t2, 0x50($t9)` reads the
+// item out of the chest being opened (t9) for the "you got ..." box and the
+// hand-over. While the seed is in play the chest is emptied right there: 255
+// is the game's own "nothing", the value Merrow's shuffle uses for an empty
+// chest. The check still fires, because that comes from the chest's opened
+// flag rather than from what was inside.
+extern "C" void quest64_archipelago_empty_chest(uint8_t* rdram, recomp_context* ctx) {
+    if (!playing_seed()) {
         return;
     }
-    std::span<const uint8_t> rom = recomp::get_rom();
-    std::vector<uint8_t> patched(rom.begin(), rom.end());
-    int emptied = 0;
-    for (const merrow::chests::Chest& chest : merrow::chests::chests) {
-        size_t at = static_cast<size_t>(chest.rom) + 33;
-        if (at < patched.size()) {
-            patched[at] = 0xFF;
-            emptied++;
-        }
+    int32_t chest = static_cast<int32_t>(ctx->r25);
+    if (chest != 0 && seed_has(zelda64::archipelago::group_chest, MEM_HU(0x62, chest))) {
+        MEM_H(0x50, chest) = 0xFF;
     }
-    log_line("Archipelago mode: emptied " + std::to_string(emptied) + " chests");
-    locate_givers(patched);
-    locate_portal(patched);
-    recomp::set_rom_contents(std::move(patched));
 }
 
 int zelda64::archipelago::pending_level_ups() {
@@ -1923,16 +2142,62 @@ int zelda64::archipelago::pending_level_ups() {
 // at 0x800098D4 it reads that monster's experience out of its stat table
 // entry: `lw $t7, 0x10($t6)`, where t6 came from `lw $t6, 0x64($s0)` - the
 // defeated monster's entry. The hook sits after that load (0x800098D8,
-// shared with Hard Mode's own), so t6 still holds the entry, and the entry's
-// halfword at +2 is the monster's index in the game's list.
+// shared with Hard Mode's own), so t6 still holds the entry.
 //
-// Indexes 0-66 are the ordinary monsters, 67-74 the eight bosses in story
-// order, so the boss's number is index - 66. Both groups check here; there
-// is no flag to watch for either, which is why this one is a hook.
+// The entry does not say which monster it is in any global sense: each of
+// the six monster files numbers its own entries from 0, so reading an id out
+// of it made every area's first monster "monster 0" and never reached a
+// boss. The one list the locations use is Merrow's 75 (0-66 the ordinary
+// monsters, 67-74 the bosses), and the ordinary ones are simply the six
+// files one after another. So an ordinary monster is
+//
+//     first id of the file that is loaded + the entry's place in its table
+//
+// where the loaded file is the row of the file table (0x80054160, 20 bytes a
+// row: ROM start, ROM end, table end, table start, ...) that 0x8007D0BC
+// points at - the same row the Enemy Randomizer rescales on load.
+//
+// A boss's entry is in his own file, outside that table. Which boss is here
+// is what func_8000B530 leaves at 0x8007D1A0 as the map loads: his index in
+// gBossData plus one, 0 when there is none. gBossData is in story order and
+// the boss-order shuffle only moves where each entry stands, so that number
+// is the boss himself (Solvaring 1 ... Mammon 8).
 //
 // A repeat is harmless - the server ignores a location it already has - but
 // the sent list keeps the traffic down, since an enemy type is checked once
 // however many of them are killed.
+namespace {
+    constexpr int32_t monster_file_table = 0x80054160;
+    constexpr int32_t monster_file_row = 0x8007D0BC;
+    constexpr int32_t monster_file_row_size = 20;
+    constexpr int32_t monster_entry_size = 0x38;
+    constexpr int32_t boss_here = 0x8007D1A0;
+    // Merrow's id of each file's first entry; the files hold 12, 15, 11,
+    // 13, 12 and 4 entries, 67 in all.
+    constexpr std::array<int, 6> file_first_id = { 0, 12, 27, 38, 51, 63 };
+    constexpr std::array<int, 6> file_entries = { 12, 15, 11, 13, 12, 4 };
+
+    // Merrow's id of the monster whose stat entry this is, or -1.
+    int global_monster_id(uint8_t* rdram, int32_t entry) {
+        int32_t row = MEM_W(0, monster_file_row);
+        int file = (row - monster_file_table) / monster_file_row_size;
+        if (row < monster_file_table || file < 0 || file >= static_cast<int>(file_first_id.size()) ||
+            (row - monster_file_table) % monster_file_row_size != 0) {
+            return -1;
+        }
+        int32_t table = MEM_W(0xC, row);
+        int32_t end = MEM_W(0x8, row);
+        if (entry < table || entry >= end || (entry - table) % monster_entry_size != 0) {
+            return -1;
+        }
+        int local = (entry - table) / monster_entry_size;
+        if (local >= file_entries[file]) {
+            return -1;
+        }
+        return file_first_id[file] + local;
+    }
+}
+
 extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
     if (!ap_enabled.load()) {
         return;
@@ -1941,11 +2206,8 @@ extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
     if (entry == 0) {
         return;
     }
-    int index = MEM_HU(0, entry + 2);
-    if (index < 0 || index >= monster_count) {
-        return;
-    }
-    if (index < boss_first) {
+    int index = global_monster_id(rdram, entry);
+    if (index >= 0) {
         if (enemy_sent[index]) {
             return;
         }
@@ -1955,14 +2217,23 @@ extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
         log_line("defeated monster " + std::to_string(index) + ", checked");
         return;
     }
-    int order = index - boss_first + 1;
+    int order = MEM_W(0, boss_here);
+    if (order < 1 || order > boss_count) {
+        char note[128];
+        std::snprintf(note, sizeof note,
+                      "defeated something at 0x%08X that is neither in the monster file (row 0x%08X) "
+                      "nor a boss; not checked", static_cast<uint32_t>(entry),
+                      static_cast<uint32_t>(MEM_W(0, monster_file_row)));
+        log_line(note);
+        return;
+    }
     if (boss_sent[order - 1]) {
         return;
     }
     boss_sent[order - 1] = true;
     zelda64::archipelago::send_check(zelda64::archipelago::id_base +
                                      zelda64::archipelago::group_boss + order);
-    log_line("defeated boss " + std::to_string(order) + ", checked");
+    log_line(std::string("defeated boss ") + std::to_string(order) + " (" + boss_names[order - 1] + "), checked");
     // Mammon is the last of them, and the run is over.
     if (order == boss_count) {
         zelda64::archipelago::goal_reached();
@@ -1992,7 +2263,7 @@ extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
 // point v0 is the answer and s0 is still the boss's index.
 extern "C" void quest64_archipelago_boss_soul(uint8_t* rdram, recomp_context* ctx) {
     (void)rdram;
-    if (!ap_enabled.load()) {
+    if (!playing_seed()) {
         return;
     }
     int mode = boss_souls.load();
@@ -2020,33 +2291,18 @@ extern "C" void quest64_archipelago_boss_soul(uint8_t* rdram, recomp_context* ct
 
 // ---- the gift NPCs
 //
-// The sixteen are the last group without a check, and unlike the others they
-// have neither a flag array nor a routine that has been found to hook. What
-// they do have is a record: Merrow's itemgranters holds the ROM address of
-// each one's item byte, and those addresses all sit in the tail of a map
-// file, in what looks like a per-map NPC table of the same kind the chests
-// and spirits have.
+// The sixteen are found through their records: Merrow's itemgranters holds
+// the ROM address of each one's item byte, which is +7 of a type-2 record in
+// its map's NPC table { u16 id, u16 type, ..., u8 item at +7, u16 message
+// when not held +8, u16 message when held +0xA }. The map table turns that
+// into the RAM address the record has while its map is loaded.
 //
-// Watching that record was tried and settled the question: talking to Pat
-// moved nothing in it. The only change the log ever showed was the map file
-// arriving in RAM, so the "given already" state is kept somewhere else and
-// the record is read-only data.
-//
-// What the record is still good for is saying what each NPC gives and where.
-// So a gift is noticed by the item turning up in the bag, and attributed by
-// where Brian is: across all sixteen, the map and the item together name
-// exactly one giver. The two items that repeat are in different maps - Fresh
-// Bread is Pat in map 13 and Maggie in 16, Heroes Drink is Rhett in 22 and
-// Morris in 23 - so there is no pair left to confuse.
-//
-// The live byte is read rather than Merrow.s vanilla one, so this follows
-// the randomizer.s gift shuffle: Pat.s record read 6 (Mint Leaves) where the
-// ROM says 1 (Fresh Bread), and 6 is what she hands over.
-//
-// The gap in this is a shop: Bronze keeps the Greenoch Shop and gives a
-// Healing Potion, which that shop may also sell, and buying one would look
-// the same. The menu mask is logged with every attribution so a purchase can
-// be told apart from a conversation once one has been seen.
+// The game keeps no "given already" state: func_800086E4, talking to an
+// NPC, asks func_80021240 whether the bag holds the record's item, and gives
+// it (func_800212A0) only if not. So in vanilla a giver hands over again
+// whenever you no longer have the thing, and never while you do. In
+// Archipelago mode the bag is not asked at all: see
+// quest64_archipelago_giver_talk below.
 namespace {
     constexpr int giver_count = 16;
 
@@ -2137,67 +2393,184 @@ namespace {
         log_line(note);
     }
 
-    // The inventory as counts per item id, so an addition is seen wherever
-    // it lands and a reshuffle of the slots is not mistaken for one.
-    std::array<uint8_t, 256> bag_counts{};
-    bool bag_known = false;
+    // ---- the boss-item locks
+    //
+    // With Boss Souls a boss may not be there to beat, so the four items the
+    // bosses drop - Earth Orb 0x14, Wind Jewel 0x15, Water Jewel 0x16, Fire
+    // Ruby 0x17 - can no longer be what the way forward waits on. Each lock
+    // is an exit record in a map file (the door, boat or teleporter), and
+    // its word at +0x14 is { u8 kind, u8 flags, u16 item }: flag 0x10 is
+    // "needs the item", 0x20 "blocked once you have it" (Epona's teleporter
+    // back to the boat, which the Water Jewel turns off).
+    //
+    // What they are opened to is exactly Merrow's "Unlock progression locks"
+    // (merrow::data::unlockedDoorData, entries 0-15). Entries 16 and 17, the
+    // Eletale Book's door and the Dark Gaol Key's, are not boss items and are
+    // left to the Mammon's World gate above. Epona's hut follows Merrow too:
+    // its two overlapping teleporters both go to Colleen's side.
+    //
+    // Merrow writes these into the ROM at boot; here they have to wait for
+    // the server to say Boss Souls is on, so they are written into the map
+    // as it sits in RAM instead, like the portal door. A map file is DMA'd
+    // afresh on every load, so this is done on every frame the map is
+    // current and undoes itself the moment it stops: disconnect, or play
+    // without Boss Souls, and the next load is the game's own again.
+    struct BossLock {
+        int map = -1;
+        int32_t ram = 0;
+        std::vector<uint8_t> original;   // what the ROM holds, from +0x10
+        std::vector<uint8_t> opened;     // what goes at +0x14
+    };
+    std::vector<BossLock> boss_locks;
+    constexpr int boss_lock_count = 16;
 
-    void read_bag(uint8_t* rdram, std::array<uint8_t, 256>& into) {
-        into.fill(0);
-        for (int slot = 0; slot < inventory_slots; slot++) {
-            uint8_t id = static_cast<uint8_t>(MEM_BU(0, gInventory + slot));
-            if (into[id] < 255) {
-                into[id]++;
-            }
+    std::vector<uint8_t> from_hex(const std::string& hex) {
+        std::vector<uint8_t> out;
+        for (size_t i = 0; i + 1 < hex.size(); i += 2) {
+            out.push_back(static_cast<uint8_t>(std::stoul(hex.substr(i, 2), nullptr, 16)));
         }
+        return out;
     }
 
-    void watch_givers(uint8_t* rdram) {
-        std::array<uint8_t, 256> now{};
-        read_bag(rdram, now);
-        if (!bag_known) {
-            bag_known = true;
-            bag_counts = now;
+    void locate_boss_locks(const std::vector<uint8_t>& rom) {
+        boss_locks.clear();
+        for (int i = 0; i < boss_lock_count; i++) {
+            if (static_cast<size_t>(i) * 2 + 1 >= merrow::data::unlockedDoorData.size()) {
+                break;
+            }
+            uint32_t address = static_cast<uint32_t>(
+                std::stoul(merrow::data::unlockedDoorData[i * 2], nullptr, 16));
+            BossLock lock;
+            lock.opened = from_hex(merrow::data::unlockedDoorData[i * 2 + 1]);
+            // The record from +0x10 (four bytes before the patch) through the
+            // end of the patch, so the check that it is really there covers
+            // more than the bytes being changed.
+            uint32_t from = address - 4;
+            size_t length = 4 + lock.opened.size();
+            for (int m = 0; m < map_table_maps; m++) {
+                size_t row = map_table_rom + static_cast<size_t>(m) * map_table_stride;
+                if (row + 0x10 > rom.size()) {
+                    break;
+                }
+                uint32_t start = be32(rom, row + 4);
+                uint32_t end = be32(rom, row + 8);
+                uint32_t dest = be32(rom, row + 0xC);
+                if (from >= start && address + lock.opened.size() <= end) {
+                    lock.map = m;
+                    lock.ram = static_cast<int32_t>(from - start + dest);
+                    break;
+                }
+            }
+            if (lock.map < 0 || from + length > rom.size()) {
+                log_line("boss lock " + std::to_string(i) + " is not in any map file; left alone");
+                continue;
+            }
+            lock.original.assign(rom.begin() + from, rom.begin() + from + length);
+            if (std::equal(lock.opened.begin(), lock.opened.end(), lock.original.begin() + 4)) {
+                // Already open in the ROM (Unlock progression locks, Lost Keys).
+                continue;
+            }
+            boss_locks.push_back(std::move(lock));
+        }
+        log_line("boss-item locks: " + std::to_string(boss_locks.size()) + " to open when Boss Souls is on");
+    }
+
+    void open_boss_locks(uint8_t* rdram) {
+        if (boss_souls.load() == 0) {
             return;
         }
         int map = static_cast<int32_t>(MEM_W(0, gCurrentMap));
-        for (int id = 0; id < 256; id++) {
-            if (now[id] <= bag_counts[id] || id == inventory_empty) {
+        for (const BossLock& lock : boss_locks) {
+            if (lock.map != map) {
                 continue;
             }
-            for (int i = 0; i < giver_count; i++) {
-                const Giver& giver = givers[i];
-                if (giver.map != map || giver.item_ram == 0 || giver_sent[i]) {
-                    continue;
-                }
-                // The live byte, not the vanilla one: the randomizer's gift
-                // shuffle rewrites it, and what was handed over is what the
-                // record says now.
-                if (static_cast<uint8_t>(MEM_BU(0, giver.item_ram)) != id) {
-                    continue;
-                }
-                giver_sent[i] = true;
-                zelda64::archipelago::send_check(zelda64::archipelago::id_base +
-                                                 zelda64::archipelago::group_giver + i);
-                // What the NPC handed over is not the player's to keep: the
-                // server decides what this check gives.
-                bool removed = take_item(rdram, id);
-                if (removed && now[id] > 0) {
-                    now[id]--;
-                }
-                char note[160];
-                std::snprintf(note, sizeof note,
-                              "giver %d checked: item %d arrived on map %d, menu mask 0x%08X%s",
-                              i, id, map, static_cast<uint32_t>(MEM_W(0, menu_mask)),
-                              removed ? ", taken back" : ", but it could not be taken back");
-                log_line(note);
-                break;
+            // Written only over the record the ROM says is there: the map is
+            // still arriving on the frame it becomes current.
+            bool vanilla = true;
+            for (size_t i = 0; i < lock.original.size() && vanilla; i++) {
+                vanilla = static_cast<uint8_t>(MEM_BU(static_cast<int32_t>(i), lock.ram)) == lock.original[i];
             }
+            if (!vanilla) {
+                continue;
+            }
+            for (size_t i = 0; i < lock.opened.size(); i++) {
+                MEM_B(static_cast<int32_t>(4 + i), lock.ram) = static_cast<int8_t>(lock.opened[i]);
+            }
+            char note[96];
+            std::snprintf(note, sizeof note, "opened a boss-item lock in map %d (RAM 0x%08X)",
+                          map, static_cast<uint32_t>(lock.ram + 4));
+            log_line(note);
         }
-        bag_counts = now;
     }
 
-    void forget_bag() { bag_known = false; }
+}
+
+// func_800086E4 at 0x80008814, just after `jal func_80021240` asked whether
+// the bag holds the item of the NPC being talked to: v0 is the answer, s0 the
+// NPC and [s0+0x80] its record. Non-zero means "held": the NPC says the
+// line at +0xA and gives nothing; zero means the line at +8 and the item.
+//
+// While the seed is in play a giver's answer ignores the bag. The first time,
+// it is "not held": the NPC hands over, the check goes, and the item itself
+// is kept out of the bag (quest64_archipelago_skip_gift_item). From then on,
+// once this session has sent the check or the server says it has it, it is
+// "held", so the NPC never gives twice - not even after a reload, since the
+// server's list arrives with every connection.
+namespace {
+    bool skip_next_add = false;
+}
+
+extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* ctx) {
+    if (!playing_seed()) {
+        return;
+    }
+    int32_t npc = static_cast<int32_t>(ctx->r16);
+    int32_t record = npc != 0 ? static_cast<int32_t>(MEM_W(0x80, npc)) : 0;
+    if (record == 0) {
+        return;
+    }
+    int map = static_cast<int32_t>(MEM_W(0, gCurrentMap));
+    for (int i = 0; i < giver_count; i++) {
+        const Giver& giver = givers[i];
+        if (giver.map != map || giver.item_ram == 0 || giver.item_ram - 7 != record) {
+            continue;
+        }
+        int64_t location = zelda64::archipelago::id_base + zelda64::archipelago::group_giver + i;
+        bool done = giver_sent[i];
+        {
+            std::lock_guard lock{ server_mutex };
+            if (slot_locations.count(location) == 0) {
+                return;   // not a check in this seed: the NPC gives as usual
+            }
+            done = done || checked_locations.count(location) != 0;
+        }
+        if (done) {
+            giver_sent[i] = true;
+            ctx->r2 = 1;
+            return;
+        }
+        giver_sent[i] = true;
+        ctx->r2 = 0;
+        skip_next_add = true;
+        zelda64::archipelago::send_check(location);
+        log_line("giver " + std::to_string(i) + " checked on map " + std::to_string(map) +
+                 " (item " + std::to_string(MEM_BU(7, record)) + " kept out of the bag)");
+        return;
+    }
+}
+
+// func_800212A0, at its first instruction: put item a0 in the bag. A leaf
+// that never moves the stack, so returning here skips it cleanly. Only the
+// one add that follows a giver's check is skipped; the flag is set at
+// 0x80008814 and the add is at 0x80008850, on the same path.
+extern "C" int quest64_archipelago_skip_gift_item(uint8_t* rdram, recomp_context* ctx) {
+    (void)rdram;
+    (void)ctx;
+    if (!skip_next_add) {
+        return 0;
+    }
+    skip_next_add = false;
+    return 1;
 }
 
 
@@ -2227,12 +2600,36 @@ namespace {
 // Which chest it was is known here too: 0x8007BA7C holds the one being
 // opened and its flag id sits at +0x62, the same number that indexes the
 // flag array and names the location.
+// func_80002F60's spirit grab. At 0x800032D8 it ORs the spirit screen's bit
+// into the menu mask and stores it (in a branch delay slot, so not a place a
+// hook can go); every path that stores it then falls into 0x80003318. Taking
+// the bit straight back out there means the screen never opens at all -
+// clearing it from on_frame instead left it on screen for a few frames. The
+// spirit is still taken and its flag set just after (0x80003320), which is
+// what sends the check.
+extern "C" void quest64_archipelago_spirit_grab(uint8_t* rdram) {
+    if (!playing_seed()) {
+        return;
+    }
+    // The spirit being taken: 0x8007BA78 points at it, and its id at +0x14
+    // is what 0x80003320 hands to the flag routine just after.
+    constexpr int32_t current_spirit = 0x8007BA78;
+    int32_t spirit = static_cast<int32_t>(MEM_W(0, current_spirit));
+    if (spirit == 0 || !seed_has(zelda64::archipelago::group_spirit, MEM_BU(0x14, spirit))) {
+        return;
+    }
+    MEM_W(0, menu_mask) = static_cast<int32_t>(static_cast<uint32_t>(MEM_W(0, menu_mask)) & ~menu_spirit);
+}
+
 extern "C" int quest64_archipelago_hide_chest_text(uint8_t* rdram) {
-    if (!ap_enabled.load()) {
+    if (!playing_seed()) {
         return 0;
     }
     int32_t chest = static_cast<int32_t>(MEM_W(0, current_chest));
-    if (chest != 0) {
+    if (chest == 0 || !seed_has(zelda64::archipelago::group_chest, MEM_HU(0x62, chest))) {
+        return 0;   // not a check in this seed: the game's own box
+    }
+    {
         log_line("chest " + std::to_string(MEM_HU(0, chest + 0x62)) + " opened, no box shown");
     }
     return 1;

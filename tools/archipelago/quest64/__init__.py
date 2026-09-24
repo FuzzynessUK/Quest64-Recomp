@@ -78,6 +78,7 @@ class Q64World(World):
             item: location
             for item, location in vanilla_locations.items()
             if location_data_table[location].can_create(self.options)
+            and item_data_table[item].can_create(self.options)
         }
 
     def pre_fill(self) -> None:
@@ -138,4 +139,30 @@ class Q64World(World):
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),
+            # The game's own settings from the yaml, and the seed its
+            # randomizer rolls them with, so every session of this slot
+            # plays the same shuffle.
+            "rando_seed": self.random.getrandbits(31),
+            "settings": {
+                "shuffle_spells": self.options.shuffle_spells.value,
+                "early_healing": self.options.early_healing.value,
+                "enemy_randomizer": self.options.enemy_randomizer.value,
+                "shuffle_boss_order": self.options.shuffle_boss_order.value,
+                "random_guilty_element": self.options.random_guilty_element.value,
+                "faster_areas": self.options.faster_areas.value,
+                "wings_never_expire": self.options.wings_never_expire.value,
+                "no_enemy_drop_limit": self.options.no_enemy_drop_limit.value,
+                "element_cap_99": self.options.element_cap_99.value,
+                "jp_healing": self.options.jp_healing.value,
+                "jp_magic_barrier": self.options.jp_magic_barrier.value,
+                "jp_stat_up_effect": self.options.jp_stat_up_effect.value,
+                "exit_from_anywhere": self.options.exit_from_anywhere.value,
+                "fast_walking": self.options.fast_walking.value,
+                "text_improvements": self.options.text_improvements.value,
+                "text_palette": self.options.text_palette.value,
+                "staff_palette": self.options.staff_palette.value,
+                "cloak_colour": self.options.cloak_colour.value,
+                "brian_clothes": self.options.brian_clothes.value,
+                "spell_palettes": self.options.spell_palettes.value,
+            },
         }

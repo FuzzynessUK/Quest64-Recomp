@@ -6,6 +6,12 @@
             <div class="config__wrapper">
                 <div class="config-debug">
                     <div class="config-debug__scroll">
+                        <div class="config-debug-option" data-if="ap_locked == 1">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Connected to Archipelago: the enhancement settings come from your YAML. Connect before starting the game so it boots with them.</div>
+                            </label>
+                        </div>
+                        <div data-if="ap_locked == 0">
                         <div class="config-debug-option" data-if="enh_changed">
                             <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Changed settings apply when the game is next launched.</div>
@@ -77,6 +83,7 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                     <div class="config-tip"></div>

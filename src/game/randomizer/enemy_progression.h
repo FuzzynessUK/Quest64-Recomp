@@ -31,6 +31,7 @@ namespace zelda64::randomizer::progression {
     struct Slot {
         int home = -1;   // index into progression data areas, -1 = leave alone
         int dest = -1;
+        int id = -1;     // Merrow's monster id, for its vanilla stats
     };
 
     struct Plan {

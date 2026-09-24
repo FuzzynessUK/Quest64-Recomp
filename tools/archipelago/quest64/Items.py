@@ -51,7 +51,7 @@ item_data_table: Dict[str, Q64ItemData] = {
     "Wind Jade": Q64ItemData(code=0x51640015, type=ItemClassification.progression, num_exist=1, can_create=lambda options: True),
     "Water Jewel": Q64ItemData(code=0x51640016, type=ItemClassification.progression, num_exist=1, can_create=lambda options: True),
     "Fire Ruby": Q64ItemData(code=0x51640017, type=ItemClassification.progression, num_exist=1, can_create=lambda options: True),
-    "Eletale's Book": Q64ItemData(code=0x51640018, type=ItemClassification.progression, num_exist=1, can_create=lambda options: True),
+    "Eletale's Book": Q64ItemData(code=0x51640018, type=ItemClassification.progression, num_exist=1, can_create=lambda options: options.mammon_portal.value == 0),
     "Dark Gaol Key": Q64ItemData(code=0x51640019, type=ItemClassification.progression, num_exist=1, can_create=lambda options: True),
 }
 

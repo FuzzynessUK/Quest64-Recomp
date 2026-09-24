@@ -10,7 +10,8 @@ class Chestsanity(DefaultOnToggle):
 
 class Giftsanity(DefaultOnToggle):
     """NPCs who hand over an item are Archipelago checks: the gift NPCs, the
-    two endgame Shannons and the wingsmiths."""
+    two endgame Shannons and the wingsmiths. Each gives its check once, the
+    first time you talk to them, whatever is in your bag - and no item."""
     display_name = "Giftsanity"
 
 
@@ -54,8 +55,13 @@ class ExtraLevelUps(Range):
 class MammonPortal(Choice):
     """What it takes to open the way into Mammon's World.
 
-    The last door of the final staircase, in Baragoon Moor, always wants the
-    Eletale's Book. This asks for something on top of that:
+    The last door of the final staircase, in Baragoon Moor, wants the
+    Eletale's Book in the vanilla game. Any other choice replaces the Book:
+    the door opens once the condition is met, the Book is left out of the
+    pool, and the Shannon who would have handed it over is a gift check of
+    her own (even with giftsanity off).
+
+    vanilla       the Book, as the game has it
 
     all_bosses    every boss before Mammon - Solvaring, Zelse, Nepty, Shilf,
                   Fargo, Guilty and Beigis - has to be beaten. They are
@@ -88,12 +94,143 @@ class BossSouls(Choice):
     arrives while you are standing in the arena takes effect when you next
     walk in.
 
+    With Souls on, the doors, boats and teleporters the Earth Orb, Wind
+    Jade, Water Jewel and Fire Ruby open are open from the start, since the
+    boss who drops one may not be there yet. The Dark Gaol Key still locks
+    what it locks, and so does the Eletale's Book unless Mammon's World
+    Portal replaces it.
+
     bosses        the seven before Mammon get Souls
     with_mammon   Mammon as well, so the last fight waits on his Soul too"""
     display_name = "Boss Souls"
     option_off = 0
     option_bosses = 1
     option_with_mammon = 2
+    default = 0
+
+
+class ShuffleSpells(Toggle):
+    """Randomizer. Shuffles which spell each element teaches, with the spell
+    damage rebalance, Invalidity, and the fixes that keep shuffled spell
+    combinations from crashing."""
+    display_name = "Shuffled Spells"
+
+
+class EarlyHealing(Toggle):
+    """Randomizer. A healing spell is guaranteed early."""
+    display_name = "Early Healing"
+
+
+class EnemyRandomizer(Toggle):
+    """Randomizer. Any monster set can land in any area, and every monster
+    is scaled to the area it appears in."""
+    display_name = "Enemy Randomizer"
+
+
+class ShuffleBossOrder(Toggle):
+    """Randomizer. The seven bosses before Mammon swap arenas."""
+    display_name = "Shuffle Boss Order"
+
+
+class RandomGuiltyElement(Toggle):
+    """Randomizer. Guilty takes a random element instead of his own."""
+    display_name = "Randomize Guilty Element"
+
+
+class FasterAreas(Toggle):
+    """Randomizer. Fast Monastery, Fast Blue Cave, Fast Shamwood and Fast
+    Mammon's World together: the long empty stretches are skipped."""
+    display_name = "Faster Areas"
+
+
+class WingsNeverExpire(Toggle):
+    """Randomizer. Using a pair of wings does not use them up."""
+    display_name = "Wings Never Expire"
+
+
+class NoEnemyDropLimit(Toggle):
+    """Randomizer. Monsters keep dropping items past the vanilla limit."""
+    display_name = "No Enemy Drop Limit"
+
+
+class ElementCap99(Toggle):
+    """Randomizer. Each element can be raised to 99 instead of 50, by
+    spirits, level-ups and Level Up items alike."""
+    display_name = "Element Cap 99"
+
+
+class JPHealing(Toggle):
+    """Enhancements. Healing Lv2 restores 16 HP instead of 8, as in the
+    Japanese release."""
+    display_name = "JP Healing Amounts"
+
+
+class JPMagicBarrier(Toggle):
+    """Enhancements. Magic Barrier holds two turns longer, as in the
+    Japanese release."""
+    display_name = "JP Magic Barrier"
+
+
+class JPStatUpEffect(Toggle):
+    """Enhancements. A colour burst over Brian when a stat rises, as in the
+    Japanese release."""
+    display_name = "JP Stat Up Effect"
+
+
+class ExitFromAnywhere(Toggle):
+    """Enhancements. The bound Exit Spell control warps out of an area
+    without the spell or the MP."""
+    display_name = "Exit from Anywhere"
+
+
+class FastWalking(Toggle):
+    """Enhancements. Brian walks 50% faster."""
+    display_name = "Fast Walking"
+
+
+class TextImprovements(Toggle):
+    """Enhancements. Merrow's clearer wording for a number of the game's
+    messages."""
+    display_name = "Text Improvements"
+
+
+class TextPalette(Choice):
+    """Cosmetics. The colour of the text boxes."""
+    display_name = "Text Palette"
+    option_off = 0
+    option_random = 1
+    default = 0
+
+
+class StaffPalette(Choice):
+    """Cosmetics. The colour of Brian's staff."""
+    display_name = "Staff Palette"
+    option_off = 0
+    option_random = 1
+    default = 0
+
+
+class CloakColour(Choice):
+    """Cosmetics. The colour of Brian's cloak."""
+    display_name = "Cloak Colour"
+    option_off = 0
+    option_random = 1
+    default = 0
+
+
+class BrianClothes(Choice):
+    """Cosmetics. The colours of Brian's clothes."""
+    display_name = "Brian's Clothes"
+    option_off = 0
+    option_random = 1
+    default = 0
+
+
+class SpellPalettes(Choice):
+    """Cosmetics. The colours of the spell effects."""
+    display_name = "Spell Palettes"
+    option_off = 0
+    option_random = 1
     default = 0
 
 
@@ -115,3 +252,23 @@ class Q64Options(PerGameCommonOptions):
     enemysanity: Enemysanity
     spiritsanity: Spiritsanity
     extra_level_ups: ExtraLevelUps
+    shuffle_spells: ShuffleSpells
+    early_healing: EarlyHealing
+    enemy_randomizer: EnemyRandomizer
+    shuffle_boss_order: ShuffleBossOrder
+    random_guilty_element: RandomGuiltyElement
+    faster_areas: FasterAreas
+    wings_never_expire: WingsNeverExpire
+    no_enemy_drop_limit: NoEnemyDropLimit
+    element_cap_99: ElementCap99
+    jp_healing: JPHealing
+    jp_magic_barrier: JPMagicBarrier
+    jp_stat_up_effect: JPStatUpEffect
+    exit_from_anywhere: ExitFromAnywhere
+    fast_walking: FastWalking
+    text_improvements: TextImprovements
+    text_palette: TextPalette
+    staff_palette: StaffPalette
+    cloak_colour: CloakColour
+    brian_clothes: BrianClothes
+    spell_palettes: SpellPalettes

@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+namespace zelda64::randomizer { struct Options; }
+namespace zelda64::enhancements { struct Options; }
+
 // The Archipelago connector: the port talks to an Archipelago server itself,
 // over the same WebSocket protocol any other client uses, so there is no
 // separate Quest 64 client to run. The world that decides what is where is
@@ -99,6 +102,25 @@ namespace zelda64::archipelago {
 
     // Tell the server the goal is done.
     void goal_reached();
+
+    // --- the seed's own settings -------------------------------------------
+    // The yaml chooses the game's randomizer, enhancement and cosmetic
+    // settings, and the apworld sends them in slot_data. They can only be
+    // used if they are known as the game boots, since that is when the ROM
+    // is patched - so the player connects from the launcher first.
+    //
+    // Called at the very start of the boot patches: if a connection is in
+    // progress it waits for it (up to ten seconds), then takes the settings
+    // once. From then on seed_settings_in_effect() says whether this launch
+    // plays by them.
+    void settle_seed_settings();
+    bool seed_settings_in_effect();
+    // The menus hide the settings the seed decides: while connected, and for
+    // the rest of a launch that booted with the seed's settings.
+    bool settings_locked();
+    // Overwrite the parts of each boot copy that the seed decides.
+    void apply_seed_settings(zelda64::randomizer::Options& options);
+    void apply_seed_settings(zelda64::enhancements::Options& options);
 
     // Called once as the program exits.
     void shutdown();

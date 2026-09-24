@@ -42,6 +42,10 @@ namespace zelda64::hardmode {
     // Once per frame from the cheats hook: switches the save folder the
     // first time it runs, which is after the saving thread exists.
     void on_frame(uint8_t* rdram);
+
+    // The element level Hard Mode allows right now: it rises with each boss
+    // beaten (a table in its payload). Only meaningful while active().
+    int element_cap(uint8_t* rdram);
 }
 
 #endif

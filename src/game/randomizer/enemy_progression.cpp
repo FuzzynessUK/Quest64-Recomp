@@ -115,6 +115,7 @@ Plan zelda64::randomizer::progression::make_plan(const std::vector<int>& table_p
                 const data::MonsterInfo& m = data::monsters[static_cast<size_t>(id)];
                 slot.home = m.home_area;
                 slot.dest = a;
+                slot.id = id;
                 std::snprintf(line, sizeof(line), "    %-18s %d/%d/%d/%d/%d -> %d/%d/%d/%d/%d\n", m.name,
                     m.stat[0], m.stat[1], m.stat[2], m.stat[3], m.stat[4],
                     rescale(slot.home, a, 0, m.stat[0]), rescale(slot.home, a, 1, m.stat[1]),
@@ -145,5 +146,20 @@ int32_t zelda64::randomizer::progression::scaled_value(int map_id, int entry, St
         return own;
     }
     const Slot& slot = slots[static_cast<size_t>(entry)];
+    // EXP (and Stones, which ride along with it) are rescaled from the
+    // monster's vanilla EXP, and whatever the table holds beyond that is
+    // then applied as a plain multiplier. The EXP boost and EXP-by-BST
+    // options are written into the ROM table before this runs, so feeding
+    // the table value into the square root would take the root of the
+    // boost too: "double EXP" came out at 1.41x. This way it is exactly 2x,
+    // and with no EXP option own == vanilla and nothing changes.
+    if (stat == Stat::EXP && slot.id >= 0) {
+        int32_t vanilla = data::monsters[static_cast<size_t>(slot.id)].stat[static_cast<int>(Stat::EXP)];
+        if (vanilla > 0 && own > 0) {
+            double base = rescale(slot.home, slot.dest, static_cast<int>(stat), vanilla);
+            double value = std::nearbyint(base * static_cast<double>(own) / vanilla);
+            return static_cast<int32_t>(std::min<double>(std::max<double>(value, 1.0), caps[static_cast<int>(stat)]));
+        }
+    }
     return rescale(slot.home, slot.dest, static_cast<int>(stat), own);
 }

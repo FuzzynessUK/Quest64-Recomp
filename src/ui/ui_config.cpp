@@ -856,6 +856,9 @@ void make_enhancements_bindings(Rml::Context* context) {
     enhancements_context.edited = zelda64::enhancements::load_options();
 
     constructor.BindFunc("enh_changed", [](Rml::Variant& out) { out = enhancements_context.changed ? 1 : 0; });
+    // The seed's yaml decides these while connected to Archipelago (and for
+    // the rest of a launch that booted connected), so the tab is hidden.
+    constructor.BindFunc("ap_locked", [](Rml::Variant& out) { out = zelda64::archipelago::settings_locked() ? 1 : 0; });
     bind_tooltip_events(constructor);
     constructor.BindFunc("enh_one_hit_ko",
         [](Rml::Variant& out) { out = enhancements_context.edited.one_hit_ko ? 1 : 0; },
@@ -970,7 +973,7 @@ void make_enhancements_bindings(Rml::Context* context) {
     constructor.BindFunc("enh_ap_notice",
         [](Rml::Variant& out) { out = enhancements_context.edited.ap_notice; },
         [](const Rml::Variant& in) {
-            enhancements_context.edited.ap_notice = std::clamp(in.Get<int>(), 0, 2);
+            enhancements_context.edited.ap_notice = std::clamp(in.Get<int>(), 0, 3);
             enhancements_option_changed(false);   // live, like the rest of this group
         }
     );
@@ -1309,6 +1312,7 @@ void make_randomizer_bindings(Rml::Context* context) {
     randomizer_context.edited = zelda64::randomizer::load_options();
 
     constructor.BindFunc("rnd_changed", [](Rml::Variant& out) { out = randomizer_context.changed ? 1 : 0; });
+    constructor.BindFunc("ap_locked", [](Rml::Variant& out) { out = zelda64::archipelago::settings_locked() ? 1 : 0; });
     bind_tooltip_events(constructor);
     constructor.BindFunc("rnd_presets", [](Rml::Variant& out) { out = randomizer_presets_status(); });
     constructor.RegisterArray<std::vector<std::string>>();
@@ -1814,6 +1818,10 @@ void recompui::update_archipelago() {
         if (randomizer_context.model_handle) {
             randomizer_context.model_handle.DirtyVariable("ap_status");
             randomizer_context.model_handle.DirtyVariable("ap_connected");
+            randomizer_context.model_handle.DirtyVariable("ap_locked");
+        }
+        if (enhancements_context.model_handle) {
+            enhancements_context.model_handle.DirtyVariable("ap_locked");
         }
     }
 }
@@ -1932,7 +1940,8 @@ void recompui::update_notifications() {
         // 1 only what was sent to this slot, 2 what is found here for other
         // players as well.
         if ((message.kind == zelda64::notify::Kind::ApReceived && live.ap_notice < 1) ||
-            (message.kind == zelda64::notify::Kind::ApSent && live.ap_notice < 2)) {
+            (message.kind == zelda64::notify::Kind::ApSent && live.ap_notice < 2) ||
+            (message.kind == zelda64::notify::Kind::ApRoom && live.ap_notice < 3)) {
             continue;
         }
         // One song at a time: the name of the track starting takes the
@@ -2284,6 +2293,48 @@ public:
                         audio_context.edited.custom_tracks[track] = draw(files);
                     }
                 }
+                audio_option_changed(false);
+                push_tracks_live();
+                dirty_track_names();
+            });
+        // The Random button on a track row: "aud_random_track:13". One draw
+        // for that slot alone, from the folder it takes (custom_music, or
+        // fanfares for a jingle); the game's own music of the same kind when
+        // that folder is empty.
+        recompui::register_event(listener, "aud_random_track",
+            [](const std::string& param, Rml::Event& event) {
+                std::string digits = param;
+                if (!digits.empty() && digits[0] == ':') {
+                    digits.erase(0, 1);
+                }
+                char* end = nullptr;
+                long parsed = std::strtol(digits.c_str(), &end, 10);
+                if (end == digits.c_str() || parsed < 0 || parsed >= zelda64::audio::game_track_count) {
+                    return;
+                }
+                int track = static_cast<int>(parsed);
+                refresh_music_library();
+                bool jingle = zelda64::audio::track_is_jingle(track);
+                std::vector<std::string> pool = jingle ? audio_context.fanfares : audio_context.library;
+                if (pool.empty()) {
+                    for (int other = 0; other < zelda64::audio::game_track_count; other++) {
+                        if (other != track && zelda64::audio::track_is_jingle(other) == jingle) {
+                            pool.push_back(zelda64::audio::game_prefix + std::to_string(other));
+                        }
+                    }
+                }
+                if (pool.empty()) {
+                    return;
+                }
+                auto it = audio_context.edited.custom_tracks.find(track);
+                std::string current = it != audio_context.edited.custom_tracks.end() ? it->second : std::string();
+                std::mt19937 rng{ std::random_device{}() };
+                std::string choice = pool[std::uniform_int_distribution<size_t>(0, pool.size() - 1)(rng)];
+                // A different one from what is there, when there is a choice.
+                for (int tries = 0; tries < 8 && choice == current && pool.size() > 1; tries++) {
+                    choice = pool[std::uniform_int_distribution<size_t>(0, pool.size() - 1)(rng)];
+                }
+                audio_context.edited.custom_tracks[track] = choice;
                 audio_option_changed(false);
                 push_tracks_live();
                 dirty_track_names();

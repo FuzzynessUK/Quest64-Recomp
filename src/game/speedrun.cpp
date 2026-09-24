@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -218,6 +219,20 @@ namespace {
     int read_bytes = 0;
 }
 
+// func_8002B510, at its first instruction: the Controller Pak menu is being
+// opened, and a0 says from where - it is ORed into the menu's mode flags
+// (0x8008FD0C). The field loop passes 4 when a save NPC opens it
+// (0x8000207C); the main menu passes 0 for Load (0x80001680) and 8 for its
+// other entry (0x80001690). Both run the same menu in the same game mode, so
+// this is the one thing that tells an in-game save from a load.
+namespace {
+    bool pak_menu_from_field = false;
+}
+
+extern "C" void quest64_speedrun_pak_menu_open(recomp_context* ctx) {
+    pak_menu_from_field = (ctx->r4 & 4) != 0;
+}
+
 // func_80031A44, at its first instruction: the game is writing a save.
 extern "C" void quest64_speedrun_pak_write(uint8_t* rdram, recomp_context* ctx) {
     load_run_times();
@@ -253,6 +268,15 @@ extern "C" void quest64_speedrun_pak_read_end(uint8_t* rdram, recomp_context* ct
         return;
     }
     std::string key = save_key(rdram, read_file_no, read_buffer, read_bytes);
+    // The in-game save menu reads every file just to list it. That is not
+    // a file being continued, and taking it for one wound the connector's
+    // item mark back to when that file was saved - everything since, Level
+    // Ups included, was handed over a second time. Only the main menu's
+    // Load screen loads.
+    if (pak_menu_from_field) {
+        pak_note("read  " + key + " - in game (the save menu), not a load");
+        return;
+    }
     // Before the early return below: the connector wants to know about a
     // save whether or not the timer has a time for it.
     zelda64::archipelago::load_progress(key);

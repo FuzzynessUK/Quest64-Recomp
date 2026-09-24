@@ -8,7 +8,9 @@
 #include <vector>
 
 #include "enhancements.h"
+#include "archipelago.h"
 #include "hardmode.h"
+#include "randomizer.h"
 #include "zelda_render.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
@@ -186,6 +188,19 @@ void zelda64::enhancements::save_options(const Options& o) {
 }
 
 const zelda64::enhancements::Options& zelda64::enhancements::active_options() {
+    // Connected to Archipelago as the game booted: the seed decides the
+    // gameplay ones (see archipelago::apply_seed_settings), the player's own
+    // file the rest.
+    if (zelda64::archipelago::seed_settings_in_effect()) {
+        static Options seed;
+        static bool seed_built = false;
+        if (!seed_built) {
+            seed = load_options();
+            zelda64::archipelago::apply_seed_settings(seed);
+            seed_built = true;
+        }
+        return seed;
+    }
     if (!active_loaded) {
         active = load_options();
         // Easier Quest's two JP options. Checked against the saved
@@ -232,8 +247,58 @@ void zelda64::enhancements::apply_at_boot(uint8_t* rdram) {
     recomp::set_rom_contents(std::move(patched));
 }
 
+int zelda64::enhancements::element_cap(uint8_t* rdram) {
+    if (zelda64::hardmode::active()) {
+        return zelda64::hardmode::element_cap(rdram);
+    }
+    const zelda64::randomizer::Options& r = zelda64::randomizer::active_options();
+    return r.mode == zelda64::randomizer::Mode::Randomizer && r.element_uncap ? 99 : 50;
+}
+
+bool zelda64::enhancements::elements_all_maxed(uint8_t* rdram) {
+    // gPlayerMainData +0x24..+0x27: Fire, Earth, Water, Wind.
+    constexpr int32_t elements = 0x8007BA80 + 0x24;
+    int cap = element_cap(rdram);
+    for (int i = 0; i < 4; i++) {
+        if (static_cast<int>(MEM_BU(i, elements)) < cap) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// func_80002F60 at 0x800032D8: a0 is the level the overworld spirit grab
+// compares all four elements against, and when every one is at it the grab
+// is skipped outright - the spirit cannot be picked up at all, which leaves
+// it standing there and, as a check, never sent. Run after the randomizer's
+// and Hard Mode's hooks at the same address: a value no element byte can
+// equal lets the grab through, and the screen it opens is closed again at
+// once by on_frame (nothing is left to raise). Not under Hard Mode, whose
+// cap rises with each boss and turns a spirit away on purpose so it can be
+// come back for.
+extern "C" void quest64_enh_spirit_cap(uint8_t* rdram, recomp_context* ctx) {
+    (void)rdram;
+    if (zelda64::hardmode::active()) {
+        return;
+    }
+    ctx->r4 = 0x100;
+}
+
 void zelda64::enhancements::on_frame(uint8_t* rdram) {
     const Options& options = active_options();
+
+    // The element-choice screen (bit 3 of the menu mask 0x8007B2E4) opened
+    // with every element already at the cap - a natural level-up, a spirit
+    // taken at the cap, or an Archipelago Level Up - has nothing to raise
+    // and no way out. It is closed the frame it appears.
+    {
+        constexpr int32_t menu_mask = 0x8007B2E4;
+        constexpr uint32_t menu_spirit = 0x8;
+        uint32_t mask = static_cast<uint32_t>(MEM_W(0, menu_mask));
+        if ((mask & menu_spirit) && elements_all_maxed(rdram)) {
+            MEM_W(0, menu_mask) = static_cast<int32_t>(mask & ~menu_spirit);
+        }
+    }
 
     if (options.longer_magic_barrier) {
         // The counter only rises when the spell is cast and falls as the

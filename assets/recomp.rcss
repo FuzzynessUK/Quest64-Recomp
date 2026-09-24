@@ -2624,11 +2624,15 @@ button {
 }
 
 .aud-picker {
-  margin: 4dp 0dp 12dp 0dp;
+  position: absolute;
+  top: 8dp;
+  left: 8dp;
+  right: 8dp;
+  z-index: 20;
   padding: 8dp;
   border-width: 1dp;
   border-color: rgba(185, 125, 242, 0.6);
-  background-color: rgba(0, 0, 0, 0.35);
+  background-color: rgba(20, 20, 24, 0.97);
 }
 
 .aud-picker__title {

@@ -21,6 +21,7 @@ def _on(group: str) -> Callable:
     return {
         "chest": lambda options: bool(options.chestsanity),
         "giver": lambda options: bool(options.giftsanity),
+        "book_giver": lambda options: bool(options.giftsanity) or options.mammon_portal.value != 0,
         "enemy": lambda options: bool(options.enemysanity),
         "boss": lambda options: True,
         "spirit": lambda options: bool(options.spiritsanity),
@@ -124,7 +125,7 @@ location_data_table: Dict[str, Q64LocationData] = {
     "Giver - Rhett (Limelin Tavern)": Q64LocationData(region="Overworld", address=0x51642005, group="giver", can_create=_on("giver")),
     "Giver - Morris (Brannoch House)": Q64LocationData(region="Overworld", address=0x51642006, group="giver", can_create=_on("giver")),
     "Giver - Bronze (Greenoch Shop)": Q64LocationData(region="Overworld", address=0x51642007, group="giver", can_create=_on("giver")),
-    "Giver - Shannon (Brannoch Castle)": Q64LocationData(region="Boss 7", address=0x51642008, group="giver", can_create=_on("giver")),
+    "Giver - Shannon (Brannoch Castle)": Q64LocationData(region="Boss 7", address=0x51642008, group="giver", can_create=_on("book_giver")),
     "Giver - Shannon (Mammon's World)": Q64LocationData(region="Endgame", address=0x51642009, group="giver", can_create=_on("giver")),
     "Giver - Ingram (Melrode Wingsmith)": Q64LocationData(region="Overworld", address=0x5164200A, group="giver", can_create=_on("giver")),
     "Giver - Thom (Dondoran Wingsmith)": Q64LocationData(region="Overworld", address=0x5164200B, group="giver", can_create=_on("giver")),
