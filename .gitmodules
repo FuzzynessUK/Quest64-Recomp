@@ -19,3 +19,6 @@
 [submodule "Quest64Syms"]
 	path = Quest64Syms
 	url = https://github.com/Rainchus/Quest64Syms
+[submodule "lib/APCpp"]
+	path = lib/APCpp
+	url = https://github.com/N00byKing/APCpp

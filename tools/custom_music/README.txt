@@ -46,7 +46,3 @@ instead. Keep a file under 32768 bytes if it has to run on hardware or in
 another port.) The game log
 custom_music.txt (next to the settings, in %LOCALAPPDATA%\Quest64Recompiled)
 says what was loaded or why a file was skipped.
-
-The two Pokemon gym leader files shipped here are examples: "GS" from a
-MIDI (sequenced by Joao "Johnnyz" Buaes), "RBY (ootrs)" from a Darunia's
-Joy pack.
