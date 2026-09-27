@@ -26,51 +26,20 @@
 #include "recomp.h"
 #include "librecomp/game.hpp"
 #include "json/json.hpp"
-
-#ifdef _WIN32
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-#  define SECURITY_WIN32
-#  include <security.h>
-#  include <schannel.h>
-#  pragma comment(lib, "ws2_32.lib")
-#  pragma comment(lib, "secur32.lib")
-using socket_t = SOCKET;
-constexpr socket_t invalid_socket = INVALID_SOCKET;
-#else
-#  include <arpa/inet.h>
-#  include <netdb.h>
-#  include <netinet/in.h>
-#  include <netinet/tcp.h>
-#  include <sys/socket.h>
-#  include <unistd.h>
-using socket_t = int;
-constexpr socket_t invalid_socket = -1;
-#endif
+#include "archipelago_client.h"
 
 // The Archipelago connector. See include/archipelago.h for what the game
-// side may call; everything below runs on one worker thread.
+// side may call; the connection itself is APCpp's, behind the q64ap wrapper
+// (archipelago_client.h), and this file drives it from one worker thread.
 //
-// There is no networking library in this tree, so the WebSocket is done here:
-// a TCP connection, the HTTP upgrade handshake (which needs SHA-1 and
-// base64, both small enough to write out), and then RFC 6455 frames. Only
-// what an Archipelago session uses is implemented - text frames, ping/pong,
-// close - and a client always masks what it sends.
-//
-// The protocol itself is Archipelago's: the server opens with RoomInfo, we
-// answer with Connect, and it replies Connected or ConnectionRefused. After
-// that it sends ReceivedItems and we send LocationChecks.
+// The protocol is Archipelago's: the server opens with RoomInfo, APCpp
+// answers with Connect, and the server replies Connected or
+// ConnectionRefused. After that it sends ReceivedItems and we send
+// LocationChecks. APCpp turns those into callbacks and the wrapper into
+// events, which the worker below reads.
 
 namespace {
     using nlohmann::json;
-
-    constexpr const char* game_name = "Quest 64 Recompiled";
-    // The Archipelago version this speaks, which is the one the apworld is
-    // built for. The server refuses a client older than it needs.
-    constexpr int ap_major = 0, ap_minor = 6, ap_build = 7;
-    // Receive our own items from other worlds, our own items from our own
-    // world, and anything the slot starts with.
-    constexpr int items_handling = 0b111;
 
     std::filesystem::path options_path() {
         return zelda64::get_app_folder_path() / "archipelago.json";
@@ -86,663 +55,6 @@ namespace {
         std::ofstream out(log_path(), std::ios::app);
         out << text << "\n";
     }
-
-    // ---- SHA-1 and base64, for the handshake only ------------------------
-
-    std::array<uint32_t, 5> sha1(const std::string& input) {
-        std::array<uint32_t, 5> h{ 0x67452301u, 0xEFCDAB89u, 0x98BADCFEu, 0x10325476u, 0xC3D2E1F0u };
-        std::string message = input;
-        uint64_t bits = static_cast<uint64_t>(message.size()) * 8;
-        message.push_back(static_cast<char>(0x80));
-        while (message.size() % 64 != 56) {
-            message.push_back('\0');
-        }
-        for (int i = 7; i >= 0; i--) {
-            message.push_back(static_cast<char>((bits >> (i * 8)) & 0xFF));
-        }
-        for (size_t at = 0; at < message.size(); at += 64) {
-            uint32_t w[80];
-            for (int i = 0; i < 16; i++) {
-                w[i] = (static_cast<uint8_t>(message[at + i * 4]) << 24) |
-                       (static_cast<uint8_t>(message[at + i * 4 + 1]) << 16) |
-                       (static_cast<uint8_t>(message[at + i * 4 + 2]) << 8) |
-                       static_cast<uint8_t>(message[at + i * 4 + 3]);
-            }
-            auto rotl = [](uint32_t v, int by) { return (v << by) | (v >> (32 - by)); };
-            for (int i = 16; i < 80; i++) {
-                w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
-            }
-            uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4];
-            for (int i = 0; i < 80; i++) {
-                uint32_t f, k;
-                if (i < 20)      { f = (b & c) | (~b & d);          k = 0x5A827999u; }
-                else if (i < 40) { f = b ^ c ^ d;                   k = 0x6ED9EBA1u; }
-                else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDCu; }
-                else             { f = b ^ c ^ d;                   k = 0xCA62C1D6u; }
-                uint32_t t = rotl(a, 5) + f + e + k + w[i];
-                e = d; d = c; c = rotl(b, 30); b = a; a = t;
-            }
-            h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e;
-        }
-        return h;
-    }
-
-    std::string base64(const uint8_t* data, size_t length) {
-        static const char* set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        std::string out;
-        for (size_t i = 0; i < length; i += 3) {
-            uint32_t block = static_cast<uint32_t>(data[i]) << 16;
-            if (i + 1 < length) block |= static_cast<uint32_t>(data[i + 1]) << 8;
-            if (i + 2 < length) block |= data[i + 2];
-            out.push_back(set[(block >> 18) & 0x3F]);
-            out.push_back(set[(block >> 12) & 0x3F]);
-            out.push_back(i + 1 < length ? set[(block >> 6) & 0x3F] : '=');
-            out.push_back(i + 2 < length ? set[block & 0x3F] : '=');
-        }
-        return out;
-    }
-
-    // ---- the socket -------------------------------------------------------
-
-    struct Socket {
-        socket_t handle = invalid_socket;
-
-        ~Socket() { close(); }
-
-        void close() {
-            if (handle != invalid_socket) {
-#ifdef _WIN32
-                closesocket(handle);
-#else
-                ::close(handle);
-#endif
-                handle = invalid_socket;
-            }
-        }
-
-        bool open(const std::string& host, const std::string& port, std::string& error) {
-            addrinfo hints{};
-            hints.ai_family = AF_UNSPEC;
-            hints.ai_socktype = SOCK_STREAM;
-            addrinfo* found = nullptr;
-            if (getaddrinfo(host.c_str(), port.c_str(), &hints, &found) != 0 || found == nullptr) {
-                error = "cannot find " + host;
-                return false;
-            }
-            for (addrinfo* a = found; a != nullptr; a = a->ai_next) {
-                handle = ::socket(a->ai_family, a->ai_socktype, a->ai_protocol);
-                if (handle == invalid_socket) {
-                    continue;
-                }
-                if (::connect(handle, a->ai_addr, static_cast<int>(a->ai_addrlen)) == 0) {
-                    break;
-                }
-                close();
-            }
-            freeaddrinfo(found);
-            if (handle == invalid_socket) {
-                error = "nothing listening on " + host + ":" + port;
-                return false;
-            }
-            int one = 1;
-            setsockopt(handle, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one), sizeof one);
-            // A short read timeout, so the worker can also flush whatever the
-            // game has queued rather than sitting in recv.
-#ifdef _WIN32
-            DWORD timeout = 100;
-            setsockopt(handle, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof timeout);
-#else
-            timeval timeout{ 0, 100 * 1000 };
-            setsockopt(handle, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout);
-#endif
-            return true;
-        }
-
-        bool send_all(const uint8_t* data, size_t length) {
-            size_t sent = 0;
-            while (sent < length) {
-                int n = ::send(handle, reinterpret_cast<const char*>(data + sent),
-                               static_cast<int>(length - sent), 0);
-                if (n <= 0) {
-                    return false;
-                }
-                sent += static_cast<size_t>(n);
-            }
-            return true;
-        }
-
-        // -1 closed or failed, 0 nothing waiting, else bytes read.
-        int read_some(uint8_t* into, size_t room) {
-            int n = ::recv(handle, reinterpret_cast<char*>(into), static_cast<int>(room), 0);
-            if (n > 0) {
-                return n;
-            }
-            if (n == 0) {
-                return -1;
-            }
-#ifdef _WIN32
-            int err = WSAGetLastError();
-            return (err == WSAETIMEDOUT || err == WSAEWOULDBLOCK) ? 0 : -1;
-#else
-            return (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) ? 0 : -1;
-#endif
-        }
-    };
-
-    // ---- TLS ---------------------------------------------------------------
-    //
-    // A room hosted on archipelago.gg is wss:// only: a plaintext upgrade to
-    // one gets no reply at all, which is what "the server hung up during the
-    // handshake" in the log meant. A room hosted from the Archipelago
-    // launcher is the other way round - plain ws:// and no certificate - and
-    // the two look identical as an address, so which one to speak is decided
-    // by trying (see split_server and run_session).
-    //
-    // There is no TLS library in this tree and no package manager to add one
-    // with, so this uses what Windows already has: Schannel, through SSPI, in
-    // the same spirit as the SHA-1 and base64 above. Only what one session
-    // needs is here - a client handshake, then encrypt and decrypt - and
-    // Windows checks the certificate chain and the host name itself, so
-    // nothing here has to be trusted to get that right.
-#ifdef _WIN32
-    std::string tls_error(SECURITY_STATUS status) {
-        switch (status) {
-            case SEC_E_UNTRUSTED_ROOT:     return "the server's certificate is not trusted";
-            case SEC_E_CERT_EXPIRED:       return "the server's certificate has expired";
-            case SEC_E_WRONG_PRINCIPAL:    return "the server's certificate is for another host";
-            case SEC_E_ILLEGAL_MESSAGE:    return "the server did not answer in TLS";
-            case SEC_E_ALGORITHM_MISMATCH: return "no TLS version in common with the server";
-            default: {
-                char note[64];
-                std::snprintf(note, sizeof note, "TLS failed (0x%08lX)",
-                              static_cast<unsigned long>(status));
-                return note;
-            }
-        }
-    }
-
-    struct Tls {
-        CredHandle credentials{};
-        CtxtHandle context{};
-        bool have_credentials = false;
-        bool have_context = false;
-        SecPkgContext_StreamSizes sizes{};
-        std::vector<uint8_t> cipher;   // read off the socket, not yet decrypted
-        std::vector<uint8_t> plain;    // decrypted, not yet handed to the caller
-
-        ~Tls() {
-            if (have_context) {
-                DeleteSecurityContext(&context);
-            }
-            if (have_credentials) {
-                FreeCredentialsHandle(&credentials);
-            }
-        }
-
-        bool handshake(Socket& socket, const std::string& host, std::string& error) {
-            // SCHANNEL_CRED rather than the newer SCH_CREDENTIALS: the
-            // latter is only declared when SCHANNEL_USE_BLACKLISTS is
-            // defined, which also drags in the NT headers for
-            // UNICODE_STRING. The difference is TLS 1.3, and the server
-            // takes 1.2 (checked against archipelago.gg), so it is not
-            // worth the extra headers. Leaving grbitEnabledProtocols at 0
-            // lets Windows pick the best it has.
-            SCHANNEL_CRED credential{};
-            credential.dwVersion = SCHANNEL_CRED_VERSION;
-            credential.dwFlags = SCH_USE_STRONG_CRYPTO | SCH_CRED_AUTO_CRED_VALIDATION |
-                                 SCH_CRED_NO_DEFAULT_CREDS;
-            if (AcquireCredentialsHandleA(nullptr, const_cast<char*>(UNISP_NAME_A),
-                                          SECPKG_CRED_OUTBOUND, nullptr, &credential, nullptr,
-                                          nullptr, &credentials, nullptr) != SEC_E_OK) {
-                error = "Windows would not open a TLS credential";
-                return false;
-            }
-            have_credentials = true;
-
-            // The host name goes in as the target: that is both what SNI
-            // carries and what the certificate is checked against.
-            std::string target = host;
-            const DWORD request = ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT |
-                                  ISC_REQ_CONFIDENTIALITY | ISC_REQ_ALLOCATE_MEMORY |
-                                  ISC_REQ_STREAM;
-            DWORD attributes = 0;
-
-            SecBuffer greeting{};
-            greeting.BufferType = SECBUFFER_TOKEN;
-            SecBufferDesc greeting_desc{ SECBUFFER_VERSION, 1, &greeting };
-            SECURITY_STATUS status = InitializeSecurityContextA(
-                &credentials, nullptr, const_cast<char*>(target.c_str()), request, 0, 0,
-                nullptr, 0, &context, &greeting_desc, &attributes, nullptr);
-            if (status != SEC_I_CONTINUE_NEEDED) {
-                error = tls_error(status);
-                return false;
-            }
-            have_context = true;
-            if (greeting.cbBuffer != 0 && greeting.pvBuffer != nullptr) {
-                bool sent = socket.send_all(static_cast<uint8_t*>(greeting.pvBuffer),
-                                            greeting.cbBuffer);
-                FreeContextBuffer(greeting.pvBuffer);
-                if (!sent) {
-                    error = "the server hung up during the TLS handshake";
-                    return false;
-                }
-            }
-
-            // The socket's own 100ms read timeout paces this; a server that
-            // says nothing at all is given five seconds before giving up,
-            // which is also how quickly a plaintext server is found out when
-            // TLS is tried against it first.
-            std::vector<uint8_t> incoming;
-            uint8_t buffer[4096];
-            int idle = 0;
-            for (;;) {
-                int n = socket.read_some(buffer, sizeof buffer);
-                if (n < 0) {
-                    error = "the server hung up during the TLS handshake";
-                    return false;
-                }
-                if (n == 0) {
-                    if (++idle > 50) {
-                        error = "the TLS handshake timed out";
-                        return false;
-                    }
-                    continue;
-                }
-                idle = 0;
-                incoming.insert(incoming.end(), buffer, buffer + n);
-
-                SecBuffer in_buffers[2]{};
-                in_buffers[0].BufferType = SECBUFFER_TOKEN;
-                in_buffers[0].pvBuffer = incoming.data();
-                in_buffers[0].cbBuffer = static_cast<unsigned long>(incoming.size());
-                in_buffers[1].BufferType = SECBUFFER_EMPTY;
-                SecBufferDesc in_desc{ SECBUFFER_VERSION, 2, in_buffers };
-
-                SecBuffer out_buffer{};
-                out_buffer.BufferType = SECBUFFER_TOKEN;
-                SecBufferDesc out_desc{ SECBUFFER_VERSION, 1, &out_buffer };
-
-                status = InitializeSecurityContextA(
-                    &credentials, &context, const_cast<char*>(target.c_str()), request, 0, 0,
-                    &in_desc, 0, nullptr, &out_desc, &attributes, nullptr);
-
-                if (out_buffer.cbBuffer != 0 && out_buffer.pvBuffer != nullptr) {
-                    bool sent = socket.send_all(static_cast<uint8_t*>(out_buffer.pvBuffer),
-                                                out_buffer.cbBuffer);
-                    FreeContextBuffer(out_buffer.pvBuffer);
-                    if (!sent) {
-                        error = "the server hung up during the TLS handshake";
-                        return false;
-                    }
-                }
-
-                if (status == SEC_E_INCOMPLETE_MESSAGE) {
-                    continue;   // a record still arriving; keep it and read on
-                }
-                if (status == SEC_I_CONTINUE_NEEDED || status == SEC_E_OK) {
-                    // Whatever was not part of the handshake belongs to
-                    // whatever comes next.
-                    if (in_buffers[1].BufferType == SECBUFFER_EXTRA) {
-                        incoming.erase(incoming.begin(),
-                                       incoming.end() - in_buffers[1].cbBuffer);
-                    }
-                    else {
-                        incoming.clear();
-                    }
-                    if (status == SEC_E_OK) {
-                        cipher = std::move(incoming);
-                        break;
-                    }
-                    continue;
-                }
-                error = tls_error(status);
-                return false;
-            }
-
-            if (QueryContextAttributes(&context, SECPKG_ATTR_STREAM_SIZES, &sizes) != SEC_E_OK) {
-                error = "Windows would not describe the TLS stream";
-                return false;
-            }
-            return true;
-        }
-
-        bool send_all(Socket& socket, const uint8_t* data, size_t length) {
-            std::vector<uint8_t> record;
-            while (length > 0) {
-                unsigned long chunk =
-                    static_cast<unsigned long>(std::min<size_t>(length, sizes.cbMaximumMessage));
-                record.assign(sizes.cbHeader + chunk + sizes.cbTrailer, 0);
-                std::memcpy(record.data() + sizes.cbHeader, data, chunk);
-
-                SecBuffer buffers[3]{};
-                buffers[0] = { sizes.cbHeader, SECBUFFER_STREAM_HEADER, record.data() };
-                buffers[1] = { chunk, SECBUFFER_DATA, record.data() + sizes.cbHeader };
-                buffers[2] = { sizes.cbTrailer, SECBUFFER_STREAM_TRAILER,
-                               record.data() + sizes.cbHeader + chunk };
-                SecBufferDesc message{ SECBUFFER_VERSION, 3, buffers };
-                if (EncryptMessage(&context, 0, &message, 0) != SEC_E_OK) {
-                    return false;
-                }
-                size_t total = static_cast<size_t>(buffers[0].cbBuffer) + buffers[1].cbBuffer +
-                               buffers[2].cbBuffer;
-                if (!socket.send_all(record.data(), total)) {
-                    return false;
-                }
-                data += chunk;
-                length -= chunk;
-            }
-            return true;
-        }
-
-        // The same contract as Socket::read_some: -1 gone, 0 nothing waiting.
-        int read_some(Socket& socket, uint8_t* into, size_t room) {
-            for (;;) {
-                if (!plain.empty()) {
-                    size_t taking = std::min(room, plain.size());
-                    std::memcpy(into, plain.data(), taking);
-                    plain.erase(plain.begin(), plain.begin() + static_cast<long>(taking));
-                    return static_cast<int>(taking);
-                }
-                if (!cipher.empty()) {
-                    SecBuffer buffers[4]{};
-                    buffers[0] = { static_cast<unsigned long>(cipher.size()), SECBUFFER_DATA,
-                                   cipher.data() };
-                    buffers[1].BufferType = SECBUFFER_EMPTY;
-                    buffers[2].BufferType = SECBUFFER_EMPTY;
-                    buffers[3].BufferType = SECBUFFER_EMPTY;
-                    SecBufferDesc message{ SECBUFFER_VERSION, 4, buffers };
-                    SECURITY_STATUS status = DecryptMessage(&context, &message, 0, nullptr);
-                    if (status == SEC_E_OK) {
-                        // Both of these point into `cipher`, so they are
-                        // copied out before it is replaced.
-                        std::vector<uint8_t> extra;
-                        for (const SecBuffer& part : buffers) {
-                            const uint8_t* at = static_cast<const uint8_t*>(part.pvBuffer);
-                            if (part.BufferType == SECBUFFER_DATA && part.cbBuffer != 0) {
-                                plain.insert(plain.end(), at, at + part.cbBuffer);
-                            }
-                            else if (part.BufferType == SECBUFFER_EXTRA && part.cbBuffer != 0) {
-                                extra.assign(at, at + part.cbBuffer);
-                            }
-                        }
-                        cipher = std::move(extra);
-                        continue;
-                    }
-                    if (status != SEC_E_INCOMPLETE_MESSAGE) {
-                        return -1;   // expired, renegotiating, or simply broken
-                    }
-                }
-                uint8_t buffer[4096];
-                int n = socket.read_some(buffer, sizeof buffer);
-                if (n <= 0) {
-                    return n;
-                }
-                cipher.insert(cipher.end(), buffer, buffer + n);
-            }
-        }
-    };
-#endif
-
-    // What the WebSocket talks through: a plain socket, or one with TLS over
-    // it. Both answer send_all and read_some the same way, so nothing below
-    // has to know which it got.
-    struct Stream {
-        Socket socket;
-#ifdef _WIN32
-        std::unique_ptr<Tls> tls;
-#endif
-
-        void close() {
-#ifdef _WIN32
-            tls.reset();
-#endif
-            socket.close();
-        }
-
-        bool open(const std::string& host, const std::string& port, bool secure,
-                  std::string& error) {
-            close();
-            if (!socket.open(host, port, error)) {
-                return false;
-            }
-            if (!secure) {
-                return true;
-            }
-#ifdef _WIN32
-            tls = std::make_unique<Tls>();
-            if (!tls->handshake(socket, host, error)) {
-                close();
-                return false;
-            }
-            return true;
-#else
-            error = "this build cannot speak TLS";
-            close();
-            return false;
-#endif
-        }
-
-        bool send_all(const uint8_t* data, size_t length) {
-#ifdef _WIN32
-            if (tls) {
-                return tls->send_all(socket, data, length);
-            }
-#endif
-            return socket.send_all(data, length);
-        }
-
-        int read_some(uint8_t* into, size_t room) {
-#ifdef _WIN32
-            if (tls) {
-                return tls->read_some(socket, into, room);
-            }
-#endif
-            return socket.read_some(into, room);
-        }
-    };
-
-    // ---- WebSocket --------------------------------------------------------
-
-    struct WebSocket {
-        Stream stream;
-        std::vector<uint8_t> incoming;   // raw bytes not yet parsed into frames
-        std::string partial;             // a message still arriving in pieces
-        std::mt19937 rng{ std::random_device{}() };
-
-        // Back to how it started, so the other scheme can be tried on the
-        // same object - nothing here is safe to copy or move.
-        void reset() {
-            stream.close();
-            incoming.clear();
-            partial.clear();
-        }
-
-        bool handshake(const std::string& host, const std::string& port, std::string& error) {
-            uint8_t nonce[16];
-            for (uint8_t& b : nonce) {
-                b = static_cast<uint8_t>(rng() & 0xFF);
-            }
-            std::string key = base64(nonce, sizeof nonce);
-
-            std::string request =
-                "GET / HTTP/1.1\r\n"
-                "Host: " + host + ":" + port + "\r\n"
-                "Upgrade: websocket\r\n"
-                "Connection: Upgrade\r\n"
-                "Sec-WebSocket-Key: " + key + "\r\n"
-                "Sec-WebSocket-Version: 13\r\n"
-                "\r\n";
-            if (!stream.send_all(reinterpret_cast<const uint8_t*>(request.data()), request.size())) {
-                error = "the server hung up during the handshake";
-                return false;
-            }
-
-            std::string response;
-            uint8_t buffer[1024];
-            while (response.find("\r\n\r\n") == std::string::npos) {
-                int n = stream.read_some(buffer, sizeof buffer);
-                if (n < 0) {
-                    error = "the server hung up during the handshake";
-                    return false;
-                }
-                if (n == 0) {
-                    if (response.size() > 8192) {
-                        error = "the handshake reply made no sense";
-                        return false;
-                    }
-                    continue;
-                }
-                response.append(reinterpret_cast<char*>(buffer), static_cast<size_t>(n));
-            }
-            if (response.compare(0, 12, "HTTP/1.1 101") != 0) {
-                error = "not a WebSocket server (" + response.substr(0, response.find("\r\n")) + ")";
-                return false;
-            }
-
-            // The accept header proves the server saw our key.
-            std::array<uint32_t, 5> digest = sha1(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-            uint8_t raw[20];
-            for (int i = 0; i < 5; i++) {
-                raw[i * 4 + 0] = static_cast<uint8_t>(digest[i] >> 24);
-                raw[i * 4 + 1] = static_cast<uint8_t>(digest[i] >> 16);
-                raw[i * 4 + 2] = static_cast<uint8_t>(digest[i] >> 8);
-                raw[i * 4 + 3] = static_cast<uint8_t>(digest[i]);
-            }
-            std::string want = base64(raw, sizeof raw);
-            std::string lowered = response;
-            std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            if (lowered.find("sec-websocket-accept: " + [&] {
-                    std::string w = want;
-                    std::transform(w.begin(), w.end(), w.begin(),
-                                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                    return w;
-                }()) == std::string::npos) {
-                error = "the server's handshake reply did not match";
-                return false;
-            }
-
-            // Anything after the headers is already frame data.
-            size_t body = response.find("\r\n\r\n") + 4;
-            incoming.assign(response.begin() + static_cast<long>(body), response.end());
-            return true;
-        }
-
-        bool send_text(const std::string& text) {
-            std::vector<uint8_t> frame;
-            frame.push_back(0x81);   // FIN, text
-            size_t length = text.size();
-            if (length < 126) {
-                frame.push_back(static_cast<uint8_t>(0x80 | length));
-            }
-            else if (length <= 0xFFFF) {
-                frame.push_back(0x80 | 126);
-                frame.push_back(static_cast<uint8_t>(length >> 8));
-                frame.push_back(static_cast<uint8_t>(length));
-            }
-            else {
-                frame.push_back(0x80 | 127);
-                for (int i = 7; i >= 0; i--) {
-                    frame.push_back(static_cast<uint8_t>((static_cast<uint64_t>(length) >> (i * 8)) & 0xFF));
-                }
-            }
-            uint8_t mask[4];
-            for (uint8_t& b : mask) {
-                b = static_cast<uint8_t>(rng() & 0xFF);
-            }
-            frame.insert(frame.end(), mask, mask + 4);
-            for (size_t i = 0; i < length; i++) {
-                frame.push_back(static_cast<uint8_t>(text[i]) ^ mask[i % 4]);
-            }
-            return stream.send_all(frame.data(), frame.size());
-        }
-
-        void send_control(uint8_t opcode, const std::vector<uint8_t>& payload) {
-            std::vector<uint8_t> frame;
-            frame.push_back(static_cast<uint8_t>(0x80 | opcode));
-            frame.push_back(static_cast<uint8_t>(0x80 | payload.size()));
-            uint8_t mask[4];
-            for (uint8_t& b : mask) {
-                b = static_cast<uint8_t>(rng() & 0xFF);
-            }
-            frame.insert(frame.end(), mask, mask + 4);
-            for (size_t i = 0; i < payload.size(); i++) {
-                frame.push_back(payload[i] ^ mask[i % 4]);
-            }
-            stream.send_all(frame.data(), frame.size());
-        }
-
-        // Reads whatever has arrived and appends any complete messages.
-        // False means the connection is gone.
-        bool poll(std::vector<std::string>& messages) {
-            uint8_t buffer[4096];
-            int n = stream.read_some(buffer, sizeof buffer);
-            if (n < 0) {
-                return false;
-            }
-            if (n > 0) {
-                incoming.insert(incoming.end(), buffer, buffer + n);
-            }
-
-            for (;;) {
-                if (incoming.size() < 2) {
-                    return true;
-                }
-                bool fin = (incoming[0] & 0x80) != 0;
-                uint8_t opcode = incoming[0] & 0x0F;
-                bool masked = (incoming[1] & 0x80) != 0;
-                uint64_t length = incoming[1] & 0x7F;
-                size_t at = 2;
-                if (length == 126) {
-                    if (incoming.size() < at + 2) return true;
-                    length = (static_cast<uint64_t>(incoming[at]) << 8) | incoming[at + 1];
-                    at += 2;
-                }
-                else if (length == 127) {
-                    if (incoming.size() < at + 8) return true;
-                    length = 0;
-                    for (int i = 0; i < 8; i++) {
-                        length = (length << 8) | incoming[at + i];
-                    }
-                    at += 8;
-                }
-                uint8_t mask[4] = {};
-                if (masked) {
-                    if (incoming.size() < at + 4) return true;
-                    std::memcpy(mask, incoming.data() + at, 4);
-                    at += 4;
-                }
-                if (incoming.size() < at + length) {
-                    return true;
-                }
-                std::string payload(reinterpret_cast<char*>(incoming.data() + at), length);
-                if (masked) {
-                    for (size_t i = 0; i < payload.size(); i++) {
-                        payload[i] = static_cast<char>(static_cast<uint8_t>(payload[i]) ^ mask[i % 4]);
-                    }
-                }
-                incoming.erase(incoming.begin(), incoming.begin() + static_cast<long>(at + length));
-
-                switch (opcode) {
-                    case 0x0:   // continuation
-                    case 0x1:   // text
-                        partial += payload;
-                        if (fin) {
-                            messages.push_back(partial);
-                            partial.clear();
-                        }
-                        break;
-                    case 0x8:   // close
-                        return false;
-                    case 0x9:   // ping
-                        send_control(0xA, std::vector<uint8_t>(payload.begin(), payload.end()));
-                        break;
-                    default:
-                        break;   // pong, or a binary frame we have no use for
-                }
-            }
-        }
-    };
 
     // ---- state shared with the game --------------------------------------
 
@@ -806,15 +118,37 @@ namespace {
     std::vector<int64_t> server_items;
     int items_applied = 0;
     std::set<int64_t> checked_locations;
-    // Every location this slot has, done or not: checked_locations plus the
-    // Connected packet's missing_locations. A gift NPC whose location is not
-    // in it (giftsanity off) is left to give its own item.
+    // Every location this slot has, done or not: slot_data "locations", which
+    // the apworld sends because APCpp does not pass on the Connected packet's
+    // missing_locations. A gift NPC whose location is not in it (giftsanity
+    // off) is left to give its own item.
     std::set<int64_t> slot_locations;
+    // A seed made by an apworld from before "locations" has no list; for one
+    // of those the sanity switches in slot_data decide instead.
+    bool slot_locations_known = false;
+    bool chestsanity = true, giftsanity = true, enemysanity = true, spiritsanity = true;
     // The yaml's settings for the game itself (slot_data "settings") and the
     // seed its randomizer rolls with, as last received. Null until a
     // Connected packet carries them.
     json seed_settings_live;
     int64_t rando_seed_live = 0;
+
+    // seed_has, with server_mutex already held.
+    bool in_slot(int64_t location) {
+        if (slot_locations_known) {
+            return slot_locations.count(location) != 0;
+        }
+        if (checked_locations.count(location) != 0) {
+            return true;
+        }
+        switch ((location - zelda64::archipelago::id_base) & 0xF000) {
+            case zelda64::archipelago::group_chest:  return chestsanity;
+            case zelda64::archipelago::group_giver:  return giftsanity;
+            case zelda64::archipelago::group_enemy:  return enemysanity;
+            case zelda64::archipelago::group_spirit: return spiritsanity;
+            default:                                 return true;
+        }
+    }
 
     // Whether a location is part of this seed. Chests, spirits and gift NPCs
     // are only changed while theirs is: with chestsanity or spiritsanity off
@@ -822,7 +156,7 @@ namespace {
     // spirit brings up the level-up screen.
     bool seed_has(int64_t group, int index) {
         std::lock_guard lock{ server_mutex };
-        return slot_locations.count(zelda64::archipelago::id_base + group + index) != 0;
+        return in_slot(zelda64::archipelago::id_base + group + index);
     }
     int mammon_portal = 0;   // 0 vanilla, 1 bosses, 2 monsters, 3 both
     // 0 off, 1 the seven before Mammon, 2 with Mammon as well.
@@ -835,40 +169,6 @@ namespace {
     // than something the mutex guards. The server sends every item again on
     // every connect, so this rebuilds itself and never needs saving.
     std::atomic<uint32_t> souls_held{ 0 };
-    // Who else is in the room, so an arriving item can say where it came
-    // from, and which slot is us, so our own finds do not say "from".
-    std::map<int, std::string> player_names;
-    int our_slot = -1;
-    // Which game each slot is playing, and every game's item ids by name.
-    // An item found here for somebody else belongs to their game, not this
-    // one, so naming it takes the server's data package - all the room
-    // sends in the message itself is numbers ("1 found their 1365511683").
-    std::map<int, std::string> slot_game;
-    std::map<std::string, std::map<int64_t, std::string>> item_names_by_game;
-
-    // What to call an item belonging to `slot`. Called with server_mutex held.
-    std::string item_name_for(int slot, int64_t item) {
-        auto game = slot_game.find(slot);
-        if (game != slot_game.end()) {
-            auto names = item_names_by_game.find(game->second);
-            if (names != item_names_by_game.end()) {
-                auto found = names->second.find(item);
-                if (found != names->second.end()) {
-                    return found->second;
-                }
-            }
-        }
-        // Whose game it is was not known, or the id was not in it. Ids are
-        // handed out per game and the room only holds a few, so looking
-        // through the rest still beats showing a number at somebody.
-        for (const auto& [name, names] : item_names_by_game) {
-            auto found = names.find(item);
-            if (found != names.end()) {
-                return found->second;
-            }
-        }
-        return "item " + std::to_string(item);
-    }
 
     std::thread worker;
     std::atomic<bool> worker_should_run{ false };
@@ -881,411 +181,238 @@ namespace {
         log_line(detail);
     }
 
-    // Which of the two an address asks for. A bare host:port says nothing
-    // either way, and the two kinds of room are told apart by trying.
-    enum class Scheme { Either, Plain, Secure };
-
-    struct Address {
-        std::string host;
-        std::string port = "38281";
-        Scheme scheme = Scheme::Either;
+    // The slot_data keys the apworld sends. APCpp logs a warning for any key
+    // nobody asked for, so all of them are listed, used or not.
+    const std::vector<std::string> slot_data_keys = {
+        "goal", "mammon_portal", "boss_souls", "chestsanity", "giftsanity",
+        "wingsmith_wings", "enemysanity", "spiritsanity", "shuffle_orbs",
+        "rando_seed", "settings", "locations",
     };
 
-    Address split_server(const std::string& server) {
-        // Accepts host, host:port, and a ws:// or wss:// prefix.
-        Address address;
-        std::string rest = server;
-        if (rest.compare(0, 6, "wss://") == 0) {
-            rest = rest.substr(6);
-            address.scheme = Scheme::Secure;
+    // One slot_data value, as JSON text. It comes from the server, so
+    // anything that is not the shape expected is ignored rather than trusted.
+    // Called with server_mutex held.
+    void take_slot_data(const std::string& key, const std::string& text) {
+        json v = json::parse(text, nullptr, false);
+        if (v.is_discarded()) {
+            return;
         }
-        else if (rest.compare(0, 5, "ws://") == 0) {
-            rest = rest.substr(5);
-            address.scheme = Scheme::Plain;
+        auto flag = [&](bool& field) {
+            if (v.is_boolean()) {
+                field = v.get<bool>();
+            }
+            else if (v.is_number_integer()) {
+                field = v.get<int64_t>() != 0;
+            }
+        };
+        if (key == "mammon_portal" && v.is_number_integer()) {
+            mammon_portal = v.get<int>();
         }
-        size_t colon = rest.rfind(':');
-        if (colon == std::string::npos) {
-            address.host = rest;
-            return address;
+        else if (key == "boss_souls" && v.is_number_integer()) {
+            boss_souls.store(v.get<int>());
         }
-        address.host = rest.substr(0, colon);
-        address.port = rest.substr(colon + 1);
-        return address;
+        else if (key == "wingsmith_wings") {
+            bool on = false;
+            flag(on);
+            wingsmith_wings.store(on);
+        }
+        else if (key == "chestsanity") {
+            flag(chestsanity);
+        }
+        else if (key == "giftsanity") {
+            flag(giftsanity);
+        }
+        else if (key == "enemysanity") {
+            flag(enemysanity);
+        }
+        else if (key == "spiritsanity") {
+            flag(spiritsanity);
+        }
+        else if (key == "settings" && v.is_object()) {
+            seed_settings_live = v;
+        }
+        else if (key == "rando_seed" && v.is_number_integer()) {
+            rando_seed_live = v.get<int64_t>();
+        }
+        else if (key == "locations" && v.is_array()) {
+            slot_locations.clear();
+            for (const json& id : v) {
+                if (id.is_number_integer()) {
+                    slot_locations.insert(id.get<int64_t>());
+                }
+            }
+            slot_locations_known = true;
+        }
     }
 
-    // This machine or this network, where a room is the Archipelago
-    // launcher's and speaks plain. Only used to decide what to try first.
-    bool local_host(const std::string& host) {
-        static const char* local[] = { "localhost", "127.", "::1", "10.", "192.168." };
-        for (const char* prefix : local) {
-            if (host.compare(0, std::strlen(prefix), prefix) == 0) {
-                return true;
+    // The server's item list as it is being sent again after a connect.
+    // server_items keeps the old list until this one has caught up with it,
+    // so the game never sees the list shrink and grow back - which would
+    // announce every Soul already held all over again.
+    std::vector<int64_t> incoming_items;
+    bool replaying = false;
+
+    // Everything the wrapper has queued since the last look.
+    void take_events() {
+        bool items_changed = false;
+        q64ap::Event ev;
+        while (q64ap::poll_event(ev)) {
+            std::lock_guard lock{ server_mutex };
+            switch (ev.type) {
+                case q64ap::EventType::ResetItems:
+                    // Sent as the server accepts us, before anything else it
+                    // says about this slot.
+                    replaying = true;
+                    incoming_items.clear();
+                    slot_locations.clear();
+                    slot_locations_known = false;
+                    wingsmith_wings.store(false);
+                    break;
+                case q64ap::EventType::ItemReceived: {
+                    std::vector<int64_t>& list = replaying ? incoming_items : server_items;
+                    list.resize(std::min<size_t>(ev.index, list.size()));
+                    list.push_back(ev.id);
+                    if (replaying && incoming_items.size() >= server_items.size()) {
+                        server_items = std::move(incoming_items);
+                        incoming_items.clear();
+                        replaying = false;
+                    }
+                    items_changed = items_changed || !replaying;
+                    if (ev.notify) {
+                        std::string line = "Received " + pretty_item(ev.id);
+                        zelda64::notify::post(line, zelda64::notify::Kind::ApReceived);
+                        log_line(line);
+                    }
+                    break;
+                }
+                case q64ap::EventType::LocationChecked:
+                    checked_locations.insert(ev.id);
+                    break;
+                case q64ap::EventType::SlotData:
+                    take_slot_data(ev.key, ev.value);
+                    break;
             }
         }
-        return false;
+        if (items_changed) {
+            std::lock_guard lock{ server_mutex };
+            refresh_souls();
+        }
     }
 
-    // One connection, from dial to hang-up. Returns when it drops.
+    // The room's messages. Our own receipts are announced from the items
+    // themselves; APCpp leaves them out of these.
+    void take_messages(const std::string& us) {
+        q64ap::Message m;
+        while (q64ap::poll_message(m)) {
+            if (!m.text.empty()) {
+                log_line("  " + m.text);
+            }
+            if (!m.item_send) {
+                continue;
+            }
+            if (m.sender == us) {
+                zelda64::notify::post("You have sent \"" + m.item + "\" to \"" + m.receiver + "\"",
+                                      zelda64::notify::Kind::ApSent);
+            }
+            else {
+                // The rest of the room's traffic, for the "all items in the
+                // room" setting.
+                zelda64::notify::post(
+                    m.sender == m.receiver
+                        ? m.sender + " found their \"" + m.item + "\""
+                        : m.sender + " sent \"" + m.item + "\" to \"" + m.receiver + "\"",
+                    zelda64::notify::Kind::ApRoom);
+            }
+        }
+    }
+
+    // One connection, from dial to the options changing. APCpp reconnects by
+    // itself after a drop, and tries TLS first and plain second, so all this
+    // does is watch it and pass things across.
     void run_session(const zelda64::archipelago::Options& options, uint32_t my_generation) {
         auto stale = [&] { return !worker_should_run.load() || generation.load() != my_generation; };
 
-        auto [host, port, scheme] = split_server(options.server);
-        set_status(zelda64::archipelago::Status::Connecting, "Connecting to " + host + ":" + port + "...");
-
-        // A room on archipelago.gg takes TLS and nothing else; one hosted
-        // from the Archipelago launcher takes plain and nothing else; and
-        // "host:port" is how both are written. So both are always tried,
-        // and all the address decides is which to try first: a ws:// or
-        // wss:// prefix if there is one, otherwise plain for a room on this
-        // machine or this network and TLS for anything else.
-        //
-        // A prefix picks the order rather than ruling the other one out on
-        // purpose. Nobody should have to know which kind of room they were
-        // given to be able to join it, and the wrong one is refused in a
-        // moment rather than waited on.
-        bool secure_first = scheme == Scheme::Secure ? true
-                          : scheme == Scheme::Plain  ? false
-                          :                            !local_host(host);
-        const bool attempts[2] = { secure_first, !secure_first };
-
-        WebSocket ws;
-        std::string error, first_error;
-        bool ready = false;
-        for (bool secure : attempts) {
-            if (stale()) {
-                return;
-            }
-            ws.reset();
-            log_line(secure ? "trying TLS" : "trying without TLS");
-            if (ws.stream.open(host, port, secure, error) && ws.handshake(host, port, error)) {
-                log_line(secure ? "connected over TLS" : "connected without TLS");
-                ready = true;
-                break;
-            }
-            log_line("  " + error);
-            // The kind that was tried first is the one worth reporting: the
-            // other was only the long shot, and its complaint is usually
-            // about not speaking the right thing rather than about the room.
-            if (first_error.empty()) {
-                first_error = error;
-            }
-        }
-        if (!ready) {
-            set_status(zelda64::archipelago::Status::Failed, "Could not connect: " + first_error);
+        set_status(zelda64::archipelago::Status::Connecting, "Connecting to " + options.server + "...");
+        q64ap::ConnectInfo info{ options.server, options.slot, options.password, slot_data_keys };
+        if (!q64ap::connect(info)) {
+            set_status(zelda64::archipelago::Status::Failed, "Could not connect: see archipelago.txt");
             return;
         }
 
+        const auto started = std::chrono::steady_clock::now();
         bool authenticated = false;
-        std::vector<std::string> messages;
-
+        bool said_slow = false;
         while (!stale()) {
-            messages.clear();
-            if (!ws.poll(messages)) {
-                if (!stale()) {
-                    set_status(zelda64::archipelago::Status::Failed,
-                               authenticated ? "Disconnected from the server" : "The server closed the connection");
+            // The status first: whatever arrived before the server accepted
+            // us (slot_data above all) is then already in the queue below.
+            q64ap::Status net = q64ap::status();
+            take_events();
+            take_messages(options.slot);
+
+            if (net == q64ap::Status::Refused) {
+                set_status(zelda64::archipelago::Status::Failed,
+                           "Refused: check the slot name and password");
+                q64ap::disconnect();
+                // Nothing to do until the options change.
+                while (!stale()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(150));
                 }
                 return;
             }
-
-            for (const std::string& raw : messages) {
-                json parsed;
-                try {
-                    parsed = json::parse(raw);
+            if (net == q64ap::Status::Authenticated && !authenticated) {
+                authenticated = true;
+                {
+                    std::lock_guard lock{ state_mutex };
+                    slot_connected = options.slot;
                 }
-                catch (const json::exception&) {
-                    continue;
+                {
+                    std::lock_guard lock{ server_mutex };
+                    log_line("the server has " + std::to_string(checked_locations.size()) +
+                             " check(s) for this slot; mammon_portal = " +
+                             std::to_string(mammon_portal) + ", boss_souls = " +
+                             std::to_string(boss_souls.load()) +
+                             (slot_locations_known ? "" : "; no location list (an older apworld)"));
                 }
-                if (!parsed.is_array()) {
-                    continue;
-                }
-                for (const json& packet : parsed) {
-                    std::string cmd = packet.value("cmd", "");
-                    if (cmd == "RoomInfo") {
-                        json connect = {
-                            { "cmd", "Connect" },
-                            { "password", options.password },
-                            { "game", game_name },
-                            { "name", options.slot },
-                            { "uuid", "quest64-recomp" },
-                            { "version", { { "major", ap_major }, { "minor", ap_minor },
-                                           { "build", ap_build }, { "class", "Version" } } },
-                            { "items_handling", items_handling },
-                            { "tags", json::array() },
-                            { "slot_data", true },
-                        };
-                        ws.send_text(json::array({ connect }).dump());
-
-                        // And the names for everything in the room. Only the
-                        // games actually being played - asking for none at
-                        // all fetches every game Archipelago knows about.
-                        json games = json::array();
-                        if (packet.contains("games") && packet["games"].is_array()) {
-                            games = packet["games"];
-                        }
-                        json wanted = { { "cmd", "GetDataPackage" }, { "games", games } };
-                        ws.send_text(json::array({ wanted }).dump());
-                    }
-                    else if (cmd == "DataPackage") {
-                        if (packet.contains("data") && packet["data"].contains("games") &&
-                            packet["data"]["games"].is_object()) {
-                            std::lock_guard lock{ server_mutex };
-                            const json& games = packet["data"]["games"];
-                            for (auto game = games.begin(); game != games.end(); ++game) {
-                                if (!game.value().contains("item_name_to_id")) {
-                                    continue;
-                                }
-                                const json& ids = game.value()["item_name_to_id"];
-                                std::map<int64_t, std::string>& names = item_names_by_game[game.key()];
-                                for (auto it = ids.begin(); it != ids.end(); ++it) {
-                                    if (it.value().is_number_integer()) {
-                                        names[it.value().get<int64_t>()] = it.key();
-                                    }
-                                }
-                            }
-                            log_line("item names for " + std::to_string(item_names_by_game.size()) +
-                                     " game(s)");
-                        }
-                    }
-                    else if (cmd == "Connected") {
-                        authenticated = true;
-                        {
-                            std::lock_guard lock{ state_mutex };
-                            slot_connected = options.slot;
-                        }
-                        // What this slot has already done, and what the yaml
-                        // asked for. A gate that counts bosses or monsters
-                        // has nothing else to go on: neither leaves a flag in
-                        // the save, so after a reload the server's list is
-                        // the only record that they were ever beaten.
-                        {
-                            std::lock_guard lock{ server_mutex };
-                            slot_locations.clear();
-                            if (packet.contains("checked_locations") &&
-                                packet["checked_locations"].is_array()) {
-                                for (const json& id : packet["checked_locations"]) {
-                                    if (id.is_number_integer()) {
-                                        checked_locations.insert(id.get<int64_t>());
-                                        slot_locations.insert(id.get<int64_t>());
-                                    }
-                                }
-                            }
-                            if (packet.contains("missing_locations") &&
-                                packet["missing_locations"].is_array()) {
-                                for (const json& id : packet["missing_locations"]) {
-                                    if (id.is_number_integer()) {
-                                        slot_locations.insert(id.get<int64_t>());
-                                    }
-                                }
-                            }
-                            // Who is who, so an item can say who found it.
-                            if (packet.contains("slot")) {
-                                our_slot = packet["slot"].get<int>();
-                            }
-                            if (packet.contains("players") && packet["players"].is_array()) {
-                                player_names.clear();
-                                for (const json& who : packet["players"]) {
-                                    if (!who.contains("slot")) {
-                                        continue;
-                                    }
-                                    std::string name = who.value("alias", "");
-                                    if (name.empty()) {
-                                        name = who.value("name", "");
-                                    }
-                                    if (!name.empty()) {
-                                        player_names[who["slot"].get<int>()] = name;
-                                    }
-                                }
-                            }
-                            // Which game each slot plays, so an item sent to
-                            // one of them can be looked up in the right game.
-                            if (packet.contains("slot_info") && packet["slot_info"].is_object()) {
-                                slot_game.clear();
-                                for (auto it = packet["slot_info"].begin();
-                                     it != packet["slot_info"].end(); ++it) {
-                                    std::string game = it.value().value("game", "");
-                                    if (!game.empty()) {
-                                        slot_game[std::atoi(it.key().c_str())] = game;
-                                    }
-                                }
-                            }
-                            if (packet.contains("slot_data") && packet["slot_data"].is_object()) {
-                                const json& slot = packet["slot_data"];
-                                if (slot.contains("mammon_portal") &&
-                                    slot["mammon_portal"].is_number_integer()) {
-                                    mammon_portal = slot["mammon_portal"].get<int>();
-                                }
-                                if (slot.contains("boss_souls") &&
-                                    slot["boss_souls"].is_number_integer()) {
-                                    boss_souls.store(slot["boss_souls"].get<int>());
-                                }
-                                wingsmith_wings.store(slot.value("wingsmith_wings", false));
-                                if (slot.contains("settings") && slot["settings"].is_object()) {
-                                    seed_settings_live = slot["settings"];
-                                    rando_seed_live = slot.value("rando_seed", int64_t{ 0 });
-                                }
-                            }
-                            log_line("the server has " + std::to_string(checked_locations.size()) +
-                                     " check(s) for this slot; mammon_portal = " +
-                                     std::to_string(mammon_portal) + ", boss_souls = " +
-                                     std::to_string(boss_souls.load()));
-                        }
-                        set_status(zelda64::archipelago::Status::Connected,
-                                   "Connected as " + options.slot);
-                        note_seed_settings();
-                    }
-                    else if (cmd == "RoomUpdate") {
-                        // Sent when anything the room knows changes, including
-                        // this slot's own list growing.
-                        if (packet.contains("checked_locations") &&
-                            packet["checked_locations"].is_array()) {
-                            std::lock_guard lock{ server_mutex };
-                            for (const json& id : packet["checked_locations"]) {
-                                if (id.is_number_integer()) {
-                                    checked_locations.insert(id.get<int64_t>());
-                                }
-                            }
-                        }
-                    }
-                    else if (cmd == "ConnectionRefused") {
-                        std::string why;
-                        if (packet.contains("errors") && packet["errors"].is_array()) {
-                            for (const json& e : packet["errors"]) {
-                                if (!why.empty()) why += ", ";
-                                why += e.get<std::string>();
-                            }
-                        }
-                        if (why.empty()) {
-                            why = "the server refused the connection";
-                        }
-                        set_status(zelda64::archipelago::Status::Failed, "Refused: " + why);
-                        return;
-                    }
-                    else if (cmd == "ReceivedItems") {
-                        if (packet.contains("items") && packet["items"].is_array()) {
-                            // index 0 is the server listing everything this
-                            // slot has ever been sent, which it does on every
-                            // connect. That is worth applying but not worth
-                            // announcing - it would be a wall of notices for
-                            // things found hours ago. Anything else is new.
-                            bool fresh = packet.value("index", 0) != 0;
-                            {
-                                // index says where these belong in the list,
-                                // so a resync (0) rebuilds it and a delta
-                                // adds to the end. The mark is left alone.
-                                std::lock_guard lock{ server_mutex };
-                                size_t at = packet.value("index", 0);
-                                if (at > server_items.size()) {
-                                    at = server_items.size();
-                                }
-                                server_items.resize(at);
-                                for (const json& item : packet["items"]) {
-                                    if (item.contains("item")) {
-                                        server_items.push_back(item["item"].get<int64_t>());
-                                    }
-                                }
-                                refresh_souls();
-                            }
-                            if (fresh) {
-                                for (const json& item : packet["items"]) {
-                                    if (!item.contains("item")) {
-                                        continue;
-                                    }
-                                    std::string line = "Received " +
-                                        pretty_item(item["item"].get<int64_t>());
-                                    int finder = item.value("player", -1);
-                                    std::lock_guard lock{ server_mutex };
-                                    auto who = player_names.find(finder);
-                                    if (finder != our_slot && who != player_names.end()) {
-                                        line += " from " + who->second;
-                                    }
-                                    zelda64::notify::post(line, zelda64::notify::Kind::ApReceived);
-                                    log_line(line);
-                                }
-                            }
-                        }
-                    }
-                    else if (cmd == "PrintJSON") {
-                        std::string line;
-                        if (packet.contains("data") && packet["data"].is_array()) {
-                            for (const json& part : packet["data"]) {
-                                line += part.value("text", "");
-                            }
-                        }
-                        if (!line.empty()) {
-                            log_line("  " + line);
-                        }
-                        // The other direction: a check found here holding
-                        // something that belongs to another player. The
-                        // message itself is only numbers, so the name comes
-                        // from the data package and the player from the room
-                        // - our own receipts are announced from ReceivedItems
-                        // instead, where the name is this game's own.
-                        if (packet.value("type", "") == "ItemSend" &&
-                            packet.contains("item") && packet["item"].is_object()) {
-                            int finder = packet["item"].value("player", -1);
-                            int receiver = packet.value("receiving", -1);
-                            int64_t what = packet["item"].value("item", static_cast<int64_t>(0));
-                            std::lock_guard lock{ server_mutex };
-                            auto name_of = [&](int slot) {
-                                auto who = player_names.find(slot);
-                                return who != player_names.end() ? who->second
-                                                                 : "player " + std::to_string(slot);
-                            };
-                            if (finder == our_slot && receiver != our_slot) {
-                                zelda64::notify::post(
-                                    "You have sent \"" + item_name_for(receiver, what) +
-                                        "\" to \"" + name_of(receiver) + "\"",
-                                    zelda64::notify::Kind::ApSent);
-                            }
-                            else if (finder != our_slot && receiver != our_slot) {
-                                // The rest of the room's traffic, for the
-                                // "all items in the room" setting. What
-                                // arrives here is announced from
-                                // ReceivedItems, so it is not repeated.
-                                std::string item = item_name_for(receiver, what);
-                                zelda64::notify::post(
-                                    finder == receiver
-                                        ? name_of(finder) + " found their \"" + item + "\""
-                                        : name_of(finder) + " sent \"" + item + "\" to \"" +
-                                              name_of(receiver) + "\"",
-                                    zelda64::notify::Kind::ApRoom);
-                            }
-                        }
-                    }
-                }
+                set_status(zelda64::archipelago::Status::Connected, "Connected as " + options.slot);
+                note_seed_settings();
+            }
+            else if (net != q64ap::Status::Authenticated && authenticated) {
+                authenticated = false;
+                set_status(zelda64::archipelago::Status::Failed,
+                           "Disconnected from the server; trying again");
+            }
+            else if (!authenticated && !said_slow &&
+                     std::chrono::steady_clock::now() - started > std::chrono::seconds(15)) {
+                said_slow = true;
+                set_status(zelda64::archipelago::Status::Failed,
+                           "Could not connect to " + options.server + " (still trying)");
             }
 
-            if (!authenticated) {
-                continue;
-            }
-
-            // Anything the game has queued up.
-            std::vector<int64_t> to_send;
-            bool send_goal = false;
-            {
-                std::lock_guard lock{ queue_mutex };
-                while (!outgoing_checks.empty()) {
-                    to_send.push_back(outgoing_checks.front());
-                    outgoing_checks.pop_front();
+            if (authenticated) {
+                // Anything the game has queued up.
+                std::vector<int64_t> to_send;
+                bool send_goal = false;
+                {
+                    std::lock_guard lock{ queue_mutex };
+                    while (!outgoing_checks.empty()) {
+                        to_send.push_back(outgoing_checks.front());
+                        outgoing_checks.pop_front();
+                    }
+                    send_goal = goal_pending;
+                    goal_pending = false;
                 }
-                send_goal = goal_pending;
-                goal_pending = false;
-            }
-            if (!to_send.empty()) {
-                json checks = { { "cmd", "LocationChecks" }, { "locations", to_send } };
-                if (!ws.send_text(json::array({ checks }).dump())) {
-                    set_status(zelda64::archipelago::Status::Failed, "Disconnected from the server");
-                    return;
+                if (!to_send.empty()) {
+                    q64ap::send_locations(to_send);
+                    log_line("sent " + std::to_string(to_send.size()) + " check(s)");
                 }
-                log_line("sent " + std::to_string(to_send.size()) + " check(s)");
+                if (send_goal) {
+                    q64ap::send_goal_complete();
+                    log_line("told the server the goal is done");
+                }
             }
-            if (send_goal) {
-                json done = { { "cmd", "StatusUpdate" }, { "status", 30 } };   // CLIENT_GOAL
-                ws.send_text(json::array({ done }).dump());
-                log_line("told the server the goal is done");
-            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
+        q64ap::disconnect();
     }
 
     void worker_main() {
@@ -1308,8 +435,8 @@ namespace {
 
             run_session(options, my_generation);
 
-            // A dropped connection waits a moment and tries again, unless the
-            // options changed underneath us or the server refused us outright.
+            // Only a failure to start at all comes back while the options
+            // are unchanged; give it a moment before trying again.
             for (int i = 0; i < 20 && worker_should_run.load() && generation.load() == my_generation; i++) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(150));
             }
@@ -1335,10 +462,7 @@ namespace {
         if (worker.joinable()) {
             return;
         }
-#ifdef _WIN32
-        WSADATA wsa{};
-        WSAStartup(MAKEWORD(2, 2), &wsa);
-#endif
+        q64ap::set_log(log_line);
         worker_should_run.store(true);
         worker = std::thread(worker_main);
     }
@@ -1671,9 +795,6 @@ void zelda64::archipelago::shutdown() {
     if (worker.joinable()) {
         worker.join();
     }
-#ifdef _WIN32
-    WSACleanup();
-#endif
 }
 
 // ---------------------------------------------------------------- the game
@@ -1973,6 +1094,43 @@ namespace {
         return false;
     }
 
+    // A boss is down, however it was noticed: the kill hook, his bit in the
+    // save's "beaten" byte, or (Mammon) the message that ends the game. The
+    // first to notice sends his check; Mammon's is also the goal.
+    void boss_beaten(int order, const char* how) {
+        if (order < 1 || order > boss_count || boss_sent[order - 1]) {
+            return;
+        }
+        boss_sent[order - 1] = true;
+        zelda64::archipelago::send_check(zelda64::archipelago::id_base +
+                                         zelda64::archipelago::group_boss + order);
+        log_line(std::string(how) + " boss " + std::to_string(order) + " (" + boss_names[order - 1] + "), checked");
+        // Mammon is the last of them, and the run is over.
+        if (order == boss_count) {
+            zelda64::archipelago::goal_reached();
+            log_line("Mammon is down: the goal is reached");
+        }
+    }
+
+    // The byte func_8000B9D8 reads to keep a cleared arena empty: bit n set
+    // once boss n+1 (gBossData order, Solvaring first) has been beaten. The
+    // one writer is func_8001CFE8, as a won battle ends: it sets flag
+    // [0x8008C570] - 1 through func_8000BA0C (mask table 0x8004D740, 1 << n),
+    // and func_8001C8C4 copied that word from 0x8007D1A0 - the boss number -
+    // as the battle began. So every boss, Mammon too, lands here the moment
+    // he falls, and a reload or a reconnect reads the same answer again. The
+    // kill hook only sees a boss if his fight goes through the experience
+    // routine; this does not depend on that.
+    constexpr int32_t bosses_beaten = 0x8007D19C;
+    void scan_bosses(uint8_t* rdram) {
+        uint8_t beaten = MEM_BU(0, bosses_beaten);
+        for (int order = 1; order <= boss_count; order++) {
+            if (beaten & (1u << (order - 1))) {
+                boss_beaten(order, "beaten (save flag)");
+            }
+        }
+    }
+
     void scan_flags(uint8_t* rdram, int32_t base, int count, std::vector<bool>& sent,
                     int64_t group, const char* what) {
         for (int id = 0; id < count; id++) {
@@ -2000,6 +1158,11 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
     }
     scan_flags(rdram, chest_flags, chest_count, chest_sent, group_chest, "chest");
     scan_flags(rdram, spirit_flags, spirit_count, spirit_sent, group_spirit, "spirit");
+    // Only with a save loaded: before that the byte is whatever the boot
+    // left, not anybody's progress.
+    if (MEM_W(0, gNextMap) != -1) {
+        scan_bosses(rdram);
+    }
     if (!playing_seed()) {
         // Not connected: the original game. The door is the game's own, a
         // gift NPC gives as usual and a spirit opens its screen.
@@ -2234,18 +1397,7 @@ extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
         log_line(note);
         return;
     }
-    if (boss_sent[order - 1]) {
-        return;
-    }
-    boss_sent[order - 1] = true;
-    zelda64::archipelago::send_check(zelda64::archipelago::id_base +
-                                     zelda64::archipelago::group_boss + order);
-    log_line(std::string("defeated boss ") + std::to_string(order) + " (" + boss_names[order - 1] + "), checked");
-    // Mammon is the last of them, and the run is over.
-    if (order == boss_count) {
-        zelda64::archipelago::goal_reached();
-        log_line("Mammon is down: the goal is reached");
-    }
+    boss_beaten(order, "defeated");
 }
 
 // Boss Souls: a boss whose Soul has not arrived is simply not there.
@@ -2546,7 +1698,7 @@ extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* c
         bool done = giver_sent[i];
         {
             std::lock_guard lock{ server_mutex };
-            if (slot_locations.count(location) == 0) {
+            if (!in_slot(location)) {
                 return;   // not a check in this seed: the NPC gives as usual
             }
             done = done || checked_locations.count(location) != 0;
@@ -2595,7 +1747,20 @@ namespace {
     void forget_sent_checks() {
         std::fill(chest_sent.begin(), chest_sent.end(), false);
         std::fill(spirit_sent.begin(), spirit_sent.end(), false);
+        std::fill(boss_sent.begin(), boss_sent.end(), false);
     }
+}
+
+// func_80007A50, just before it shows gMsg_Shannon_Mammon_has_been_destroyed:
+// the end of the game, the same moment the speedrun timer stops. Mammon's
+// arena is the last thing in the game, so nothing may ever save his bit -
+// this is the one signal that is certain to happen.
+extern "C" void quest64_archipelago_mammon_destroyed(uint8_t* rdram) {
+    (void)rdram;
+    if (!ap_enabled.load()) {
+        return;
+    }
+    boss_beaten(boss_count, "destroyed (end message)");
 }
 
 // func_80006604, at its first instruction: the chest's "you got ..." box.

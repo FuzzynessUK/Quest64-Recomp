@@ -70,10 +70,17 @@ def set_rules(world, player):
     wanted_locations = [loc for order, loc, _ in boss_locations if order < 8] if mode & 1 else []
     wanted_regions = monster_regions if mode & 2 else []
     if wanted_locations or wanted_regions:
+        # The rule looks at other regions, so Archipelago has to be told to
+        # look at these entrances again whenever one of those regions becomes
+        # reachable: a location through the region it stands in.
+        watched = set(wanted_regions)
+        watched.update(mw.get_location(name, player).parent_region.name for name in wanted_locations)
         for entrance in mw.get_region("Endgame", player).entrances:
             add_rule(entrance, lambda state, l=tuple(wanted_locations), r=tuple(wanted_regions): (
                 all(state.can_reach(name, "Location", player) for name in l)
                 and all(state.can_reach(name, "Region", player) for name in r)))
+            for region_name in sorted(watched):
+                mw.register_indirect_condition(mw.get_region(region_name, player), entrance)
 
     # Mammon has to be beatable, which with his Soul on means having it.
     mw.completion_condition[player] = lambda state: state.can_reach(

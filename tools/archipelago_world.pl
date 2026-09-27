@@ -275,7 +275,9 @@ PY
 # is connected as it starts, it plays with these and hides the Randomizer and
 # Enhancements menus. Every one is off unless the yaml says otherwise.
 #   [ option name, class, section, display name, description, kind ]
-# kind "toggle" is Off/On (0/1); "random" is Off/Random (0/1).
+# kind "toggle" is Off/On (0/1); "random" is Off/Randomized (0/1). The choice
+# is called "randomized" because "random" is a reserved option value in
+# Archipelago.
 my @seed_settings = (
     [ 'shuffle_spells', 'ShuffleSpells', 'Randomizer', 'Shuffled Spells',
       'Shuffles which spell each element teaches, with the spell damage rebalance, Invalidity, and the fixes that keep shuffled spell combinations from crashing.', 'toggle' ],
@@ -338,7 +340,7 @@ for my $o (@seed_settings) {
         $seed_classes .= "class $class(Toggle):\n$body\"\"\"\n    display_name = \"$display\"\n\n\n";
     }
     else {
-        $seed_classes .= "class $class(Choice):\n$body\"\"\"\n    display_name = \"$display\"\n    option_off = 0\n    option_random = 1\n    default = 0\n\n\n";
+        $seed_classes .= "class $class(Choice):\n$body\"\"\"\n    display_name = \"$display\"\n    option_off = 0\n    option_randomized = 1\n    default = 0\n\n\n";
     }
 }
 my $seed_fields = join('', map { "    $_->[0]: $_->[1]\n" } @seed_settings);
@@ -359,7 +361,7 @@ my $seed_yaml = '';
         $seed_yaml .= "\n" . join("\n", wrap_words("$display: $doc", 78, '  # ', '  # ')) . "\n";
         $seed_yaml .= $kind eq 'toggle'
             ? "  $name:\n    'false': 1\n    'true': 0\n"
-            : "  $name:\n    off: 1\n    random: 0\n";
+            : "  $name:\n    off: 1\n    randomized: 0\n";
     }
 }
 
@@ -601,10 +603,17 @@ def set_rules(world, player):
     wanted_locations = [loc for order, loc, _ in boss_locations if order < 8] if mode & 1 else []
     wanted_regions = monster_regions if mode & 2 else []
     if wanted_locations or wanted_regions:
+        # The rule looks at other regions, so Archipelago has to be told to
+        # look at these entrances again whenever one of those regions becomes
+        # reachable: a location through the region it stands in.
+        watched = set(wanted_regions)
+        watched.update(mw.get_location(name, player).parent_region.name for name in wanted_locations)
         for entrance in mw.get_region("Endgame", player).entrances:
             add_rule(entrance, lambda state, l=tuple(wanted_locations), r=tuple(wanted_regions): (
                 all(state.can_reach(name, "Location", player) for name in l)
                 and all(state.can_reach(name, "Region", player) for name in r)))
+            for region_name in sorted(watched):
+                mw.register_indirect_condition(mw.get_region(region_name, player), entrance)
 
     # Mammon has to be beatable, which with his Soul on means having it.
     mw.completion_condition[player] = lambda state: state.can_reach(
@@ -754,6 +763,11 @@ class Q64World(World):
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),
+            # Every location id this slot has. The game's client (APCpp) is
+            # not given the server's missing_locations, and it needs to know
+            # which chests, spirits and givers are checks in this seed.
+            "locations": sorted(loc.address for loc in self.multiworld.get_locations(self.player)
+                                if loc.address is not None),
             # The game's own settings from the yaml, and the seed its
             # randomizer rolls them with, so every session of this slot
             # plays the same shuffle.

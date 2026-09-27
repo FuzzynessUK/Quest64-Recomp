@@ -338,6 +338,8 @@ jobs:
           Move-Item -Path "cmake-build/dxcompiler.dll" -Destination "dxcompiler.dll"
           Move-Item -Path "cmake-build/dxil.dll" -Destination "dxil.dll"
           Move-Item -Path "cmake-build/SDL2.dll" -Destination "SDL2.dll"
+          Move-Item -Path "cmake-build/APCpp.dll" -Destination "APCpp.dll"
+          Copy-Item -Path "lib/APCpp/LICENSE" -Destination "APCpp-LICENSE.txt"
           Move-Item -Path "cmake-build/Quest64Recompiled.pdb" -Destination "Quest64Recompiled.pdb"
           Remove-Item -Path "assets/scss" -Recurse -Force
       - name: Archive Quest64Recomp
@@ -349,6 +351,9 @@ jobs:
             dxcompiler.dll
             dxil.dll
             SDL2.dll
+            APCpp.dll
+            APCpp-LICENSE.txt
+            THIRD_PARTY_NOTICES.md
             assets/
             recompcontrollerdb.txt
       - name: Archive Debug Files

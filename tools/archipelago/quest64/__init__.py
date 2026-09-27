@@ -140,6 +140,11 @@ class Q64World(World):
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),
+            # Every location id this slot has. The game's client (APCpp) is
+            # not given the server's missing_locations, and it needs to know
+            # which chests, spirits and givers are checks in this seed.
+            "locations": sorted(loc.address for loc in self.multiworld.get_locations(self.player)
+                                if loc.address is not None),
             # The game's own settings from the yaml, and the seed its
             # randomizer rolls them with, so every session of this slot
             # plays the same shuffle.

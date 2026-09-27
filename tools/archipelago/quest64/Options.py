@@ -205,7 +205,7 @@ class TextPalette(Choice):
     """Cosmetics. The colour of the text boxes."""
     display_name = "Text Palette"
     option_off = 0
-    option_random = 1
+    option_randomized = 1
     default = 0
 
 
@@ -213,7 +213,7 @@ class StaffPalette(Choice):
     """Cosmetics. The colour of Brian's staff."""
     display_name = "Staff Palette"
     option_off = 0
-    option_random = 1
+    option_randomized = 1
     default = 0
 
 
@@ -221,7 +221,7 @@ class CloakColour(Choice):
     """Cosmetics. The colour of Brian's cloak."""
     display_name = "Cloak Colour"
     option_off = 0
-    option_random = 1
+    option_randomized = 1
     default = 0
 
 
@@ -229,7 +229,7 @@ class BrianClothes(Choice):
     """Cosmetics. The colours of Brian's clothes."""
     display_name = "Brian's Clothes"
     option_off = 0
-    option_random = 1
+    option_randomized = 1
     default = 0
 
 
@@ -237,7 +237,7 @@ class SpellPalettes(Choice):
     """Cosmetics. The colours of the spell effects."""
     display_name = "Spell Palettes"
     option_off = 0
-    option_random = 1
+    option_randomized = 1
     default = 0
 
 

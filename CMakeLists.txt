@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 
 if (APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum OS X deployment version")
@@ -62,6 +62,18 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/lib/RmlUi)
 target_compile_definitions(rmlui_core PRIVATE LUNASVG_BUILD_STATIC)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime)
+
+# APCpp - the Archipelago client library (LGPL-2.1, built as a DLL).
+# APCpp unpacks its mbedTLS into its own binary folder but points the include
+# path at the top-level one, which only agree when APCpp is built alone; so the
+# same tarball is unpacked here as well for the include path to find.
+if (WIN32 AND NOT EXISTS ${CMAKE_BINARY_DIR}/mbedtls-3.6.4/include)
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_SOURCE_DIR}/lib/APCpp/mbedtls-3.6.4.tar.bz2
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+endif()
+add_subdirectory(${CMAKE_SOURCE_DIR}/lib/APCpp ${CMAKE_BINARY_DIR}/APCpp)
 
 target_include_directories(rt64 PRIVATE ${CMAKE_BINARY_DIR}/rt64/src)
 
@@ -200,6 +212,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/enhancements.cpp
     ${CMAKE_SOURCE_DIR}/src/game/audio.cpp
     ${CMAKE_SOURCE_DIR}/src/game/archipelago.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/archipelago_client.cpp
     ${CMAKE_SOURCE_DIR}/src/game/statfx.cpp
     ${CMAKE_SOURCE_DIR}/src/game/easierquest.cpp
     ${CMAKE_SOURCE_DIR}/src/game/statuswatch.cpp
@@ -416,7 +429,13 @@ target_link_libraries(Quest64Recompiled PRIVATE
     RmlUi::Debugger
     nfd
     lunasvg
+    APCpp
 )
+
+# APCpp is a DLL: it has to sit next to the exe.
+add_custom_command(TARGET Quest64Recompiled POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:APCpp> $<TARGET_FILE_DIR:Quest64Recompiled>)
 
 # TODO fix the rt64 CMake script so that this doesn't need to be duplicated here
 # For DXC

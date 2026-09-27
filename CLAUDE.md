@@ -99,11 +99,10 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     itself, not from after it as in stock libultra; `FE FE` = literal).
     The instrument bank (ROM 0xE7E800) has 29 programs, no percussion
     bank: program 9 is a GM-keyed drum kit. The battle theme uses 21
-    (lead), 0, 18, 25, 23, 19, 7, 9. The sample `tools/custom_music/Pokemon GS - Gym Leader Battle.seq`, deployed to the game folder (was track 15, Melrode
-    Monastery, the first thing heard) is the Pokémon G/S gym leader theme
-    from a MIDI, pinned `--prog 0=21,1=23,2=0`; the Darunia's Joy `.ootrs`
-    is OoT bytecode, a different format, so it was not used directly.
-    The DMA reader (`pi.cpp do_rom_read`) has no size check, so the ROM
+    (lead), 0, 18, 25, 23, 19, 7, 9. No sample songs ship in
+    `tools/custom_music` (the two Pokémon ones were removed 2026-09-27);
+    a MIDI melody sounds right pinned to the lead, e.g.
+    `--prog 0=21,1=23,2=0`. The DMA reader (`pi.cpp do_rom_read`) has no size check, so the ROM
     copy grows past 16MB when the tail runs out. Track labels: map table
     rows for areas; boss pick 0x8001CA28 gives track 0 (boss) or 0x29
     (Mammon). **Show song name** (Layout > Notifications, `song_notice`):
@@ -218,6 +217,17 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
 `D:\Software\Archipelago\custom_worlds`; the player's own yaml is
 `Players\Fuzz.yaml`).
 
+- **Transport is APCpp** (2026-09-27, submodule `lib/APCpp`, LGPL, built as
+  `APCpp.dll` which must ship next to the exe). Only
+  `src/game/archipelago_client.cpp` (`q64ap::`) touches it; include its
+  header by path, since `"Archipelago.h"` finds our `archipelago.h` on
+  Windows. APCpp's message queue has no lock, so it is drained only inside
+  APCpp's callbacks (its network thread). APCpp does not pass on
+  `missing_locations`, so the apworld sends slot_data `locations`; seeds
+  from older apworlds fall back to the `*sanity` flags. It does not pass on
+  who sent a received item either, so "Received X" no longer says "from Y".
+  CMake unpacks APCpp's mbedTLS tarball into the build root too, working
+  round APCpp's include path.
 - **Connected, not enabled, is the switch.** Anything that changes play
   (empty chests, no spirit screen, gifts, Boss Souls, the portal, the gem
   locks) checks `playing_seed()`, and chests/spirits/givers also check that
@@ -406,7 +416,9 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   anything containing escapes. A heredoc'd perl script with `\Q...\E` on
   strings built in variables is the safe way to edit CRLF files.
 - RmlUi: a document needs `rml.rcss` and `recomp.rcss` linked or it has no base
-  styles, and only `latolatin` and `promptfont` are registered faces. A made-up
+  styles, and only `Jost` (the menu font, SIL OFL, replaced the
+  proprietary Chiaro 2026-09-27), `latolatin` and `promptfont` are
+  registered faces. A made-up
   `font-family` renders nothing. Select labels are 196dp wide, 20dp uppercase
   with 2.8dp letter-spacing: a single word longer than ~11 letters overflows
   into the select (inline `font-size: 16dp` fixes it).

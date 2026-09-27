@@ -193,26 +193,26 @@ Quest 64 Recompiled:
   # Text Palette: The colour of the text boxes.
   text_palette:
     off: 1
-    random: 0
+    randomized: 0
 
   # Staff Palette: The colour of Brian's staff.
   staff_palette:
     off: 1
-    random: 0
+    randomized: 0
 
   # Cloak Colour: The colour of Brian's cloak.
   cloak_colour:
     off: 1
-    random: 0
+    randomized: 0
 
   # Brian's Clothes: The colours of Brian's clothes.
   brian_clothes:
     off: 1
-    random: 0
+    randomized: 0
 
   # Spell Palettes: The colours of the spell effects.
   spell_palettes:
     off: 1
-    random: 0
+    randomized: 0
   progression_balancing: 50
   accessibility: full
