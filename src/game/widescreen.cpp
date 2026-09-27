@@ -164,6 +164,16 @@ namespace {
         MEM_W(0, addr) = static_cast<int32_t>(value);
     }
 
+    // Whether the field HUD can be on screen. The pause screen (gGameMode 2)
+    // and the Controller Pak screens (4) draw no HUD, but they do draw their
+    // own titles in the HUD's top-left zone with textures of the same sizes -
+    // the pause menu's "Status" is one - and those must stay where they are.
+    constexpr int32_t game_mode = 0x8007B2E0;
+    bool hud_on_screen(uint8_t* rdram) {
+        int mode = MEM_HU(0, game_mode);
+        return mode != 2 && mode != 4;
+    }
+
     int32_t alloc_sublist(size_t words) {
         int32_t bytes = static_cast<int32_t>(words * 4);
         if (sublist_cursor + bytes > sublist_ring_end) {
@@ -556,7 +566,7 @@ namespace {
                     }
                     else if (op == op_texrect && (h1_w0 >> 24) == op_rdphalf_1 && (h2_w0 >> 24) == op_rdphalf_2) {
                         HudBlock* block = hud_block_of(ulx >> 2, (w1 & 0xFFF) >> 2, tiles[tile]);
-                        if (block != nullptr && block->custom.load()) {
+                        if (block != nullptr && block->custom.load() && hud_on_screen(rdram)) {
                             move_hud_texrect(rdram, addr, w0, w1, read_w(rdram, addr + 12), read_w(rdram, addr + 20), *block,
                                 block == &hud_hp ? hud_hp_anchor_y : hud_sp_anchor_y);
                         }
