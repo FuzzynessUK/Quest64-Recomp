@@ -218,8 +218,8 @@ public:
             };
             FontFace font_faces[] = {
                 {"LatoLatin-Regular.ttf", false},
-                {"ChiaroNormal.otf", false},
-                {"ChiaroBold.otf", false},
+                {"Jost-Regular.ttf", false},
+                {"Jost-Bold.ttf", false},
                 {"LatoLatin-Italic.ttf", false},
                 {"LatoLatin-Bold.ttf", false},
                 {"LatoLatin-BoldItalic.ttf", false},

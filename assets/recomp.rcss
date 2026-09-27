@@ -266,7 +266,7 @@ hr {
 
 body {
   color: #fff;
-  font-family: "latolatin";
+  font-family: "Jost";
   font-size: 20dp;
   font-style: normal;
   font-weight: normal;
@@ -2456,7 +2456,7 @@ scrollbarhorizontal sliderbar {
 body {
   box-sizing: border-box;
   color: #F2F2F2;
-  font-family: "latolatin";
+  font-family: "Jost";
 }
 
 .rmlui-window {
