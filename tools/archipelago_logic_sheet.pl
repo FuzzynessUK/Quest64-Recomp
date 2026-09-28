@@ -23,6 +23,11 @@ use Quest64Checks;
 
 my $root = dirname(__FILE__) . '/..';
 my $out  = "$root/DOCS/archipelago_logic.xlsx";
+# The workbook is now what archipelago_world.pl builds the logic from, and
+# may hold edits this script knows nothing about: only a fresh start with
+# --force writes over it.
+die "$out already exists and is the world's logic; pass --force to start it again from scratch\n"
+    if -e $out && !grep { $_ eq '--force' } @ARGV;
 my $checks = Quest64Checks::gather($root);
 
 my $BASE = 0x51640000;

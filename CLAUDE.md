@@ -228,6 +228,15 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   who sent a received item either, so "Received X" no longer says "from Y".
   CMake unpacks APCpp's mbedTLS tarball into the build root too, working
   round APCpp's include path.
+- **The logic lives in `DOCS/archipelago_logic.xlsx`** (2026-09-28). Regions,
+  entrances, each location's region, every rule and the completion rule are
+  read from it by `tools/Quest64Logic.pm`, which checks every Rule cell
+  against a Rule Builder whitelist and the real item/location/option names,
+  and `archipelago_world.pl` writes `Regions.py` and `Rules.py` from it in
+  Rule Builder form (APQuest's pattern; the apworld's manifest sets
+  minimum_ap_version 0.6.7). Change logic in the workbook and rerun the
+  generator; `archipelago_logic_sheet.pl` only recreates the workbook with
+  `--force`. Location names and ids stay fixed in the generator.
 - **Connected, not enabled, is the switch.** Anything that changes play
   (empty chests, no spirit screen, gifts, Boss Souls, the portal, the gem
   locks) checks `playing_seed()`, and chests/spirits/givers also check that

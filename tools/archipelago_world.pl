@@ -25,6 +25,7 @@ use IO::Compress::Zip qw(zip $ZipError);
 
 use lib dirname(__FILE__);
 use Quest64Checks;
+use Quest64Logic;
 
 my $root = dirname(__FILE__) . '/..';
 my $out  = "$root/tools/archipelago";
@@ -41,44 +42,28 @@ my %GROUP = (chest => 0x1000, giver => 0x2000, enemy => 0x3000, boss => 0x4000, 
 sub py_str { my $s = shift; $s =~ s/\\/\\\\/g; $s =~ s/"/\\"/g; return "\"$s\"" }
 
 # ---------------------------------------------------------------- locations
-# region is the coarse gate the rules use; see Regions.py.
+# The names, ids and groups are fixed here; which region each location is in,
+# and any rule of its own, come from the logic workbook (see "logic" below).
 my @loc;
 for my $c (@{ $checks->{chests} }) {
-    push @loc, { name => Quest64Checks::chest_name($c), id => $BASE + $GROUP{chest} + $c->{idx},
-                 region => region_for_stage($c->{region}), group => 'chest' };
+    push @loc, { name => Quest64Checks::chest_name($c), id => $BASE + $GROUP{chest} + $c->{idx}, group => 'chest' };
 }
 for my $g (@{ $checks->{givers} }) {
-    # The Shannon who hands over Eletale's Book cannot be behind the door
-    # that book opens, or locking the orbs to their vanilla spots deadlocks.
-    # She is reachable once Fargo is down; the other Shannon, with the Dark
-    # Gaol Key, is in Mammon's World itself.
-    my $region = $g->{kind} ne 'Shannon (endgame)' ? 'Overworld'
-               : $g->{item} eq "Eletale's Book"    ? 'Boss 7'
-               :                                     'Endgame';
     # With a mammon_portal condition the Book opens nothing, so the Shannon
     # who hands it over is a check of her own even without giftsanity.
     my $create = $g->{item} eq "Eletale's Book" ? 'book_giver' : 'giver';
     push @loc, { name => Quest64Checks::giver_name($g), id => $BASE + $GROUP{giver} + $g->{idx},
-                 region => $region, group => 'giver', create => $create };
+                 group => 'giver', create => $create };
 }
 for my $m (@{ $checks->{monsters} }) {
-    push @loc, { name => Quest64Checks::enemy_name($m), id => $BASE + $GROUP{enemy} + $m->{id},
-                 region => region_for_tier($m->{tier}), group => 'enemy' };
+    push @loc, { name => Quest64Checks::enemy_name($m), id => $BASE + $GROUP{enemy} + $m->{id}, group => 'enemy' };
 }
 for my $b (@{ $checks->{bosses} }) {
-    push @loc, { name => Quest64Checks::boss_name($b), id => $BASE + $GROUP{boss} + $b->{order},
-                 region => 'Boss ' . $b->{order}, group => 'boss' };
+    push @loc, { name => Quest64Checks::boss_name($b), id => $BASE + $GROUP{boss} + $b->{order}, group => 'boss' };
 }
 for my $s (@{ $checks->{spirits} }) {
-    push @loc, { name => Quest64Checks::spirit_name($s), id => $BASE + $GROUP{spirit} + $s->{id},
-                 region => 'Overworld', group => 'spirit' };
+    push @loc, { name => Quest64Checks::spirit_name($s), id => $BASE + $GROUP{spirit} + $s->{id}, group => 'spirit' };
 }
-
-# A chest's "boss region" is how many bosses the vanilla route has down by
-# the time it is reachable; a monster's tier is the story tier of its
-# earliest area. Both collapse to the same four coarse regions.
-sub region_for_stage { my $r = shift; return $r >= 5 ? 'Late' : $r >= 3 ? 'Mid' : $r >= 1 ? 'Early' : 'Overworld' }
-sub region_for_tier  { my $t = shift; return '' eq ($t // '') ? 'Overworld' : $t >= 7 ? 'Late' : $t >= 4 ? 'Mid' : $t >= 2 ? 'Early' : 'Overworld' }
 
 my %by_group;
 $by_group{ $_->{group} }++ for @loc;
@@ -105,23 +90,6 @@ my %useful = map { $_ => 1 } ('White Wings', 'Yellow Wings', 'Blue Wings', 'Gree
     die "item names not in the ROM's list: @missing\n" if @missing;
 }
 
-# Which item each region waits on. Named here rather than in Rules.py so the
-# names go through the same check as the pool's - a typo here does not fail
-# loudly, it just makes a region unreachable and every seed unwinnable, which
-# is exactly what "Eletale Book" did.
-my @gates = (
-    [ 'Boss 2', 'Earth Orb' ],   [ 'Boss 3', 'Wind Jade' ],
-    [ 'Boss 4', 'Water Jewel' ], [ 'Boss 5', 'Water Jewel' ],
-    [ 'Mid',    'Wind Jade' ],   [ 'Boss 6', 'Fire Ruby' ],
-    [ 'Boss 7', 'Fire Ruby' ],   [ 'Late',   'Fire Ruby' ],
-    [ 'Endgame', "Eletale's Book" ], [ 'Boss 8', 'Dark Gaol Key' ],
-);
-{
-    my %have = map { $_ => 1 } @items;
-    my @bad = grep { !$have{$_} } map { $_->[1] } @gates;
-    die "gate items not in the ROM's list: @bad\n" if @bad;
-}
-
 # Where the six gate items are in the unshuffled game, for the yaml option
 # that leaves them there. Read from the tables rather than typed in, and
 # checked: each one has exactly one home.
@@ -146,7 +114,6 @@ push @item_rows, { name => 'Level Up', id => $BASE + $GROUP{item} + 0xF00, type 
 # alone - the game has no such item and never sees one - so they sit in the
 # item group at 0xE00 + the boss's number, the same number the boss's own
 # check uses. Mammon's is only made when the yaml asks for it.
-my @soul_of;
 for my $b (@{ $checks->{bosses} }) {
     my $name = "$b->{name}'s Soul";
     my $needs = $b->{order} >= 8 ? 2 : 1;   # Mammon only with with_mammon
@@ -154,7 +121,6 @@ for my $b (@{ $checks->{bosses} }) {
                        type => 'progression', count => 1,
                        create => "lambda options: options.boss_souls.value >= $needs",
                        note => "Until this arrives, $b->{name} is not in the game" };
-    $soul_of[ $b->{order} ] = $name;
 }
 
 my $next = 1;
@@ -180,6 +146,26 @@ for my $r (@item_rows) {
 for my $r (grep { $_->{name} eq "Eletale's Book" } @item_rows) {
     $r->{create} = 'lambda options: options.mammon_portal.value == 0';
 }
+
+# ---------------------------------------------------------------- logic
+# Regions, entrances, each location's region and every rule come from the
+# logic workbook, which Quest64Logic.pm reads and checks against the names
+# this world really has: the items above, the locations above, and the
+# option classes in Options.py below.
+my $logic_path = "$root/DOCS/archipelago_logic.xlsx";
+my %option_class;
+{
+    open my $self, '<', __FILE__ or die __FILE__ . ": $!";
+    local $/;
+    my $src = <$self>;
+    $option_class{$1} = 1 while $src =~ /^class (\w+)\((?:Toggle|DefaultOnToggle|Choice|Range)\):/mg;
+}
+my $logic = Quest64Logic::read_logic($logic_path, {
+    items     => { map { $_->{name} => $_->{type} } @item_rows },
+    locations => { map { $_->{name} => 1 } @loc },
+    options   => \%option_class,
+});
+$_->{region} = $logic->{locations}{ $_->{name} }{region} for @loc;
 
 # ---------------------------------------------------------------- Python
 my $stamp = "# Generated by tools/archipelago_world.pl. Do not edit by hand.\n"
@@ -509,116 +495,72 @@ PY
 $options_py =~ s/SEED_CLASSES_HERE\n/$seed_classes/;
 $options_py =~ s/SEED_FIELDS_HERE\n/$seed_fields/;
 
-my $regions_py = <<'PY';
-from typing import Dict, NamedTuple, List
+# Regions.py and Rules.py are written from the logic workbook, in Rule
+# Builder form (worlds/apquest/rules.py is the pattern). To change the logic,
+# change DOCS/archipelago_logic.xlsx and run this again.
+my $logic_stamp = "# Generated by tools/archipelago_world.pl from DOCS/archipelago_logic.xlsx.\n"
+                . "# Change the logic in that workbook, not here.\n";
+
+my $regions_py = $logic_stamp . <<'PY'
+from typing import List, Tuple
 
 
-class Q64RegionData(NamedTuple):
-    connecting_regions: List[str] = []
-
-
-# Deliberately coarse. Quest 64 is close to open once you leave Melrode: the
-# gates that matter are the four gems and the book, so a region here is "how
-# far along the boss order you have to be", not a room.
-region_data_table: Dict[str, Q64RegionData] = {
-    "Menu": Q64RegionData(["Overworld"]),
-    "Overworld": Q64RegionData(["Boss 1", "Early"]),
-    "Boss 1": Q64RegionData(["Boss 2"]),
-    "Early": Q64RegionData(["Boss 2"]),
-    "Boss 2": Q64RegionData(["Boss 3"]),
-    "Boss 3": Q64RegionData(["Mid", "Boss 4"]),
-    "Mid": Q64RegionData(["Boss 5"]),
-    "Boss 4": Q64RegionData(["Boss 5"]),
-    "Boss 5": Q64RegionData(["Late", "Boss 6"]),
-    "Late": Q64RegionData(["Boss 7"]),
-    "Boss 6": Q64RegionData(["Boss 7"]),
-    "Boss 7": Q64RegionData(["Endgame"]),
-    "Endgame": Q64RegionData(["Boss 8"]),
-    "Boss 8": Q64RegionData([]),
-}
-
-
-def get_exit(region: str) -> List[str]:
-    return region_data_table[region].connecting_regions
+# Every region, Menu first: Archipelago starts there.
+regions: List[str] = [
 PY
-
-my $rules_py = <<"PY";
-from worlds.generic.Rules import add_rule, set_rule
-
-
-# The gates the game actually has: each gem opens the way on, and the book
-# and key open the endgame. Regions are chained in Regions.py, so a rule here
-# only has to name the one item that region waits on.
-region_requires = {
-@{[ join qq{
-}, map { sprintf('    %s: %s,', py_str($_->[0]), py_str($_->[1])) } @gates ]}
-}
-
-# Each boss's own check, in story order, and the Soul that has to arrive
-# before that boss is in the game at all.
-boss_locations = [
-@{[ join qq{
-}, map { sprintf('    (%d, %s, %s),', $_->{order},
-                 py_str(Quest64Checks::boss_name($_)), py_str($soul_of[ $_->{order} ])) }
-        @{ $checks->{bosses} } ]}
+    . join('', map { '    ' . py_str($_) . ",\n" } @{ $logic->{regions} })
+    . <<'PY'
 ]
 
-# A monster's check needs no item, only the chance to meet one, so the
-# regions they live in stand in for them.
-monster_regions = ["Overworld", "Early", "Mid", "Late"]
-
-
-def set_rules(world, player):
-    mw = world.multiworld
-    # With Boss Souls on, a boss may not be there to drop his gem, so the
-    # game opens every lock the four gems keep shut (the doors, boats and
-    # teleporters Merrow's "Unlock progression locks" opens) once it is
-    # connected. Only the book and the key still gate anything then.
-    gems = {"Earth Orb", "Wind Jade", "Water Jewel", "Fire Ruby"}
-    open_gems = world.options.boss_souls.value >= 1
-    # A mammon_portal condition opens the last door in the Book's place.
-    book_opens_nothing = world.options.mammon_portal.value != 0
-    for region_name, item in region_requires.items():
-        if open_gems and item in gems:
-            continue
-        if book_opens_nothing and item == "Eletale's Book":
-            continue
-        region = mw.get_region(region_name, player)
-        for entrance in region.entrances:
-            set_rule(entrance, lambda state, i=item: state.has(i, player))
-
-    # A Soul gates the boss's check, not the region he stands in: the way on
-    # runs through some of those arenas, and locking the region would wall
-    # off everything past it.
-    souls = world.options.boss_souls.value
-    for order, location, soul in boss_locations:
-        if souls >= (2 if order >= 8 else 1):
-            set_rule(mw.get_location(location, player),
-                     lambda state, s=soul: state.has(s, player))
-
-    # What the portal waits on instead of the Eletale's Book. "Every
-    # boss beaten" is written as every boss's check being reachable, which
-    # already accounts for his Soul if Souls are on.
-    mode = world.options.mammon_portal.value
-    wanted_locations = [loc for order, loc, _ in boss_locations if order < 8] if mode & 1 else []
-    wanted_regions = monster_regions if mode & 2 else []
-    if wanted_locations or wanted_regions:
-        # The rule looks at other regions, so Archipelago has to be told to
-        # look at these entrances again whenever one of those regions becomes
-        # reachable: a location through the region it stands in.
-        watched = set(wanted_regions)
-        watched.update(mw.get_location(name, player).parent_region.name for name in wanted_locations)
-        for entrance in mw.get_region("Endgame", player).entrances:
-            add_rule(entrance, lambda state, l=tuple(wanted_locations), r=tuple(wanted_regions): (
-                all(state.can_reach(name, "Location", player) for name in l)
-                and all(state.can_reach(name, "Region", player) for name in r)))
-            for region_name in sorted(watched):
-                mw.register_indirect_condition(mw.get_region(region_name, player), entrance)
-
-    # Mammon has to be beatable, which with his Soul on means having it.
-    mw.completion_condition[player] = lambda state: state.can_reach(
-        "Boss - Mammon", "Location", player)
+# (from, to). The entrance between them is named "<from> to <to>", which is
+# the name world.get_entrance() and the rules use.
+connections: List[Tuple[str, str]] = [
 PY
+    . join('', map { '    (' . py_str($_->{from}) . ', ' . py_str($_->{to}) . "),\n" } @{ $logic->{entrances} })
+    . "]\n";
+
+my $rules_py;
+{
+    my %calls = %{ $logic->{uses}{calls} // {} };
+    my %rb = map { $_ => 1 } grep { $_ ne 'OptionFilter' } keys %calls;
+    $rb{Rule} = 1;
+    my @opts = sort keys %{ $logic->{uses}{options} // {} };
+    my @entrance_rules = grep { $_->{rule} ne '' } @{ $logic->{entrances} };
+    my @location_rules = map { [ $_->{name}, $logic->{locations}{ $_->{name} }{rule} ] }
+                         grep { $logic->{locations}{ $_->{name} }{rule} ne '' } @loc;
+
+    $rules_py = $logic_stamp . "from __future__ import annotations\n\nfrom typing import TYPE_CHECKING, Dict\n\n";
+    $rules_py .= "from rule_builder.options import OptionFilter\n" if $calls{OptionFilter};
+    $rules_py .= 'from rule_builder.rules import ' . join(', ', sort keys %rb) . "\n";
+    $rules_py .= "\nfrom .Options import " . join(', ', @opts) . "\n" if @opts;
+    $rules_py .= "\nif TYPE_CHECKING:\n    from . import Q64World\n";
+    if (@{ $logic->{named} }) {
+        $rules_py .= "\n# Rules used in more than one place (the Named Rules sheet).\n";
+        $rules_py .= "$_->[0]: Rule = $_->[1]\n" for @{ $logic->{named} };
+    }
+    $rules_py .= "\n# The Entrances sheet. An entrance with no rule is always open.\n"
+               . "entrance_rules: Dict[str, Rule] = {\n"
+               . join('', map { '    ' . py_str($_->{name}) . ": $_->{rule},\n" } @entrance_rules) . "}\n";
+    $rules_py .= "\n# The Locations sheet, where reaching the region is not enough.\n"
+               . "location_rules: Dict[str, Rule] = {\n"
+               . join('', map { '    ' . py_str($_->[0]) . ": $_->[1],\n" } @location_rules) . "}\n";
+    $rules_py .= "\n# The Guide sheet's completion rule.\ncompletion_rule: Rule = $logic->{completion}\n";
+    $rules_py .= <<'PY';
+
+
+def set_all_rules(world: Q64World) -> None:
+    multiworld, player = world.multiworld, world.player
+    for name, rule in entrance_rules.items():
+        world.set_rule(multiworld.get_entrance(name, player), rule)
+    # A location the options switched off does not exist, and has no rule
+    # to set.
+    present = {location.name for location in multiworld.get_locations(player)}
+    for name, rule in location_rules.items():
+        if name in present:
+            world.set_rule(multiworld.get_location(name, player), rule)
+    world.set_completion_rule(completion_rule)
+PY
+}
 
 my $init_py = <<'PY';
 from typing import Dict, List
@@ -630,8 +572,8 @@ from .Items import Q64Item, item_data_table, item_table, code_to_item_table, fil
 from .Locations import (Q64Location, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
 from .Options import Q64Options
-from .Regions import region_data_table, get_exit
-from .Rules import set_rules
+from .Regions import regions, connections
+from .Rules import set_all_rules
 
 
 class Q64WebWorld(WebWorld):
@@ -675,12 +617,13 @@ class Q64World(World):
         return self.random.choice(filler_items)
 
     def create_regions(self) -> None:
-        for region_name in region_data_table:
+        for region_name in regions:
             self.multiworld.regions.append(Region(region_name, self.player, self.multiworld))
 
-        for region_name, region_data in region_data_table.items():
-            region = self.multiworld.get_region(region_name, self.player)
-            region.add_exits(get_exit(region_name))
+        # Named "<from> to <to>", the name Rules.py sets each rule by.
+        for source, target in connections:
+            self.multiworld.get_region(source, self.player).connect(
+                self.multiworld.get_region(target, self.player), f"{source} to {target}")
 
         for location_name, location_data in location_data_table.items():
             if not location_data.can_create(self.options):
@@ -748,7 +691,7 @@ class Q64World(World):
         self.multiworld.itempool += pool
 
     def set_rules(self) -> None:
-        set_rules(self, self.player)
+        set_all_rules(self)
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
@@ -889,6 +832,9 @@ my %files = (
     "$out/quest64/Regions.py"   => $regions_py,
     "$out/quest64/Rules.py"     => $rules_py,
     "$out/quest64/__init__.py"  => $init_py,
+    # The apworld manifest. Rule Builder (rule_builder) is what sets the
+    # floor at 0.6.7.
+    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.3.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
     "$out/quest64/docs/en_quest64.md" => "# Quest 64 Recompiled\n\nEvery chest, gift, boss and spirit can hold an item from any world in the\nmultiworld. Turn the Archipelago Connector on in the port's menu and give it\nthe server address and your slot name.\n",
     "$out/quest64/docs/guide_en.md"   => "# Quest 64 Recompiled Setup Guide\n\n1. Put `quest64.apworld` in `Archipelago/custom_worlds`.\n2. Put your filled-in `Quest64Recompiled.yaml` in `Archipelago/Players`.\n3. Generate and host as usual.\n4. In Quest 64 Recompiled, open the config menu, turn on the Archipelago\n   Connector and enter the server address, your slot name and the password\n   if the room has one.\n",
     "$out/Quest64Recompiled.yaml" => $yaml,
@@ -918,10 +864,11 @@ zip [ @members ] => $apworld,
 " if $must > $fewest;
     die "no filler items
 " unless grep { $_->{type} eq 'filler' } @item_rows;
-    # Every gate's item must actually be in the pool, or its region is
-    # unreachable and the seed cannot be finished.
-    my @unplaceable = grep { my $n = $_->[1]; !grep { $_->{name} eq $n && $_->{count} > 0 } @item_rows } @gates;
-    die "gate items with none in the pool: @{[ join ', ', map { $_->[1] } @unplaceable ]}\n" if @unplaceable;
+    # Every item a rule waits on must actually be in the pool, or what it
+    # guards is unreachable and the seed cannot be finished.
+    my @needed = sort keys %{ $logic->{uses}{items} // {} };
+    my @unplaceable = grep { my $n = $_; !grep { $_->{name} eq $n && $_->{count} > 0 } @item_rows } @needed;
+    die "rules need items with none in the pool: @unplaceable\n" if @unplaceable;
 }
 
 printf "wrote %s\n", $apworld;

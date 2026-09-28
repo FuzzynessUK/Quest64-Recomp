@@ -7,8 +7,8 @@ from .Items import Q64Item, item_data_table, item_table, code_to_item_table, fil
 from .Locations import (Q64Location, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
 from .Options import Q64Options
-from .Regions import region_data_table, get_exit
-from .Rules import set_rules
+from .Regions import regions, connections
+from .Rules import set_all_rules
 
 
 class Q64WebWorld(WebWorld):
@@ -52,12 +52,13 @@ class Q64World(World):
         return self.random.choice(filler_items)
 
     def create_regions(self) -> None:
-        for region_name in region_data_table:
+        for region_name in regions:
             self.multiworld.regions.append(Region(region_name, self.player, self.multiworld))
 
-        for region_name, region_data in region_data_table.items():
-            region = self.multiworld.get_region(region_name, self.player)
-            region.add_exits(get_exit(region_name))
+        # Named "<from> to <to>", the name Rules.py sets each rule by.
+        for source, target in connections:
+            self.multiworld.get_region(source, self.player).connect(
+                self.multiworld.get_region(target, self.player), f"{source} to {target}")
 
         for location_name, location_data in location_data_table.items():
             if not location_data.can_create(self.options):
@@ -125,7 +126,7 @@ class Q64World(World):
         self.multiworld.itempool += pool
 
     def set_rules(self) -> None:
-        set_rules(self, self.player)
+        set_all_rules(self)
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
