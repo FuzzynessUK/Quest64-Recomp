@@ -565,7 +565,8 @@ PY
 my $init_py = <<'PY';
 from typing import Dict, List
 
-from BaseClasses import Region, Tutorial
+from BaseClasses import ItemClassification, Region, Tutorial
+from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 
 from .Items import Q64Item, item_data_table, item_table, code_to_item_table, filler_items
@@ -683,8 +684,31 @@ class Q64World(World):
         for _ in range(min(wanted, max(0, open_locations - len(pool)))):
             pool.append(self.create_item("Level Up"))
 
-        while len(pool) > open_locations:
-            pool.pop()
+        # Too many items for the locations in play: shed the ones no rule
+        # waits on - filler, then useful (the wings), then Level Ups, which
+        # are progression in name only. The gate items and the Souls are
+        # what the seed is beaten with, so they are never dropped; if they
+        # alone do not fit, the options cannot make a winnable seed.
+        def expendable(item: Q64Item) -> int:
+            if item.classification == ItemClassification.filler:
+                return 0
+            if item.classification == ItemClassification.useful:
+                return 1
+            if item.name == "Level Up":
+                return 2
+            return 3
+
+        excess = len(pool) - open_locations
+        if excess > 0:
+            order = sorted(range(len(pool)), key=lambda i: expendable(pool[i]))
+            drop = set(i for i in order[:excess] if expendable(pool[i]) < 3)
+            if len(drop) < excess:
+                needed = sum(1 for item in pool if expendable(item) == 3)
+                raise OptionError(
+                    f"Quest 64: player {self.player_name} needs {needed} locations for the "
+                    f"items the seed is won with, but the options leave only {open_locations}. "
+                    f"Switch on more of the *sanity options.")
+            pool = [item for i, item in enumerate(pool) if i not in drop]
         while len(pool) < open_locations:
             pool.append(self.create_item(self.get_filler_item_name()))
 
