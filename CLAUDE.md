@@ -263,8 +263,11 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   header by path, since `"Archipelago.h"` finds our `archipelago.h` on
   Windows. APCpp's message queue has no lock, so it is drained only inside
   APCpp's callbacks (its network thread). APCpp does not pass on
-  `missing_locations`, so the apworld sends slot_data `locations`; seeds
-  from older apworlds fall back to the `*sanity` flags. It does not pass on
+  `missing_locations`, so the game works out its slot's locations from the
+  options in slot_data by the apworld's own rules (`in_slot`: the sanity
+  flags, the Book's Shannon when mammon_portal != 0, `enemy_plan`'s kinds);
+  apworlds 1.4.x-1.5.1 sent slot_data `locations`, still honoured. Level Up
+  is useful, not progression (no rule uses it). It does not pass on
   who sent a received item either, so "Received X" no longer says "from Y".
   CMake unpacks APCpp's mbedTLS tarball into the build root too, working
   round APCpp's include path.
