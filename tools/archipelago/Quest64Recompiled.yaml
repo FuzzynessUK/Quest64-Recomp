@@ -34,9 +34,25 @@ Quest 64 Recompiled:
   wingsmith_wings:
     'false': 1
     'true': 0
+
+  # How many of each pair of wings go in the item pool: two (the default),
+  # one, or none. No rule needs wings; the room left goes to filler.
+  wings_in_pool:
+    two: 1
+    one: 0
+    none: 0
   enemysanity:
     'true': 0
     'false': 1
+
+  # Only with enemy_randomizer on (Randomizer section below): every one of the
+  # 67 kinds of regular monster appears somewhere before Mammon's World.
+  # Off, some kinds can be left out; a kind that appears nowhere is simply
+  # not a check. Either way the seed knows where each monster is, and each
+  # one's check is in logic from the earliest area it appears in.
+  ensure_all_enemies:
+    'true': 1
+    'false': 0
   spiritsanity:
     'true': 1
     'false': 0
@@ -162,6 +178,29 @@ Quest 64 Recompiled:
   # JP Magic Barrier: Magic Barrier holds two turns longer, as in the Japanese
   # release.
   jp_magic_barrier:
+    'false': 1
+    'true': 0
+
+  # JP Boss MP Rewards: Beating a boss raises max MP as well as max HP and
+  # refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10,
+  # 15, 15).
+  jp_boss_mp_rewards:
+    'false': 1
+    'true': 0
+
+  # Double Experience: Levels need half the experience. both: level (combat)
+  # experience and the hidden experience that raises HP, MP, Agility and
+  # Defense; stat_only: just the hidden stat experience; level_only: just the
+  # level experience.
+  double_exp:
+    off: 1
+    both: 0
+    stat_only: 0
+    level_only: 0
+
+  # Fast MP Recovery: MP comes back as you walk at the fastest rate, as in
+  # Easy Mode.
+  fast_mp_recovery:
     'false': 1
     'true': 0
 

@@ -5,6 +5,7 @@
 #include "ultramodern/ultramodern.hpp"
 #include "zelda_game.h"
 #include "enhancements.h"
+#include "minimap.h"
 
 // Arrays that hold the mappings for every input for keyboard and controller respectively.
 using input_mapping = std::array<recomp::InputField, recomp::bindings_per_input>;
@@ -110,6 +111,22 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
             zelda64::enhancements::cast_exit();
         }
         exit_was_held = exit_held;
+    }
+
+    // Minimap zoom, one step a press. The minimap takes them the next time it
+    // draws, and only while it is on.
+    {
+        static bool zoom_was_held[2] = { false, false };
+        const GameInput zoom_inputs[2] = { GameInput::MINIMAP_ZOOM_IN, GameInput::MINIMAP_ZOOM_OUT };
+        for (int k = 0; k < 2; k++) {
+            size_t index = static_cast<size_t>(zoom_inputs[k]);
+            bool held = recomp::get_input_digital(keyboard_input_mappings[index])
+                     || recomp::get_input_digital(controller_input_mappings[index]);
+            if (held && !zoom_was_held[k]) {
+                zelda64::minimap::zoom(k == 0 ? 1 : -1);
+            }
+            zoom_was_held[k] = held;
+        }
     }
 
     if (!recomp::game_input_disabled()) {

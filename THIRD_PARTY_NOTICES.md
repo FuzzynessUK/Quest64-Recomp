@@ -107,3 +107,19 @@ SOFTWARE.
 | PromptFont | SIL Open Font License 1.1 | Copyright 2018-2023 Yukari "Shinmera" Hafner; based on Xolonium, Copyright 2011-2016 Severin Meyer. PromptFont by Yukari "Shinmera" Hafner, available at https://shinmera.com/promptfont. Console button glyphs are trademarks of their respective owners. | `assets/promptfont/LICENSE.txt` |
 | Lato (LatoLatin) | SIL Open Font License 1.1 | (c) 2010-2015 Łukasz Dziedzic | scripts.sil.org/OFL |
 | Noto Emoji | SIL Open Font License 1.1 | (c) Google LLC | scripts.sil.org/OFL |
+
+---
+
+## Reference material
+
+No code from these is included; their research into the game is what some
+features are built on, and they are credited with thanks.
+
+- **Quest 64 decompilation** by Rainchus,
+  https://github.com/Rainchus/Quest64-Decomp: where the HUD's routines are,
+  which found the compass for Hide Compass.
+- **Quest-64-Lua-Resources** by vbhayden,
+  https://github.com/vbhayden/Quest-64-Lua-Resources: `Quest64_MapCheck.lua`,
+  the layout of the map, exit, chest and spirit data the Minimap draws.
+- **Ship of Harkinian**, https://github.com/HarbourMasters/Shipwright: the
+  model for the item tracker, check tracker and notes windows.

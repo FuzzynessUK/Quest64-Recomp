@@ -80,7 +80,19 @@ const Options& zelda64::easierquest::preset() {
 }
 
 void zelda64::easierquest::apply_at_boot(uint8_t* rdram) {
-    if (!active()) {
+    // Easy Mode doubles both. Otherwise the Enhancements' Double Experience
+    // says which (1 both, 2 stat only, 3 level only); never under Hard Mode,
+    // which has its own tables.
+    bool stat = false, combat = false;
+    if (active()) {
+        stat = combat = true;
+    }
+    else if (!zelda64::hardmode::active()) {
+        int choice = zelda64::enhancements::active_options().double_exp;
+        stat = choice == 1 || choice == 2;
+        combat = choice == 1 || choice == 3;
+    }
+    if (!stat && !combat) {
         return;
     }
     std::span<const uint8_t> rom = recomp::get_rom();
@@ -100,11 +112,11 @@ void zelda64::easierquest::apply_at_boot(uint8_t* rdram) {
         MEM_W(0, vram) = static_cast<int32_t>(value);
     };
 
-    for (int level = 0; level < stat_exp_levels; level++) {
+    for (int level = 0; stat && level < stat_exp_levels; level++) {
         int32_t entry = stat_exp_table + level * 2;
         write_u16(entry, static_cast<uint16_t>(divided(MEM_HU(0, entry))));
     }
-    for (int level = 0; level < combat_exp_levels; level++) {
+    for (int level = 0; combat && level < combat_exp_levels; level++) {
         int32_t entry = combat_exp_table + level * 4;
         write_u32(entry, divided(static_cast<uint32_t>(MEM_W(0, entry))));
     }

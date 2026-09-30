@@ -38,6 +38,29 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>JP Boss MP Rewards</div><div class="config-tip-text">Beating a boss raises your max MP as well as your max HP, and refills both, as in the Japanese release: 5 for Solvaring, Zelse and Nepty, 10 for Shilf and Fargo, 15 for Guilty and Beigis. Max MP stops at 500, the same cap as max HP.</div></div>
+                                        <select data-value="enh_boss_max_mp" id="enh_boss_max_mp_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Double Experience</div><div class="config-tip-text">Levels need half the experience, so you gain them twice as fast. Both: level experience from battles and the hidden experience that raises HP, MP, Agility and Defense. Stat only: just the hidden stat experience. Level only: just the level experience. The same as Easy Mode's doubling; no effect under Hard Mode.</div></div>
+                                        <select data-value="enh_double_exp" id="enh_double_exp_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Both</option>
+                                            <option value="2">Stat only</option>
+                                            <option value="3">Level only</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fast MP Recovery</div><div class="config-tip-text">MP comes back as you walk at the fastest rate there is, the one Easy Mode uses. No effect under Hard Mode.</div></div>
+                                        <select data-value="enh_fast_mp_recovery" id="enh_fast_mp_recovery_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>JP Stat Up Effect</div><div class="config-tip-text">A burst of colour over Brian whenever one of his stats goes up, as in the Japanese release: red for HP, blue for MP, yellow for defense, green for agility. The US game has no effect at all; this one is drawn over the picture, so it follows Brian on screen.</div></div>
                                         <select data-value="enh_stat_up_effect" id="enh_stat_up_effect_select">
                                             <option value="0">Off</option>

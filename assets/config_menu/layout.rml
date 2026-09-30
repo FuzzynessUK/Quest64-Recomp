@@ -19,6 +19,21 @@
                                             <option value="1">On</option>
                                         </select>
                                     </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Minimap</div><div class="config-tip-text">A map of the area you are in: its walls, you as an arrow pointing the way you are going, chests (gold, grey once opened), spirits (cyan) and the ways out (purple). North is up. "On (no background)" leaves out the dark box behind it. Bind Minimap Zoom In and Minimap Zoom Out under Controls to zoom in on where you are; zoomed in, the map follows you. Drag the Map box in the preview below to move it, and set its size there. Applies straight away.</div></div>
+                                        <select data-value="enh_minimap" id="enh_minimap_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                            <option value="2">On (no background)</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide Compass</div><div class="config-tip-text">The turning compass at the top right of the screen is not drawn. Handy with the minimap on. Applies straight away.</div></div>
+                                        <select data-value="enh_hide_compass" id="enh_hide_compass_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
                                     <div class="config-debug__select-wrapper" style="align-items: flex-start;">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Layout</div><div class="config-tip-text">The box is your window and the lighter part the 4:3 picture. Drag the HP/MP block and the four spirits to where you want them on screen; each default button puts one back where the game draws it. The Notifications box shows where messages appear (set under Notifications). Applies straight away.</div></div>
                                         <div id="hud_preview" class="hud-preview">
@@ -26,6 +41,7 @@
                                             <div id="hud_hp_box" class="hud-box">HP/MP</div>
                                             <div id="hud_sp_box" class="hud-box">Spirits</div>
                                             <div id="hud_notice_box" class="hud-box hud-box--notice">Notifications</div>
+                                            <div id="hud_mm_box" class="hud-box">Map</div>
                                         </div>
                                     </div>
                                     <div class="config-debug__select-wrapper">
@@ -38,10 +54,20 @@
                                         <input type="text" id="enh_hud_sp_x_input" data-value="enh_hud_sp_x" maxlength="5" style="margin-right: 8dp;" />
                                         <input type="text" id="enh_hud_sp_y_input" data-value="enh_hud_sp_y" maxlength="5" />
                                     </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Minimap size</div><div class="config-tip-text">How big the minimap is (Enhancements, Quality of Life). Drag the Map box above to move it; Minimap default puts it back at the top right of the picture.</div></div>
+                                        <select data-value="enh_minimap_size" id="enh_minimap_size_select">
+                                            <option value="48">Small</option>
+                                            <option value="72">Medium</option>
+                                            <option value="96">Large</option>
+                                            <option value="128">Extra large</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div class="config-debug__option-trigger">
                                     <button class="button" onclick="hud_reset_hp">HP/MP default</button>
                                     <button class="button" onclick="hud_reset_sp">Spirits default</button>
+                                    <button class="button" onclick="hud_reset_mm" data-if="enh_minimap != 0">Minimap default</button>
                                 </div>
                             </div>
                         </div>

@@ -51,6 +51,22 @@ namespace zelda64::enhancements {
         // the two extra turns are added.
         bool longer_magic_barrier = false;
 
+        // Beating a boss raises max MP as well as max HP and refills both,
+        // with the Japanese release's per-boss amounts (Merrow PR #7 does
+        // a cruder half of the HP bonus). A hook at the end of the boss
+        // reward, func_8000BB68.
+        bool boss_max_mp = false;
+
+        // Double Experience: 0 off, 1 both, 2 stat experience only (HP, MP,
+        // Agility, Defense), 3 level (combat) experience only. Easy Mode's
+        // halving of the level requirement tables (easierquest.cpp), so the
+        // amounts the game hands out stay its own. Not under Hard Mode.
+        int double_exp = 0;
+        // Fast MP Recovery: walking MP regen at its fastest tier, as Easy
+        // Mode has it (the byte at 0x80070F39, ROM 0x071B39; Merrow's tier
+        // 12). Not under Hard Mode.
+        bool fast_mp_recovery = false;
+
         // Brian moves 50% faster. The per-frame velocity every movement state
         // hands to func_80005748 is scaled on the way in and restored on the
         // way out, so the game's own collision test still runs and nothing
@@ -61,7 +77,7 @@ namespace zelda64::enhancements {
         bool faster_walk = false;
 
         // Stack items, Hard Mode's item menu ported to the vanilla game:
-        // several of the same consumable take one place in the bag, and its
+        // several of the same consumable (or wings) take one place in the bag, and its
         // description ends with how many there are, "(03)". Names and the
         // item tables are the vanilla ones; see itemstack in enhancements.cpp.
         // Forced on in Archipelago. Not on top of Hard Mode, which stacks by
@@ -80,6 +96,28 @@ namespace zelda64::enhancements {
         bool hud_sp_custom = false;
         float hud_sp_x = 0.0f;
         float hud_sp_y = 0.0f;
+
+        // Minimap (Quality of Life, include/minimap.h): the current submap's
+        // outline with Brian, chests, spirits and exits on it. Placed and sized
+        // in the Layout tab like the HUD blocks, in frame pixels (240 tall, x
+        // from the window's left edge); not custom sits top right of the
+        // picture. Applies straight away.
+        bool minimap = false;
+        bool minimap_custom = false;
+        float minimap_x = 0.0f;
+        float minimap_y = 0.0f;
+        int minimap_size = 72;
+        // Zoom step (0 = the whole submap), changed with the Minimap Zoom
+        // In / Out controls; zoomed in, the map follows Brian. Back to 0 on
+        // every new map or submap.
+        int minimap_zoom = 0;
+        // No box behind the minimap: the walls and markers straight over the
+        // game.
+        bool minimap_background = true;
+
+        // Hide Compass (Quality of Life): the turning compass the field HUD
+        // draws at the top right is not drawn. Applies straight away.
+        bool hide_compass = false;
 
         // The Japanese release bursts a colour over Brian when a stat rises
         // (red HP, blue MP, yellow defense, green agility); the US build has
@@ -174,6 +212,10 @@ namespace zelda64::enhancements {
     // Exit spell does, without needing the spell or the MP. Takes effect on
     // the next frame the game is in the field and not already transitioning.
     void cast_exit();
+
+    // Hide Compass, applied live: the menu sets it, the hook on the compass
+    // (func_8001EA84) reads it.
+    void set_hide_compass(bool hide);
 }
 
 #endif

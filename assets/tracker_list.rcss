@@ -1,0 +1,27 @@
+/* The tracker's check list, by area (src/ui/ui_tracker.cpp). Shared by the
+   check tracker window (tracker.rml) and the Tracker tab (config_menu.rml). */
+.trk-area
+{
+	display: block;
+	padding: 2dp 4dp;
+	border-radius: 4dp;
+	font-family: "latolatin";
+	font-size: 15dp;
+	color: #ffffff;
+	cursor: pointer;
+}
+.trk-area:hover { background-color: #ffffff18; }
+.trk-area--current { color: #ffd24a; }
+.trk-area--done { color: #7cfc7c; }
+.trk-count { float: right; }
+.trk-area-body { display: block; padding-bottom: 3dp; }
+.trk-check
+{
+	display: block;
+	padding: 1dp 4dp 1dp 14dp;
+	font-family: "latolatin";
+	font-size: 13dp;
+	color: #ffffff;
+	white-space: nowrap;
+}
+.trk-check--missing { color: #ffffff9c; }

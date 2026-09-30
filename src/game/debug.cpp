@@ -11,6 +11,8 @@
 #include "enhancements.h"
 #include "hardmode.h"
 #include "speedrun.h"
+#include "tracker.h"
+#include "minimap.h"
 #include "statfx.h"
 #include "spellnotice.h"
 #include "itemnotice.h"
@@ -278,6 +280,8 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram, recomp_context* ctx) {
     zelda64::audio::on_frame(rdram, ctx);
     zelda64::hardmode::on_frame(rdram);
     zelda64::speedrun::update(false);
+    zelda64::tracker::on_frame(rdram);
+    zelda64::minimap::on_frame(rdram);
 }
 
 // Master switch, inventory and the kill button.

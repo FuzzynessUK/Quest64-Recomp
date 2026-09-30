@@ -9,6 +9,7 @@
 
 #include "speedrun.h"
 #include "archipelago.h"
+#include "tracker.h"
 #include "zelda_config.h"
 #include "json/json.hpp"
 #include "recomp.h"
@@ -29,6 +30,8 @@ namespace {
     // the first frame it stops, which is the moment New has been taken.
     std::atomic<bool> title_frame = false;
     bool title_was_running = false;
+    // When the title overlay last ran (steady_clock ticks), for the UI thread.
+    std::atomic<long long> title_seen_at = 0;
     std::atomic<bool> armed = false;
 
     long long elapsed_ms() {
@@ -59,6 +62,14 @@ void zelda64::speedrun::update(bool) {
         start();
     }
     title_was_running = now;
+}
+
+// Up if the title overlay has run in the last quarter second. Timed rather
+// than read from update(), whose hook can run more often than the overlay.
+bool zelda64::speedrun::title_showing() {
+    long long seen = title_seen_at.load();
+    return seen != 0 && clock::now().time_since_epoch().count() - seen <
+        std::chrono::duration_cast<clock::duration>(std::chrono::milliseconds(250)).count();
 }
 
 void zelda64::speedrun::start() {
@@ -124,6 +135,7 @@ extern "C" void quest64_speedrun_stop(recomp_context* ctx) {
 // while the title screen is actually on screen.
 extern "C" void quest64_speedrun_title_frame() {
     title_frame.store(true);
+    title_seen_at.store(clock::now().time_since_epoch().count());
 }
 
 // ---- carrying the time in the save file
@@ -251,6 +263,7 @@ extern "C" void quest64_speedrun_pak_write(uint8_t* rdram, recomp_context* ctx) 
     // what Archipelago has sent this save has been given. This is the only
     // place that sees a save going past, so it does the asking.
     zelda64::archipelago::save_progress(key);
+    zelda64::tracker::save_progress(key);
 }
 
 // func_800319E0, at its first instruction: note what is being read.
@@ -280,6 +293,7 @@ extern "C" void quest64_speedrun_pak_read_end(uint8_t* rdram, recomp_context* ct
     // Before the early return below: the connector wants to know about a
     // save whether or not the timer has a time for it.
     zelda64::archipelago::load_progress(key);
+    zelda64::tracker::load_progress(key);
     auto it = run_times.find(key);
     if (it == run_times.end()) {
         pak_note("read  " + key + " - no time stored for it");

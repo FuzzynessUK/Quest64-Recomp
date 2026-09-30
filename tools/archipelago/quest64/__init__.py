@@ -1,11 +1,12 @@
 from typing import Dict, List
 
-from BaseClasses import ItemClassification, Region, Tutorial
+from BaseClasses import ItemClassification, LocationProgressType, Region, Tutorial
 from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 
+from .Enemies import ENEMY_AREAS, ENEMY_IDS, ENEMY_LOCATIONS, FILE_MONSTERS, REGION_ORDER
 from .Items import Q64Item, item_data_table, item_table, code_to_item_table, filler_items
-from .Locations import (Q64Location, location_data_table, location_table,
+from .Locations import (Q64Location, Q64LocationData, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
 from .Options import Q64Options
 from .Regions import regions, connections
@@ -44,6 +45,68 @@ class Q64World(World):
         # or a spirit does. So the monster checks have to exist.
         if self.options.mammon_portal.value & 2:
             self.options.enemysanity.value = 1
+        self.plan_enemies()
+
+    def plan_enemies(self) -> None:
+        """Where every monster is, which the enemy locations' regions follow.
+
+        Enemy Randomizer off: where the game puts them, as the workbook says.
+        On: decided here and sent to the game in slot_data, which builds its
+        encounter packs to match - each area gets one of the six monster
+        files and a list of that file's monsters, sized to what the area's
+        packs can hold. A monster is logically in the earliest region of any
+        area it appears in; one that appears nowhere is not a location.
+        """
+        self.enemy_plan = None
+        self.enemy_region: Dict[int, str] = {}
+        if not self.options.enemy_randomizer:
+            for gid, name in ENEMY_LOCATIONS.items():
+                self.enemy_region[gid] = location_data_table[name].region
+            return
+
+        rnd = self.random
+        tables = [-1] * len(ENEMY_AREAS)
+        if self.options.ensure_all_enemies:
+            # Every file first gets an area before Mammon's World with room
+            # for all of it, biggest file first so the few big areas go to
+            # the files that need them.
+            free = [a for a, (_, region, _) in enumerate(ENEMY_AREAS) if region != "Endgame"]
+            files = sorted(range(len(FILE_MONSTERS)), key=lambda f: (-len(FILE_MONSTERS[f]), rnd.random()))
+            for f in files:
+                fits = [a for a in free if ENEMY_AREAS[a][2] >= len(FILE_MONSTERS[f])]
+                if not fits:
+                    raise OptionError(f"Quest 64: no area left with room for monster file {f}")
+                a = rnd.choice(fits)
+                tables[a] = f
+                free.remove(a)
+        previous = -1
+        for a in range(len(ENEMY_AREAS)):
+            if tables[a] < 0:
+                # Any file, but not the one the area before has, so
+                # neighbouring areas look different.
+                tables[a] = rnd.choice([f for f in range(len(FILE_MONSTERS)) if f != previous])
+            previous = tables[a]
+
+        rosters: List[List[int]] = []
+        for a, (_, region, capacity) in enumerate(ENEMY_AREAS):
+            entries = list(range(len(FILE_MONSTERS[tables[a]])))
+            if capacity < len(entries):
+                entries = sorted(rnd.sample(entries, capacity))
+            rosters.append(entries)
+            for entry in entries:
+                gid = FILE_MONSTERS[tables[a]][entry]
+                known = self.enemy_region.get(gid)
+                if known is None or REGION_ORDER.index(region) < REGION_ORDER.index(known):
+                    self.enemy_region[gid] = region
+        self.enemy_plan = {"tables": tables, "rosters": rosters}
+
+    def location_exists(self, name: str, data: Q64LocationData) -> bool:
+        if not data.can_create(self.options):
+            return False
+        return data.group != "enemy" or ENEMY_IDS[name] in self.enemy_region
+
+    def location_region(self, name: str, data: Q64LocationData) -> str:
+        return self.enemy_region[ENEMY_IDS[name]] if data.group == "enemy" else data.region
 
     def create_item(self, name: str) -> Q64Item:
         data = item_data_table[name]
@@ -62,10 +125,16 @@ class Q64World(World):
                 self.multiworld.get_region(target, self.player), f"{source} to {target}")
 
         for location_name, location_data in location_data_table.items():
-            if not location_data.can_create(self.options):
+            if not self.location_exists(location_name, location_data):
                 continue
-            region = self.multiworld.get_region(location_data.region, self.player)
+            region_name = self.location_region(location_name, location_data)
+            region = self.multiworld.get_region(region_name, self.player)
             region.add_locations({location_name: location_data.address}, Q64Location)
+            # A monster only met in Mammon's World is beaten after the final
+            # portal, when nothing is left to unlock: filler only.
+            if location_data.group == "enemy" and region_name == "Endgame":
+                self.multiworld.get_location(location_name, self.player).progress_type = \
+                    LocationProgressType.EXCLUDED
 
     def locked_items(self) -> Dict[str, str]:
         """Item name -> location name for anything held out of the pool.
@@ -79,7 +148,7 @@ class Q64World(World):
         return {
             item: location
             for item, location in vanilla_locations.items()
-            if location_data_table[location].can_create(self.options)
+            if self.location_exists(location, location_data_table[location])
             and item_data_table[item].can_create(self.options)
         }
 
@@ -94,7 +163,7 @@ class Q64World(World):
         # So: place what must exist, then pad with filler.
         locked = self.locked_items()
         open_locations = sum(
-            1 for data in location_data_table.values() if data.can_create(self.options)
+            1 for name, data in location_data_table.items() if self.location_exists(name, data)
         ) - len(locked)
 
         pool: List[Q64Item] = []
@@ -107,7 +176,10 @@ class Q64World(World):
             if name == "Level Up":
                 level_ups = data.num_exist
                 continue
-            for _ in range(data.num_exist):
+            count = data.num_exist
+            if data.type == ItemClassification.useful:   # the wings
+                count = min(count, self.options.wings_in_pool.value)
+            for _ in range(count):
                 pool.append(self.create_item(name))
 
         # One Level Up per spirit when spirits are checks, plus however many
@@ -174,6 +246,16 @@ class Q64World(World):
             # randomizer rolls them with, so every session of this slot
             # plays the same shuffle.
             "rando_seed": self.random.getrandbits(31),
+            # Enemy Randomizer: the file each area uses and which of its
+            # monsters must appear there, which the logic above was built
+            # on. The game builds its packs from this instead of rolling
+            # its own.
+            "enemy_plan": self.enemy_plan or {},
+            # The monsters the "all monsters" portal counts: every kind met
+            # before Mammon's World, since one only found behind the portal
+            # could never open it.
+            "portal_monsters": sorted(gid for gid, region in self.enemy_region.items()
+                                      if region != "Endgame"),
             "settings": {
                 "shuffle_spells": self.options.shuffle_spells.value,
                 "early_healing": self.options.early_healing.value,
@@ -186,6 +268,9 @@ class Q64World(World):
                 "element_cap_99": self.options.element_cap_99.value,
                 "jp_healing": self.options.jp_healing.value,
                 "jp_magic_barrier": self.options.jp_magic_barrier.value,
+                "jp_boss_mp_rewards": self.options.jp_boss_mp_rewards.value,
+                "double_exp": self.options.double_exp.value,
+                "fast_mp_recovery": self.options.fast_mp_recovery.value,
                 "jp_stat_up_effect": self.options.jp_stat_up_effect.value,
                 "exit_from_anywhere": self.options.exit_from_anywhere.value,
                 "fast_walking": self.options.fast_walking.value,

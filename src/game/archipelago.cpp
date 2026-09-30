@@ -20,6 +20,7 @@
 #include "enhancements.h"
 #include "randomizer.h"
 #include "notify.h"
+#include "tracker.h"
 #include "randomizer/chest_data.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
@@ -131,6 +132,14 @@ namespace {
     // seed its randomizer rolls with, as last received. Null until a
     // Connected packet carries them.
     json seed_settings_live;
+    // The apworld's enemy placement (slot_data "enemy_plan"), as last
+    // received: null when the seed has none (Enemy Randomizer off, or an
+    // older apworld).
+    json enemy_plan_live;
+    // The monsters the "all monsters" portal waits on (slot_data
+    // "portal_monsters"): every kind met before Mammon's World. Empty from an
+    // older apworld, which meant all 67.
+    std::vector<int> portal_monsters;
     int64_t rando_seed_live = 0;
 
     // seed_has, with server_mutex already held.
@@ -186,7 +195,7 @@ namespace {
     const std::vector<std::string> slot_data_keys = {
         "goal", "mammon_portal", "boss_souls", "chestsanity", "giftsanity",
         "wingsmith_wings", "enemysanity", "spiritsanity", "shuffle_orbs",
-        "rando_seed", "settings", "locations",
+        "rando_seed", "settings", "locations", "enemy_plan", "portal_monsters",
     };
 
     // One slot_data value, as JSON text. It comes from the server, so
@@ -231,6 +240,17 @@ namespace {
         else if (key == "settings" && v.is_object()) {
             seed_settings_live = v;
         }
+        else if (key == "enemy_plan" && v.is_object()) {
+            enemy_plan_live = v;
+        }
+        else if (key == "portal_monsters" && v.is_array()) {
+            portal_monsters.clear();
+            for (const json& id : v) {
+                if (id.is_number_integer()) {
+                    portal_monsters.push_back(id.get<int>());
+                }
+            }
+        }
         else if (key == "rando_seed" && v.is_number_integer()) {
             rando_seed_live = v.get<int64_t>();
         }
@@ -267,6 +287,8 @@ namespace {
                     slot_locations.clear();
                     slot_locations_known = false;
                     wingsmith_wings.store(false);
+                    enemy_plan_live = json();
+                    portal_monsters.clear();
                     break;
                 case q64ap::EventType::ItemReceived: {
                     std::vector<int64_t>& list = replaying ? incoming_items : server_items;
@@ -644,6 +666,7 @@ namespace {
     std::atomic<bool> settled{ false };
     std::atomic<bool> in_effect{ false };
     json seed_settings_boot;
+    json enemy_plan_boot;
     int64_t rando_seed_boot = 0;
 
     int setting(const char* name) {
@@ -708,6 +731,7 @@ void zelda64::archipelago::settle_seed_settings() {
         std::lock_guard lock{ server_mutex };
         seed_settings_boot = seed_settings_live;
         rando_seed_boot = rando_seed_live;
+        enemy_plan_boot = enemy_plan_live;
     }
     if (seed_settings_boot.is_null()) {
         log_line("connected, but the slot sent no settings (an older apworld): the menus' settings are used");
@@ -749,6 +773,27 @@ void zelda64::archipelago::apply_seed_settings(zelda64::randomizer::Options& o) 
     o.spell_overrides = spells;
     o.early_healing = setting("early_healing") != 0;
     o.enemy_randomizer = setting("enemy_randomizer") != 0;
+    // Where the apworld put the monsters, which its logic was built on:
+    // { "tables": [file per area], "rosters": [[entries per area]] }.
+    if (o.enemy_randomizer && enemy_plan_boot.is_object()) {
+        const json& tables = enemy_plan_boot.value("tables", json());
+        const json& rosters = enemy_plan_boot.value("rosters", json());
+        if (tables.is_array() && rosters.is_array() && tables.size() == rosters.size()) {
+            for (size_t a = 0; a < tables.size(); a++) {
+                o.ap_enemy_tables.push_back(tables[a].is_number_integer() ? tables[a].get<int>() : 0);
+                std::vector<int> roster;
+                if (rosters[a].is_array()) {
+                    for (const json& id : rosters[a]) {
+                        if (id.is_number_integer()) {
+                            roster.push_back(id.get<int>());
+                        }
+                    }
+                }
+                o.ap_enemy_rosters.push_back(std::move(roster));
+            }
+        }
+        log_line("enemy placement from the seed: " + std::to_string(o.ap_enemy_tables.size()) + " areas");
+    }
     o.boss_order = setting("shuffle_boss_order") != 0;
     o.boss_element = setting("random_guilty_element") != 0;
     bool fast = setting("faster_areas") != 0;
@@ -765,15 +810,22 @@ void zelda64::archipelago::apply_seed_settings(zelda64::randomizer::Options& o) 
     o.cloak_palette = setting("cloak_colour") != 0;
     o.brian_palette = setting("brian_clothes") != 0;
     o.spell_palette = setting("spell_palettes") != 0;
+    // Always, in Archipelago: with items all over the world, wings have to
+    // work wherever the player happens to be standing.
+    o.wing_unlock_indoors = true;
 }
 
-// The enhancements: the six the yaml decides, and the three that would
+// The enhancements: the seven the yaml decides, and the three that would
 // change the game underneath the seed (One Hit KO, Hard Mode, Easy Mode) off.
 // Everything else - the timer, the notices, N64 mode, the HUD layout - is
 // the player's own and stays as the menus have it.
 void zelda64::archipelago::apply_seed_settings(zelda64::enhancements::Options& o) {
     o.jp_healing = setting("jp_healing") != 0;
     o.longer_magic_barrier = setting("jp_magic_barrier") != 0;
+    // Named boss_max_mp in the apworlds before 1.5.1.
+    o.boss_max_mp = setting("jp_boss_mp_rewards") != 0 || setting("boss_max_mp") != 0;
+    o.double_exp = std::clamp(setting("double_exp"), 0, 3);
+    o.fast_mp_recovery = setting("fast_mp_recovery") != 0;
     o.stat_up_effect = setting("jp_stat_up_effect") != 0;
     o.exit_from_anywhere = setting("exit_from_anywhere") != 0;
     o.faster_walk = setting("fast_walking") != 0;
@@ -990,8 +1042,17 @@ namespace {
             }
         }
         if (mammon_portal & 2) {
-            p.monsters_needed = monster_kinds;
-            for (int id = 0; id < monster_kinds; id++) {
+            // The seed says which kinds count: those met before Mammon's
+            // World, since a kind only found behind the portal could never
+            // open it. An older apworld sent no list and meant all of them.
+            std::vector<int> needed = portal_monsters;
+            if (needed.empty()) {
+                for (int id = 0; id < monster_kinds; id++) {
+                    needed.push_back(id);
+                }
+            }
+            p.monsters_needed = static_cast<int>(needed.size());
+            for (int id : needed) {
                 if (checked_locations.count(zelda64::archipelago::id_base +
                                             zelda64::archipelago::group_enemy + id)) {
                     p.monsters++;
@@ -1308,6 +1369,30 @@ int zelda64::archipelago::pending_level_ups() {
     return level_ups_waiting.load();
 }
 
+int zelda64::archipelago::portal_requirement(int& monsters) {
+    if (!playing_seed()) {
+        return -1;
+    }
+    std::lock_guard lock{ server_mutex };
+    monsters = portal_monsters.empty() ? monster_kinds : static_cast<int>(portal_monsters.size());
+    return mammon_portal;
+}
+
+bool zelda64::archipelago::tracker_view(const std::vector<int64_t>& locations, std::vector<uint8_t>& in_seed,
+                                        std::vector<uint8_t>& checked) {
+    if (!playing_seed()) {
+        return false;
+    }
+    std::lock_guard lock{ server_mutex };
+    in_seed.assign(locations.size(), 0);
+    checked.assign(locations.size(), 0);
+    for (size_t i = 0; i < locations.size(); i++) {
+        in_seed[i] = in_slot(locations[i]) ? 1 : 0;
+        checked[i] = checked_locations.count(locations[i]) != 0 ? 1 : 0;
+    }
+    return true;
+}
+
 // func_80009818 is the rewards routine, run once per monster that died, and
 // at 0x800098D4 it reads that monster's experience out of its stat table
 // entry: `lw $t7, 0x10($t6)`, where t6 came from `lw $t6, 0x64($s0)` - the
@@ -1369,14 +1454,18 @@ namespace {
 }
 
 extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
-    if (!ap_enabled.load()) {
-        return;
-    }
     int32_t entry = static_cast<int32_t>(ctx->r14);
     if (entry == 0) {
         return;
     }
     int index = global_monster_id(rdram, entry);
+    // The tracker counts kinds beaten whether or not Archipelago is on.
+    if (index >= 0) {
+        zelda64::tracker::monster_killed(index);
+    }
+    if (!ap_enabled.load()) {
+        return;
+    }
     if (index >= 0) {
         if (enemy_sent[index]) {
             return;

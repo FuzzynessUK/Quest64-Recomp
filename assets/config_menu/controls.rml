@@ -45,6 +45,7 @@
                                 >
                                     <label
                                         class="control-option__label"
+                                        style="font-size: 22dp; letter-spacing: 1.6dp; line-height: 24dp;"
                                     >{{get_input_name(i)}}</label>
                                     <div class="control-option__bindings">
                                         <button

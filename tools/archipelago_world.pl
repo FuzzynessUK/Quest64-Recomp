@@ -167,6 +167,103 @@ my $logic = Quest64Logic::read_logic($logic_path, {
 });
 $_->{region} = $logic->{locations}{ $_->{name} }{region} for @loc;
 
+# ---------------------------------------------------------------- enemy placement
+# With the Enemy Randomizer on, the apworld decides which monster file each of
+# the sixteen progression areas uses and which of its monsters appear there,
+# and sends that to the game (slot_data "enemy_plan"), which builds its packs
+# to match. So the logic knows where every monster is. What that needs:
+#
+#   - the areas, in the game's order (merrow::progression::areas), each with
+#     the raw map areas it covers;
+#   - how many monsters each can hold: the member slots of its packs, counted
+#     once per ROM address, because Baragoon Moor, Brannoch Castle and
+#     Mammon's World share their packs between their parts;
+#   - each area's logic region, read from the workbook's monster rows (the
+#     region a monster sits in is its home area's). Brannoch Castle is no
+#     monster's home, so it is given here.
+#
+# The six files' monsters are the game's global monster ids, which are the
+# enemy locations' ids.
+my (@enemy_areas, @file_monsters);
+{
+    open my $f, '<', "$root/src/game/randomizer/merrow_mapdata.cpp" or die "merrow_mapdata.cpp: $!";
+    my ($sec, @packs, @raw) = ('');
+    while (<$f>) {
+        s/\r//;
+        $sec = 'packs' if /\bpacks = \{/;
+        $sec = 'regions' if /\bregions = \{/;
+        $sec = 'areas' if /\bareas = \{/;
+        if ($sec eq 'packs' && /^\s+\{ 0x([0-9A-F]+), \{ (.*) \} \},?$/) {
+            my $address = $1;
+            my $members = () = $2 =~ /\{ \d+, \d+, \d+ \}/g;
+            push @packs, { address => $address, members => $members };
+        }
+        if ($sec eq 'areas' && /^\s+\{ "([^"]+)", \{[^}]*\}, (\d+), (\d+), (\d+), (\d+) \},?$/) {
+            push @raw, { name => $1, pack_start => $2, pack_count => $3, region_count => $5 };
+        }
+    }
+    close $f;
+    die "merrow_mapdata.cpp: expected 27 areas, found " . scalar(@raw) . "\n" unless @raw == 27;
+
+    open $f, '<', "$root/src/game/randomizer/enemy_progression_data.cpp" or die "enemy_progression_data.cpp: $!";
+    my $in_tables = 0;
+    while (<$f>) {
+        s/\r//;
+        if (/^\s+\{ "([^"]+)", \d+, \d+, \d+, (\d+), (\d+), \{/) {
+            push @enemy_areas, { name => $1, first => $2, last => $3 };
+        }
+        $in_tables = 1 if /table_monsters = \{/;
+        push @file_monsters, [ split /, /, $1 ] if $in_tables && /^\s+\{ ([\d, ]+) \},?$/;
+    }
+    close $f;
+    die "enemy_progression_data.cpp: expected 16 areas and 6 files\n" unless @enemy_areas == 16 && @file_monsters == 6;
+
+    for my $a (@enemy_areas) {
+        my (%seen, $slots);
+        for my $r ($a->{first} .. $a->{last}) {
+            my $area = $raw[$r];
+            # The game runs each region's seven presets through the area's
+            # packs in turn; that only reaches every pack if there are enough.
+            die "$area->{name}: $area->{region_count} regions cannot reach $area->{pack_count} packs\n"
+                if $area->{region_count} * 7 < $area->{pack_count};
+            for my $p ($area->{pack_start} .. $area->{pack_start} + $area->{pack_count} - 1) {
+                $slots += $packs[$p]{members} unless $seen{ $packs[$p]{address} }++;
+            }
+        }
+        $a->{capacity} = $slots;
+    }
+
+    my $book = Quest64Logic::read_workbook($logic_path);
+    my $rows = $book->{Locations};
+    my %region_of = ('Brannoch Castle' => 'Late');
+    for my $r (4 .. $#$rows) {
+        next unless Quest64Logic::cell($rows, $r, 3) eq 'Monster';
+        my ($area, $region) = (Quest64Logic::cell($rows, $r, 4), Quest64Logic::cell($rows, $r, 6));
+        die "Locations: monsters from $area are in both $region_of{$area} and $region\n"
+            if $region_of{$area} && $region_of{$area} ne $region;
+        $region_of{$area} = $region;
+    }
+    for my $a (@enemy_areas) {
+        $a->{region} = $region_of{ $a->{name} } // die "Locations: no monster row says which region $a->{name} is in\n";
+    }
+}
+# The regions monsters can be in, earliest first. Each needs everything the
+# one before it does, so a monster found in several areas is logically where
+# the earliest of them is.
+my @enemy_region_order = ('Overworld', 'Early', 'Mid', 'Late', 'Endgame');
+{
+    my %ok = map { $_ => 1 } @enemy_region_order;
+    my @bad = grep { !$ok{ $_->{region} } } @enemy_areas;
+    die "areas in regions the enemy placement does not know: @{[ map { qq{$_->{name} ($_->{region})} } @bad ]}\n" if @bad;
+}
+my %enemy_location_of = map { $_->{id} => Quest64Checks::enemy_name($_) } @{ $checks->{monsters} };
+{
+    my $count = 0;
+    $count += @$_ for @file_monsters;
+    die "the six files hold $count monsters, but there are " . scalar(keys %enemy_location_of) . " enemy locations\n"
+        unless $count == keys %enemy_location_of;
+}
+
 # ---------------------------------------------------------------- Python
 my $stamp = "# Generated by tools/archipelago_world.pl. Do not edit by hand.\n"
           . "# The names and ids come from Quest64Checks.pm, which DOCS/archipelago_checks.xlsx\n"
@@ -255,13 +352,33 @@ code_to_item_table: Dict[int, str] = {code: name for name, code in item_table.it
 filler_items = [name for name, data in item_data_table.items() if data.type == ItemClassification.filler]
 PY
 
+my $enemies_py = $stamp . "from typing import Dict, List, Tuple\n\n"
+    . "# The regions a monster can be in, earliest first. Each needs everything\n"
+    . "# the one before it does.\n"
+    . "REGION_ORDER: List[str] = [" . join(', ', map { py_str($_) } @enemy_region_order) . "]\n\n"
+    . "# The game's sixteen progression areas, in its order: name, logic region, and\n"
+    . "# how many monsters its packs can hold.\n"
+    . "ENEMY_AREAS: List[Tuple[str, str, int]] = [\n"
+    . join('', map { sprintf("    (%s, %s, %d),\n", py_str($_->{name}), py_str($_->{region}), $_->{capacity}) } @enemy_areas)
+    . "]\n\n"
+    . "# The monsters of each of the six monster files, by global id.\n"
+    . "FILE_MONSTERS: List[List[int]] = [\n"
+    . join('', map { '    [' . join(', ', @$_) . "],\n" } @file_monsters)
+    . "]\n\n"
+    . "# Each monster's location.\n"
+    . "ENEMY_LOCATIONS: Dict[int, str] = {\n"
+    . join('', map { "    $_: " . py_str($enemy_location_of{$_}) . ",\n" } sort { $a <=> $b } keys %enemy_location_of)
+    . "}\n"
+    . "ENEMY_IDS: Dict[str, int] = {name: gid for gid, name in ENEMY_LOCATIONS.items()}\n";
+
 # ---------------------------------------------------------------- seed settings
 # The game's own settings, chosen in the yaml instead of the menus. They go to
 # the game in slot_data under "settings", keyed by these names; when the game
 # is connected as it starts, it plays with these and hides the Randomizer and
 # Enhancements menus. Every one is off unless the yaml says otherwise.
 #   [ option name, class, section, display name, description, kind ]
-# kind "toggle" is Off/On (0/1); "random" is Off/Randomized (0/1). The choice
+# kind "toggle" is Off/On (0/1); "random" is Off/Randomized (0/1); "choice:a,b,c"
+# is those options, 0 first and the default. The "random" choice
 # is called "randomized" because "random" is a reserved option value in
 # Archipelago.
 my @seed_settings = (
@@ -287,6 +404,13 @@ my @seed_settings = (
       'Healing Lv2 restores 16 HP instead of 8, as in the Japanese release.', 'toggle' ],
     [ 'jp_magic_barrier', 'JPMagicBarrier', 'Enhancements', 'JP Magic Barrier',
       'Magic Barrier holds two turns longer, as in the Japanese release.', 'toggle' ],
+    [ 'jp_boss_mp_rewards', 'JPBossMPRewards', 'Enhancements', 'JP Boss MP Rewards',
+      'Beating a boss raises max MP as well as max HP and refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10, 15, 15).', 'toggle' ],
+    [ 'double_exp', 'DoubleExperience', 'Enhancements', 'Double Experience',
+      'Levels need half the experience. both: level (combat) experience and the hidden experience that raises HP, MP, Agility and Defense; stat_only: just the hidden stat experience; level_only: just the level experience.',
+      'choice:off,both,stat_only,level_only' ],
+    [ 'fast_mp_recovery', 'FastMPRecovery', 'Enhancements', 'Fast MP Recovery',
+      'MP comes back as you walk at the fastest rate, as in Easy Mode.', 'toggle' ],
     [ 'jp_stat_up_effect', 'JPStatUpEffect', 'Enhancements', 'JP Stat Up Effect',
       'A colour burst over Brian when a stat rises, as in the Japanese release.', 'toggle' ],
     [ 'exit_from_anywhere', 'ExitFromAnywhere', 'Enhancements', 'Exit from Anywhere',
@@ -325,6 +449,12 @@ for my $o (@seed_settings) {
     if ($kind eq 'toggle') {
         $seed_classes .= "class $class(Toggle):\n$body\"\"\"\n    display_name = \"$display\"\n\n\n";
     }
+    elsif ($kind =~ /^choice:(.+)/) {
+        # choice:a,b,c - the options in order; the first is 0 and the default.
+        my @names = split /,/, $1;
+        $seed_classes .= "class $class(Choice):\n$body\"\"\"\n    display_name = \"$display\"\n"
+            . join('', map { "    option_$names[$_] = $_\n" } 0 .. $#names) . "    default = 0\n\n\n";
+    }
     else {
         $seed_classes .= "class $class(Choice):\n$body\"\"\"\n    display_name = \"$display\"\n    option_off = 0\n    option_randomized = 1\n    default = 0\n\n\n";
     }
@@ -345,9 +475,16 @@ my $seed_yaml = '';
                 if $sec eq 'Randomizer';
         }
         $seed_yaml .= "\n" . join("\n", wrap_words("$display: $doc", 78, '  # ', '  # ')) . "\n";
-        $seed_yaml .= $kind eq 'toggle'
-            ? "  $name:\n    'false': 1\n    'true': 0\n"
-            : "  $name:\n    off: 1\n    randomized: 0\n";
+        if ($kind eq 'toggle') {
+            $seed_yaml .= "  $name:\n    'false': 1\n    'true': 0\n";
+        }
+        elsif ($kind =~ /^choice:(.+)/) {
+            my @names = split /,/, $1;
+            $seed_yaml .= "  $name:\n" . join('', map { "    $names[$_]: " . ($_ == 0 ? 1 : 0) . "\n" } 0 .. $#names);
+        }
+        else {
+            $seed_yaml .= "  $name:\n    off: 1\n    randomized: 0\n";
+        }
     }
 }
 
@@ -376,11 +513,38 @@ class WingsmithWings(Toggle):
     display_name = "Wingsmiths Give Wings"
 
 
+class WingsInPool(Choice):
+    """How many of each pair of wings go in the item pool. The wings are
+    handy for getting about but no rule needs them, so fewer leaves room
+    for filler instead.
+
+    two           two of each of the six (the default)
+    one           one of each
+    none          no wings at all; the wingsmiths can still hand theirs
+                  over with Wingsmiths Give Wings"""
+    display_name = "Wings in Pool"
+    option_none = 0
+    option_one = 1
+    option_two = 2
+    default = 2
+
+
 class Enemysanity(Toggle):
     """Defeating a kind of regular monster is an Archipelago check. One check
     per kind, sent the first time you beat one of them and never again -
     there are 67 kinds, so 67 checks, and a lot of hunting."""
     display_name = "Enemysanity"
+
+
+class EnsureAllEnemies(DefaultOnToggle):
+    """Only matters with the Enemy Randomizer on. Every one of the 67 kinds of
+    regular monster appears somewhere before Mammon's World: each of the six
+    monster sets is given at least one area with room for all of it.
+
+    Off, a set can be left out entirely, or only partly fit the areas it
+    lands in. A monster that appears nowhere is simply not a check, and the
+    "all monsters" portal only counts the ones that do appear."""
+    display_name = "Ensure All Enemies Appear"
 
 
 class ShuffleOrbs(DefaultOnToggle):
@@ -487,7 +651,9 @@ class Q64Options(PerGameCommonOptions):
     chestsanity: Chestsanity
     giftsanity: Giftsanity
     wingsmith_wings: WingsmithWings
+    wings_in_pool: WingsInPool
     enemysanity: Enemysanity
+    ensure_all_enemies: EnsureAllEnemies
     spiritsanity: Spiritsanity
     extra_level_ups: ExtraLevelUps
 SEED_FIELDS_HERE
@@ -565,12 +731,13 @@ PY
 my $init_py = <<'PY';
 from typing import Dict, List
 
-from BaseClasses import ItemClassification, Region, Tutorial
+from BaseClasses import ItemClassification, LocationProgressType, Region, Tutorial
 from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 
+from .Enemies import ENEMY_AREAS, ENEMY_IDS, ENEMY_LOCATIONS, FILE_MONSTERS, REGION_ORDER
 from .Items import Q64Item, item_data_table, item_table, code_to_item_table, filler_items
-from .Locations import (Q64Location, location_data_table, location_table,
+from .Locations import (Q64Location, Q64LocationData, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
 from .Options import Q64Options
 from .Regions import regions, connections
@@ -609,6 +776,68 @@ class Q64World(World):
         # or a spirit does. So the monster checks have to exist.
         if self.options.mammon_portal.value & 2:
             self.options.enemysanity.value = 1
+        self.plan_enemies()
+
+    def plan_enemies(self) -> None:
+        """Where every monster is, which the enemy locations' regions follow.
+
+        Enemy Randomizer off: where the game puts them, as the workbook says.
+        On: decided here and sent to the game in slot_data, which builds its
+        encounter packs to match - each area gets one of the six monster
+        files and a list of that file's monsters, sized to what the area's
+        packs can hold. A monster is logically in the earliest region of any
+        area it appears in; one that appears nowhere is not a location.
+        """
+        self.enemy_plan = None
+        self.enemy_region: Dict[int, str] = {}
+        if not self.options.enemy_randomizer:
+            for gid, name in ENEMY_LOCATIONS.items():
+                self.enemy_region[gid] = location_data_table[name].region
+            return
+
+        rnd = self.random
+        tables = [-1] * len(ENEMY_AREAS)
+        if self.options.ensure_all_enemies:
+            # Every file first gets an area before Mammon's World with room
+            # for all of it, biggest file first so the few big areas go to
+            # the files that need them.
+            free = [a for a, (_, region, _) in enumerate(ENEMY_AREAS) if region != "Endgame"]
+            files = sorted(range(len(FILE_MONSTERS)), key=lambda f: (-len(FILE_MONSTERS[f]), rnd.random()))
+            for f in files:
+                fits = [a for a in free if ENEMY_AREAS[a][2] >= len(FILE_MONSTERS[f])]
+                if not fits:
+                    raise OptionError(f"Quest 64: no area left with room for monster file {f}")
+                a = rnd.choice(fits)
+                tables[a] = f
+                free.remove(a)
+        previous = -1
+        for a in range(len(ENEMY_AREAS)):
+            if tables[a] < 0:
+                # Any file, but not the one the area before has, so
+                # neighbouring areas look different.
+                tables[a] = rnd.choice([f for f in range(len(FILE_MONSTERS)) if f != previous])
+            previous = tables[a]
+
+        rosters: List[List[int]] = []
+        for a, (_, region, capacity) in enumerate(ENEMY_AREAS):
+            entries = list(range(len(FILE_MONSTERS[tables[a]])))
+            if capacity < len(entries):
+                entries = sorted(rnd.sample(entries, capacity))
+            rosters.append(entries)
+            for entry in entries:
+                gid = FILE_MONSTERS[tables[a]][entry]
+                known = self.enemy_region.get(gid)
+                if known is None or REGION_ORDER.index(region) < REGION_ORDER.index(known):
+                    self.enemy_region[gid] = region
+        self.enemy_plan = {"tables": tables, "rosters": rosters}
+
+    def location_exists(self, name: str, data: Q64LocationData) -> bool:
+        if not data.can_create(self.options):
+            return False
+        return data.group != "enemy" or ENEMY_IDS[name] in self.enemy_region
+
+    def location_region(self, name: str, data: Q64LocationData) -> str:
+        return self.enemy_region[ENEMY_IDS[name]] if data.group == "enemy" else data.region
 
     def create_item(self, name: str) -> Q64Item:
         data = item_data_table[name]
@@ -627,10 +856,16 @@ class Q64World(World):
                 self.multiworld.get_region(target, self.player), f"{source} to {target}")
 
         for location_name, location_data in location_data_table.items():
-            if not location_data.can_create(self.options):
+            if not self.location_exists(location_name, location_data):
                 continue
-            region = self.multiworld.get_region(location_data.region, self.player)
+            region_name = self.location_region(location_name, location_data)
+            region = self.multiworld.get_region(region_name, self.player)
             region.add_locations({location_name: location_data.address}, Q64Location)
+            # A monster only met in Mammon's World is beaten after the final
+            # portal, when nothing is left to unlock: filler only.
+            if location_data.group == "enemy" and region_name == "Endgame":
+                self.multiworld.get_location(location_name, self.player).progress_type = \
+                    LocationProgressType.EXCLUDED
 
     def locked_items(self) -> Dict[str, str]:
         """Item name -> location name for anything held out of the pool.
@@ -644,7 +879,7 @@ class Q64World(World):
         return {
             item: location
             for item, location in vanilla_locations.items()
-            if location_data_table[location].can_create(self.options)
+            if self.location_exists(location, location_data_table[location])
             and item_data_table[item].can_create(self.options)
         }
 
@@ -659,7 +894,7 @@ class Q64World(World):
         # So: place what must exist, then pad with filler.
         locked = self.locked_items()
         open_locations = sum(
-            1 for data in location_data_table.values() if data.can_create(self.options)
+            1 for name, data in location_data_table.items() if self.location_exists(name, data)
         ) - len(locked)
 
         pool: List[Q64Item] = []
@@ -672,7 +907,10 @@ class Q64World(World):
             if name == "Level Up":
                 level_ups = data.num_exist
                 continue
-            for _ in range(data.num_exist):
+            count = data.num_exist
+            if data.type == ItemClassification.useful:   # the wings
+                count = min(count, self.options.wings_in_pool.value)
+            for _ in range(count):
                 pool.append(self.create_item(name))
 
         # One Level Up per spirit when spirits are checks, plus however many
@@ -739,6 +977,16 @@ class Q64World(World):
             # randomizer rolls them with, so every session of this slot
             # plays the same shuffle.
             "rando_seed": self.random.getrandbits(31),
+            # Enemy Randomizer: the file each area uses and which of its
+            # monsters must appear there, which the logic above was built
+            # on. The game builds its packs from this instead of rolling
+            # its own.
+            "enemy_plan": self.enemy_plan or {},
+            # The monsters the "all monsters" portal counts: every kind met
+            # before Mammon's World, since one only found behind the portal
+            # could never open it.
+            "portal_monsters": sorted(gid for gid, region in self.enemy_region.items()
+                                      if region != "Endgame"),
             "settings": {
 SEED_SLOT_HERE            },
         }
@@ -783,9 +1031,25 @@ $game:
   wingsmith_wings:
     'false': 1
     'true': 0
+
+  # How many of each pair of wings go in the item pool: two (the default),
+  # one, or none. No rule needs wings; the room left goes to filler.
+  wings_in_pool:
+    two: 1
+    one: 0
+    none: 0
   enemysanity:
     'true': 0
     'false': 1
+
+  # Only with enemy_randomizer on (Randomizer section below): every one of the
+  # @{[ $by_group{enemy} // 0 ]} kinds of regular monster appears somewhere before Mammon's World.
+  # Off, some kinds can be left out; a kind that appears nowhere is simply
+  # not a check. Either way the seed knows where each monster is, and each
+  # one's check is in logic from the earliest area it appears in.
+  ensure_all_enemies:
+    'true': 1
+    'false': 0
   spiritsanity:
     'true': 1
     'false': 0
@@ -852,13 +1116,14 @@ make_path("$out/quest64/docs");
 my %files = (
     "$out/quest64/Locations.py" => $locations_py,
     "$out/quest64/Items.py"     => $items_py,
+    "$out/quest64/Enemies.py"   => $enemies_py,
     "$out/quest64/Options.py"   => $options_py,
     "$out/quest64/Regions.py"   => $regions_py,
     "$out/quest64/Rules.py"     => $rules_py,
     "$out/quest64/__init__.py"  => $init_py,
     # The apworld manifest. Rule Builder (rule_builder) is what sets the
     # floor at 0.6.7.
-    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.3.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
+    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.5.1", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
     "$out/quest64/docs/en_quest64.md" => "# Quest 64 Recompiled\n\nEvery chest, gift, boss and spirit can hold an item from any world in the\nmultiworld. Turn the Archipelago Connector on in the port's menu and give it\nthe server address and your slot name.\n",
     "$out/quest64/docs/guide_en.md"   => "# Quest 64 Recompiled Setup Guide\n\n1. Put `quest64.apworld` in `Archipelago/custom_worlds`.\n2. Put your filled-in `Quest64Recompiled.yaml` in `Archipelago/Players`.\n3. Generate and host as usual.\n4. In Quest 64 Recompiled, open the config menu, turn on the Archipelago\n   Connector and enter the server address, your slot name and the password\n   if the room has one.\n",
     "$out/Quest64Recompiled.yaml" => $yaml,

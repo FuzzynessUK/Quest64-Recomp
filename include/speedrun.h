@@ -13,6 +13,8 @@ namespace zelda64::speedrun {
     void start();
     // Run once per frame; starts the run on the frame the title ends.
     void update(bool title_running);
+    // Whether the title screen (its overlay) is up. Any thread.
+    bool title_showing();
     // Called from the hook on the Mammon defeat message.
     void stop();
     void reset();

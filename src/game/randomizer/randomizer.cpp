@@ -433,6 +433,8 @@ namespace {
         // The Chest Randomizer's plan, in chest id order.
         std::vector<zelda64::randomizer::ChestPlacement> chest_placements;
         bool beigis_moved = false;
+        // Who is in each boss arena, for the Grand Abbott (abbott_message).
+        std::vector<std::string> boss_lines;
 
         Builder(const Options& opts, uint32_t seed) : options(opts), rng(seed) {}
 
@@ -1829,6 +1831,22 @@ namespace {
                 }
             }
 
+            // Who is where, for the Grand Abbott in Melrode Monastery
+            // (abbott_message): one "Boss - Area" line per arena, in story
+            // order, whether or not the order was shuffled. A text line is
+            // 27 characters, so Beigis's roof is shortened.
+            {
+                static const char* const names[boss_count] = { "Solvaring", "Zelse", "Nepty", "Shilf", "Fargo", "Guilty", "Beigis" };
+                static const char* const arena_names[boss_count] = {
+                    "Connor Forest", "Windward Forest", "Blue Cave", "Baragoon Tunnel",
+                    "Boil Hole", "Brannoch Castle", "Brannoch Roof",
+                };
+                boss_lines.clear();
+                for (int i = 0; i < boss_count; i++) {
+                    boss_lines.push_back(std::string(names[boss_order[i]]) + " - " + arena_names[i]);
+                }
+            }
+
             if (options.boss_element) {
                 std::string e = std::to_string(guilty_element);
                 add_hex("D8792C", "000" + e + "000" + e);
@@ -2296,7 +2314,97 @@ namespace {
                 }
             };
 
-            if (options.enemy_randomizer) {
+            // Archipelago sends its own placement, so the seed's logic knows
+            // which monsters each area holds: the file each progression area
+            // uses and which of its entries must be met there. The packs are
+            // then built so every one of those is: each region's seven
+            // presets run through the area's packs in turn (every area has
+            // enough regions for that to reach them all), and the packs'
+            // member slots take each listed entry once before any repeats.
+            // Baragoon Moor, Brannoch Castle and Mammon's World share their
+            // packs between their parts in the ROM, so a pack is filled once
+            // and its copies follow it. The apworld sizes each list to the
+            // slots the area really has.
+            const size_t area_total = merrow::progression::areas.size();
+            bool ap_plan = options.enemy_randomizer &&
+                options.ap_enemy_tables.size() == area_total &&
+                options.ap_enemy_rosters.size() == area_total;
+            if (ap_plan) {
+                log("");
+                log("ENEMY PLACEMENT (from the Archipelago seed):");
+                progression_tables.assign(area_total, 0);
+                for (size_t a = 0; a < area_total; a++) {
+                    const merrow::progression::AreaInfo& info = merrow::progression::areas[a];
+                    int table = std::clamp(options.ap_enemy_tables[a], 0,
+                                           static_cast<int>(mapdata::monster_tables.size()) - 1);
+                    progression_tables[a] = table;
+                    int size = static_cast<int>(mapdata::monster_tables[static_cast<size_t>(table)].enemies.size());
+                    std::vector<int> roster;
+                    for (int id : options.ap_enemy_rosters[a]) {
+                        if (id >= 0 && id < size && std::find(roster.begin(), roster.end(), id) == roster.end()) {
+                            roster.push_back(id);
+                        }
+                    }
+                    if (roster.empty()) {
+                        roster = rng.count_and_shuffle(size);
+                    }
+
+                    std::vector<mapdata::PackMember*> slots;
+                    std::vector<std::pair<int, int>> copies;   // pack, the pack it copies
+                    std::vector<std::pair<uint32_t, int>> first_of;   // ROM address, pack
+                    for (int raw = info.first_raw; raw <= info.last_raw; raw++) {
+                        mapdata::Area& area = enemy_areas[static_cast<size_t>(raw)];
+                        area.map.table_index = static_cast<uint16_t>(table);
+                        for (int p = 0; p < area.pack_count; p++) {
+                            int pack = area.pack_start + p;
+                            uint32_t address = enemy_packs[static_cast<size_t>(pack)].rom_address;
+                            auto seen = std::find_if(first_of.begin(), first_of.end(),
+                                                     [&](const auto& e) { return e.first == address; });
+                            if (seen != first_of.end()) {
+                                copies.emplace_back(pack, seen->second);
+                                continue;
+                            }
+                            first_of.emplace_back(address, pack);
+                            for (mapdata::PackMember& member : enemy_packs[static_cast<size_t>(pack)].members) {
+                                slots.push_back(&member);
+                            }
+                        }
+                        for (int r = 0; r < area.region_count; r++) {
+                            mapdata::Region& region = enemy_regions[static_cast<size_t>(area.region_start + r)];
+                            std::vector<int> pool = rng.count_and_shuffle(area.pack_count);
+                            region.presets.assign(7, 0);
+                            if (!pool.empty()) {
+                                for (int k = 0; k < 7; k++) {
+                                    region.presets[static_cast<size_t>(k)] =
+                                        pool[static_cast<size_t>(r * 7 + k) % pool.size()];
+                                }
+                            }
+                            region.preset_count = 7;
+                        }
+                    }
+                    rng.shuffle(slots);
+                    std::vector<int> order = roster;
+                    rng.shuffle(order);
+                    for (size_t s = 0; s < slots.size(); s++) {
+                        slots[s]->enemy_id = s < order.size()
+                            ? order[s]
+                            : roster[static_cast<size_t>(rng.next(static_cast<int>(roster.size())))];
+                    }
+                    for (const auto& [pack, from] : copies) {
+                        enemy_packs[static_cast<size_t>(pack)].members = enemy_packs[static_cast<size_t>(from)].members;
+                    }
+
+                    std::string line = std::string("  ") + info.name + " (file " + std::to_string(table) + "):";
+                    for (size_t k = 0; k < order.size() && k < slots.size(); k++) {
+                        line += (k ? ", " : " ") + mapdata::monster_tables[static_cast<size_t>(table)].enemies[static_cast<size_t>(order[k])];
+                    }
+                    if (roster.size() > slots.size()) {
+                        line += " (only " + std::to_string(slots.size()) + " fit)";
+                    }
+                    log(line);
+                }
+            }
+            else if (options.enemy_randomizer) {
                 // Tier-aware: each merged area draws one of the files whose
                 // monsters fall inside its spread (DOCS/enemyrandologic.xlsx).
                 // Runs before the random table shuffle and replaces it.
@@ -2332,7 +2440,7 @@ namespace {
                 }
             }
 
-            if (options.enemy_randomizer) {
+            if (options.enemy_randomizer && !ap_plan) {
                 for (const mapdata::Area& area : enemy_areas) {
                     // Every region gets a full seven presets, wrapping if the
                     // area has fewer packs than that.
@@ -2853,6 +2961,8 @@ zelda64::randomizer::Result zelda64::randomizer::generate(const Options& options
     result.writes = std::move(builder.writes);
     result.spoiler = std::move(builder.spoiler);
     result.beigis_moved = builder.beigis_moved;
+    result.boss_lines = std::move(builder.boss_lines);
+    result.boss_order_shuffled = effective.boss_order;
     result.spirit_slots = std::move(builder.spirit_slots);
     result.chest_placements = std::move(builder.chest_placements);
     result.progression_tables = std::move(builder.progression_tables);
@@ -2861,6 +2971,54 @@ zelda64::randomizer::Result zelda64::randomizer::generate(const Options& options
 
 const zelda64::randomizer::NativeState& zelda64::randomizer::native_state() {
     return native;
+}
+
+// Built each time he speaks, since in an Archipelago seed the portal's
+// condition is the server's to say. Text lines hold 27 characters and a page
+// four lines ($ turns the page); the game's font has no "+", so "&".
+std::vector<uint8_t> zelda64::randomizer::abbott_message() {
+    int monsters = 0;
+    int portal = zelda64::archipelago::portal_requirement(monsters);
+    if (portal < 0 && !native.boss_order_shuffled) {
+        return {};   // not connected and nothing moved: his own line
+    }
+    std::string text = "Requirement for Mammon's#World Portal:#";
+    bool list_bosses = true;
+    switch (portal) {
+        case 0:
+            text += "The Eletale Book";
+            list_bosses = false;
+            break;
+        case 1:
+            text += "All Bosses";
+            break;
+        case 2:
+            text += "All Enemies#(" + std::to_string(monsters) + " kinds)";
+            list_bosses = false;
+            break;
+        case 3:
+            text += "All Enemies & All Bosses#(" + std::to_string(monsters) + " kinds of enemy)";
+            break;
+        default:
+            // Not connected, boss order shuffled: just who is where.
+            text = "Requirement for Mammon's#World Portal:";
+            break;
+    }
+    if (list_bosses && native.boss_lines.size() == 7) {
+        // Four to a page, after the heading's.
+        for (size_t i = 0; i < native.boss_lines.size(); i++) {
+            text += (i % 4 == 0) ? "$" : "#";
+            text += native.boss_lines[i];
+        }
+    }
+    text += "%";
+    std::optional<std::vector<uint8_t>> encoded = translate_string(text);
+    if (!encoded) {
+        return {};
+    }
+    std::vector<uint8_t> out = { 0xA0, 0xC0 };
+    out.insert(out.end(), encoded->begin(), encoded->end());
+    return out;
 }
 
 void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
@@ -2872,6 +3030,8 @@ void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {
 
     Result result = generate(options);
     native.beigis_moved = result.beigis_moved;
+    native.boss_lines = result.boss_lines;
+    native.boss_order_shuffled = result.boss_order_shuffled;
     native.spirit_slots = result.spirit_slots;
     native.chest_placements = result.chest_placements;
     if (!result.progression_tables.empty()) {

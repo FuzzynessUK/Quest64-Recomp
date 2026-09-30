@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <fstream>
+#include <iterator>
 #include <random>
 #include <sstream>
 #include <type_traits>
@@ -18,6 +20,8 @@
 #include "statfx.h"
 #include "notify.h"
 #include "speedrun.h"
+#include "tracker.h"
+#include "minimap.h"
 #include "zelda_render.h"
 #include "zelda_support.h"
 #include "promptfont.h"
@@ -59,8 +63,10 @@ int recompui::config_tab_to_index(recompui::ConfigTab tab) {
         return 8;
     case recompui::ConfigTab::Audio:
         return 9;
-    case recompui::ConfigTab::Debug:
+    case recompui::ConfigTab::Tracker:
         return 10;
+    case recompui::ConfigTab::Debug:
+        return 11;
     default:
         assert(false && "Unknown config tab.");
         return 0;
@@ -765,11 +771,14 @@ struct HudBox {
     float anchor_y;
     float w;
     float h;
+    // The minimap: square, sized by this (frame pixels), and not custom it
+    // sits at the picture's top right rather than its left edge.
+    int* size = nullptr;
     bool dragging = false;
     float drag_mouse[2] = { 0.0f, 0.0f };
     float drag_origin[2] = { 0.0f, 0.0f };
 };
-extern HudBox hud_boxes[2];
+extern HudBox hud_boxes[3];
 void hud_box_position(const HudBox& box, float& x, float& y);
 void push_hud_layout();
 void dirty_timer_position();
@@ -923,6 +932,37 @@ void make_enhancements_bindings(Rml::Context* context) {
     bind_hud_field("enh_hud_hp_y", 0, true);
     bind_hud_field("enh_hud_sp_x", 1, false);
     bind_hud_field("enh_hud_sp_y", 1, true);
+    // The minimap reads these live (update_minimap), so no relaunch.
+    // Off / On / On with no background: two settings, one control.
+    constructor.BindFunc("enh_minimap",
+        [](Rml::Variant& out) {
+            const auto& e = enhancements_context.edited;
+            out = !e.minimap ? 0 : e.minimap_background ? 1 : 2;
+        },
+        [](const Rml::Variant& in) {
+            int v = in.Get<int>();
+            enhancements_context.edited.minimap = v != 0;
+            if (v != 0) {
+                enhancements_context.edited.minimap_background = v == 1;
+            }
+            enhancements_option_changed(false);
+        }
+    );
+    constructor.BindFunc("enh_hide_compass",
+        [](Rml::Variant& out) { out = enhancements_context.edited.hide_compass ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.hide_compass = in.Get<int>() != 0;
+            zelda64::enhancements::set_hide_compass(enhancements_context.edited.hide_compass);
+            enhancements_option_changed(false);
+        }
+    );
+    constructor.BindFunc("enh_minimap_size",
+        [](Rml::Variant& out) { out = enhancements_context.edited.minimap_size; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.minimap_size = std::clamp(in.Get<int>(), 32, 160);
+            enhancements_option_changed(false);
+        }
+    );
     constructor.BindFunc("enh_remove_borders",
         [](Rml::Variant& out) { out = enhancements_context.edited.remove_borders ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1012,6 +1052,28 @@ void make_enhancements_bindings(Rml::Context* context) {
         [](Rml::Variant& out) { out = enhancements_context.edited.longer_magic_barrier ? 1 : 0; },
         [](const Rml::Variant& in) {
             enhancements_context.edited.longer_magic_barrier = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+
+    constructor.BindFunc("enh_double_exp",
+        [](Rml::Variant& out) { out = enhancements_context.edited.double_exp; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.double_exp = std::clamp(in.Get<int>(), 0, 3);
+            enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_fast_mp_recovery",
+        [](Rml::Variant& out) { out = enhancements_context.edited.fast_mp_recovery ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.fast_mp_recovery = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_boss_max_mp",
+        [](Rml::Variant& out) { out = enhancements_context.edited.boss_max_mp ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.boss_max_mp = in.Get<int>() != 0;
             enhancements_option_changed();
         }
     );
@@ -1157,6 +1219,49 @@ void push_tracks_live() {
     const auto& e = audio_context.edited;
     static const std::map<int, std::string> none;
     zelda64::audio::apply_tracks_live(e.custom_music == zelda64::audio::CustomMusic::Custom ? e.custom_tracks : none);
+}
+
+// The Tracker tab (include/tracker.h). Every setting applies straight away;
+// the windows themselves are src/ui/ui_tracker.cpp.
+Rml::DataModelHandle tracker_model_handle;
+
+void make_tracker_bindings(Rml::Context* context) {
+    Rml::DataModelConstructor constructor = context->CreateDataModel("tracker_model");
+    if (!constructor) {
+        throw std::runtime_error("Failed to make RmlUi data model for the tracker menu");
+    }
+    bind_tooltip_events(constructor);
+    auto bind_flag = [&](const char* name, bool zelda64::tracker::Options::* field) {
+        constructor.BindFunc(name,
+            [field](Rml::Variant& out) { out = (zelda64::tracker::options().*field) ? 1 : 0; },
+            [field](const Rml::Variant& in) {
+                zelda64::tracker::Options o = zelda64::tracker::options();
+                o.*field = in.Get<int>() != 0;
+                zelda64::tracker::set_options(o);
+            });
+    };
+    bind_flag("trk_items", &zelda64::tracker::Options::item_tracker);
+    bind_flag("trk_checks", &zelda64::tracker::Options::check_tracker);
+    bind_flag("trk_locked", &zelda64::tracker::Options::locked);
+    bind_flag("trk_hide_done", &zelda64::tracker::Options::hide_done_areas);
+    bind_flag("trk_hide_borders", &zelda64::tracker::Options::hide_borders);
+    bind_flag("trk_hide_titles", &zelda64::tracker::Options::hide_titles);
+    bind_flag("trk_show_wings", &zelda64::tracker::Options::show_wings);
+    bind_flag("trk_notes", &zelda64::tracker::Options::notes);
+    // Each window's background: 0 solid, 1 translucent, 2 clear.
+    auto bind_background = [&](const char* name, int zelda64::tracker::Options::* field) {
+        constructor.BindFunc(name,
+            [field](Rml::Variant& out) { out = zelda64::tracker::options().*field; },
+            [field](const Rml::Variant& in) {
+                zelda64::tracker::Options o = zelda64::tracker::options();
+                o.*field = std::clamp(in.Get<int>(), 0, 2);
+                zelda64::tracker::set_options(o);
+            });
+    };
+    bind_background("trk_item_background", &zelda64::tracker::Options::item_background);
+    bind_background("trk_check_background", &zelda64::tracker::Options::check_background);
+    bind_background("trk_notes_background", &zelda64::tracker::Options::notes_background);
+    tracker_model_handle = constructor.GetModelHandle();
 }
 
 void make_audio_bindings(Rml::Context* context) {
@@ -1795,6 +1900,371 @@ void recompui::update_stat_effects() {
     }
 }
 
+// The Archipelago logo on the title screen. While a room is connected and
+// the title screen is up (PUSH START and the NEW / LOAD / DELETE menu), it drops
+// in from above the window and settles between the Quest 64 logo and the
+// menu; it goes when either stops. It lives in the notification overlay,
+// which is draw-only and full-window.
+// Placed against the window height, as the game's 4:3 picture is.
+namespace {
+    constexpr const char* title_logo_texture = "?/title/aplogo";
+    constexpr float title_logo_top = 0.6014f;     // of the window height
+    constexpr float title_logo_height = 0.078f;   // of the window height
+    constexpr float title_logo_drop = 1.1f;       // seconds to settle
+    float title_logo_aspect = 1204.0f / 188.0f;
+    bool title_logo_loaded = false;
+    float title_logo_age = -1.0f;                 // < 0: not showing
+    std::chrono::steady_clock::time_point title_logo_last{};
+
+    void load_title_logo_texture() {
+        std::ifstream in(zelda64::get_asset_path("archipelago_logo.png"), std::ios::binary);
+        if (!in.is_open()) {
+            return;
+        }
+        std::vector<char> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        if (bytes.size() > 24) {
+            // PNG: width and height are the IHDR's first two big-endian words.
+            auto word = [&](size_t at) {
+                return (static_cast<uint32_t>(static_cast<uint8_t>(bytes[at])) << 24) |
+                       (static_cast<uint32_t>(static_cast<uint8_t>(bytes[at + 1])) << 16) |
+                       (static_cast<uint32_t>(static_cast<uint8_t>(bytes[at + 2])) << 8) |
+                       static_cast<uint32_t>(static_cast<uint8_t>(bytes[at + 3]));
+            };
+            uint32_t w = word(16), h = word(20);
+            if (w != 0 && h != 0) {
+                title_logo_aspect = static_cast<float>(w) / static_cast<float>(h);
+            }
+        }
+        recompui::queue_image_from_bytes_file(title_logo_texture, bytes);
+        title_logo_loaded = true;
+    }
+}
+
+void recompui::update_title_logo() {
+    if (speedrun_context == recompui::ContextId::null() || !title_logo_loaded) {
+        return;
+    }
+    Rml::ElementDocument* document = speedrun_context.get_document();
+    Rml::Element* logo = document ? document->GetElementById("aplogo") : nullptr;
+    if (logo == nullptr) {
+        return;
+    }
+    bool started = ultramodern::is_game_started();
+    bool title = zelda64::speedrun::title_showing();
+    bool connected = zelda64::archipelago::status() == zelda64::archipelago::Status::Connected;
+    bool wanted = started && title && connected;
+    {
+        // What decides it, each time any of it changes (title_logo.txt).
+        static int logged = -1;
+        int state = (started ? 1 : 0) | (title ? 2 : 0) | (connected ? 4 : 0);
+        if (state != logged) {
+            logged = state;
+            std::ofstream out(zelda64::get_app_folder_path() / "title_logo.txt", std::ios::app);
+            out << "game started " << started << ", title " << title << ", connected " << connected << "\n";
+        }
+    }
+    if (!wanted) {
+        if (title_logo_age >= 0.0f) {
+            logo->SetProperty("display", "none");
+            title_logo_age = -1.0f;
+        }
+        return;
+    }
+    if (!recompui::is_context_shown(speedrun_context)) {
+        recompui::show_context(speedrun_context, "");
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    if (title_logo_age < 0.0f) {
+        title_logo_age = 0.0f;
+        logo->SetProperty("decorator", "image(\"?/title/aplogo\")");
+        logo->SetProperty("display", "block");
+    }
+    else {
+        title_logo_age += std::min(std::chrono::duration<float>(now - title_logo_last).count(), 0.1f);
+    }
+    title_logo_last = now;
+
+    Rml::Vector2i size = document->GetContext()->GetDimensions();
+    float height = size.y * title_logo_height;
+    float width = height * title_logo_aspect;
+    float target = size.y * title_logo_top;
+    float start = -height;
+    // Ease out with a little overshoot, so it lands rather than stops.
+    float f = std::min(title_logo_age / title_logo_drop, 1.0f);
+    constexpr float back = 1.4f;
+    float g = f - 1.0f;
+    float eased = 1.0f + (back + 1.0f) * g * g * g + back * g * g;
+    float top = start + (target - start) * eased;
+
+    logo->SetProperty(Rml::PropertyId::Left, Rml::Property((size.x - width) / 2.0f, Rml::Unit::PX));
+    logo->SetProperty(Rml::PropertyId::Top, Rml::Property(top, Rml::Unit::PX));
+    logo->SetProperty(Rml::PropertyId::Width, Rml::Property(width, Rml::Unit::PX));
+    logo->SetProperty(Rml::PropertyId::Height, Rml::Property(height, Rml::Unit::PX));
+
+    // Once it has settled, where RmlUi says it is (title_logo.txt).
+    static bool box_logged = false;
+    if (!box_logged && title_logo_age > title_logo_drop) {
+        box_logged = true;
+        Rml::Vector2f at = logo->GetAbsoluteOffset(Rml::BoxArea::Border);
+        Rml::Vector2f box = logo->GetBox().GetSize(Rml::BoxArea::Border);
+        std::ofstream out(zelda64::get_app_folder_path() / "title_logo.txt", std::ios::app);
+        out << "logo at " << at.x << "," << at.y << " size " << box.x << "x" << box.y
+            << " visible " << logo->IsVisible() << " window " << size.x << "x" << size.y << "\n";
+    }
+}
+
+// The minimap (include/minimap.h), on the notification overlay. The outline
+// is drawn into a texture of the whole submap, fitted to a square with its
+// proportions kept; the markers are small divs placed over it every frame.
+// North is up: world x to the right, world z down the map. Brian's arrow
+// points the way he last moved, which needs no knowledge of how the game
+// measures its heading; until he has moved it uses the heading.
+//
+// Zoom (the Minimap Zoom In / Out controls): zoomed out, the whole submap
+// fills the box; zoomed in, the map is scaled up around Brian and slides so
+// he stays in the middle. The texture is drawn again at about the size it is
+// shown whenever the zoom, the box size or the submap changes, so the walls
+// stay two pixels wide at any zoom, and the one before is released.
+//
+// Placed from the Layout tab's box: frame pixels (240 tall, x from the
+// window's left edge), so window pixels are frame pixels * height / 240.
+namespace {
+    constexpr float mm_zoom_levels[] = { 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 6.0f };
+    constexpr int mm_zoom_count = static_cast<int>(std::size(mm_zoom_levels));
+    zelda64::minimap::Snapshot mm_state;
+    uint32_t mm_mesh_shown = 0;
+    bool mm_arrow_made = false;
+    // The texture now in use: its name, size in pixels, and the world ->
+    // texture pixel mapping it was drawn with.
+    std::string mm_texture;
+    int mm_tex = 0;
+    float mm_scale = 1.0f, mm_off_x = 0.0f, mm_off_z = 0.0f;
+    uint32_t mm_texture_count = 0;
+    std::vector<Rml::Element*> mm_dots;
+    float mm_last_x = 0.0f, mm_last_z = 0.0f, mm_angle = 0.0f;
+    bool mm_have_last = false, mm_have_angle = false;
+
+    void mm_plot(std::vector<char>& px, int n, float x, float y) {
+        // A soft two-pixel pen: every pixel within 1.6 of the point, fading out.
+        for (int dy = -2; dy <= 2; dy++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                int ix = static_cast<int>(std::floor(x)) + dx, iy = static_cast<int>(std::floor(y)) + dy;
+                if (ix < 0 || iy < 0 || ix >= n || iy >= n) {
+                    continue;
+                }
+                float d = std::hypot(ix + 0.5f - x, iy + 0.5f - y);
+                uint8_t alpha = static_cast<uint8_t>(std::clamp(1.6f - d, 0.0f, 1.0f) * 235.0f);
+                size_t at = (static_cast<size_t>(iy) * n + static_cast<size_t>(ix)) * 4;
+                if (alpha > static_cast<uint8_t>(px[at + 3])) {
+                    px[at] = static_cast<char>(0xE8);
+                    px[at + 1] = static_cast<char>(0xE0);
+                    px[at + 2] = static_cast<char>(0xC8);
+                    px[at + 3] = static_cast<char>(alpha);
+                }
+            }
+        }
+    }
+
+    // Draws the outline at n x n and makes it the map's image.
+    void mm_draw_outline(Rml::Element* map, const zelda64::minimap::Snapshot& s, int n) {
+        float pad = n * 0.04f;
+        float w = s.max_x - s.min_x, h = s.max_z - s.min_z;
+        mm_scale = (n - 2 * pad) / std::max(w, h);
+        mm_off_x = pad + (n - 2 * pad - w * mm_scale) / 2.0f - s.min_x * mm_scale;
+        mm_off_z = pad + (n - 2 * pad - h * mm_scale) / 2.0f - s.min_z * mm_scale;
+        std::vector<char> px(static_cast<size_t>(n) * n * 4, 0);
+        for (const auto& chain : s.outline) {
+            for (size_t i = 1; i < chain.size(); i++) {
+                float x0 = chain[i - 1].x * mm_scale + mm_off_x, y0 = chain[i - 1].z * mm_scale + mm_off_z;
+                float x1 = chain[i].x * mm_scale + mm_off_x, y1 = chain[i].z * mm_scale + mm_off_z;
+                int steps = std::max(1, static_cast<int>(std::hypot(x1 - x0, y1 - y0) * 2.0f));
+                for (int k = 0; k <= steps; k++) {
+                    float t = static_cast<float>(k) / steps;
+                    mm_plot(px, n, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+                }
+            }
+        }
+        std::string name = "?/minimap/map" + std::to_string(++mm_texture_count);
+        recompui::queue_image_from_bytes_rgba32(name, px, n, n);
+        map->SetProperty("decorator", "image(\"" + name + "\")");
+        if (!mm_texture.empty()) {
+            recompui::release_image(mm_texture);
+        }
+        mm_texture = name;
+        mm_tex = n;
+    }
+
+    void mm_make_arrow() {
+        // A white arrowhead pointing up, 32 x 32.
+        constexpr int n = 32;
+        std::vector<char> px(n * n * 4, 0);
+        for (int y = 0; y < n; y++) {
+            for (int x = 0; x < n; x++) {
+                float fx = (x + 0.5f) / n - 0.5f, fy = (y + 0.5f) / n;
+                // Inside the triangle (0.5, 0) - (0.1, 0.95) - (0.9, 0.95), notched at the back.
+                bool inside = fy > 0.05f && fy < 0.95f && std::fabs(fx) < (fy - 0.05f) * 0.45f &&
+                              !(fy > 0.7f && std::fabs(fx) < (fy - 0.7f) * 0.9f);
+                if (inside) {
+                    size_t at = static_cast<size_t>(y * n + x) * 4;
+                    px[at] = px[at + 1] = px[at + 2] = static_cast<char>(0xFF);
+                    px[at + 3] = static_cast<char>(0xFF);
+                }
+            }
+        }
+        recompui::queue_image_from_bytes_rgba32("?/minimap/arrow", px, n, n);
+        mm_arrow_made = true;
+    }
+}
+
+void recompui::update_minimap() {
+    // Zoom presses are taken even while the minimap is not shown, so they do
+    // not pile up and all land at once later.
+    int zoom_steps = zelda64::minimap::take_zoom_steps();
+    if (speedrun_context == recompui::ContextId::null()) {
+        return;
+    }
+    Rml::ElementDocument* document = speedrun_context.get_document();
+    Rml::Element* box = document ? document->GetElementById("minimap") : nullptr;
+    Rml::Element* map = document ? document->GetElementById("mm_map") : nullptr;
+    Rml::Element* markers = document ? document->GetElementById("mm_markers") : nullptr;
+    Rml::Element* brian = document ? document->GetElementById("mm_brian") : nullptr;
+    if (box == nullptr || map == nullptr || markers == nullptr || brian == nullptr) {
+        return;
+    }
+    zelda64::enhancements::Options& e = enhancements_context.edited;
+    bool have = e.minimap && ultramodern::is_game_started() && zelda64::minimap::snapshot(mm_state, mm_mesh_shown) &&
+                mm_state.valid;
+    if (!have) {
+        box->SetProperty("display", "none");
+        mm_have_last = false;
+        return;
+    }
+    // A new map or submap starts zoomed out, showing all of it.
+    if (mm_state.mesh_version != mm_mesh_shown && e.minimap_zoom != 0) {
+        e.minimap_zoom = 0;
+        enhancements_option_changed(false);
+    }
+    if (zoom_steps != 0) {
+        int zoom_step = std::clamp(e.minimap_zoom + zoom_steps, 0, mm_zoom_count - 1);
+        if (zoom_step != e.minimap_zoom) {
+            e.minimap_zoom = zoom_step;
+            enhancements_option_changed(false);
+        }
+    }
+    float zoom = mm_zoom_levels[std::clamp(e.minimap_zoom, 0, mm_zoom_count - 1)];
+    if (!recompui::is_context_shown(speedrun_context)) {
+        recompui::show_context(speedrun_context, "");
+    }
+    if (!mm_arrow_made) {
+        mm_make_arrow();
+        brian->SetProperty("decorator", "image(\"?/minimap/arrow\")");
+    }
+
+    // Where and how big, from the Layout tab.
+    Rml::Vector2i window = document->GetContext()->GetDimensions();
+    float px_per_frame = window.y / 240.0f;
+    float size_frame = static_cast<float>(std::clamp(e.minimap_size, 32, 160));
+    float fx, fy;
+    if (e.minimap_custom) {
+        fx = e.minimap_x;
+        fy = e.minimap_y;
+    }
+    else {
+        float frame_w = 240.0f * window.x / std::max(window.y, 1);
+        fx = (frame_w + 320.0f) / 2.0f - size_frame - 8.0f;
+        fy = 8.0f;
+    }
+    float size = size_frame * px_per_frame;
+    box->SetProperty("display", "block");
+    box->SetClass("minimap--bare", !e.minimap_background);
+    box->SetProperty(Rml::PropertyId::Left, Rml::Property(fx * px_per_frame, Rml::Unit::PX));
+    box->SetProperty(Rml::PropertyId::Top, Rml::Property(fy * px_per_frame, Rml::Unit::PX));
+    box->SetProperty(Rml::PropertyId::Width, Rml::Property(size, Rml::Unit::PX));
+    box->SetProperty(Rml::PropertyId::Height, Rml::Property(size, Rml::Unit::PX));
+
+    // The texture, drawn again for a new submap or when the size it is shown
+    // at has moved far from what it was drawn for.
+    int wanted = std::clamp(static_cast<int>(size * zoom), 128, 2048);
+    bool new_mesh = mm_state.mesh_version != mm_mesh_shown;
+    if (new_mesh || mm_tex == 0 || wanted > mm_tex * 5 / 4 || wanted < mm_tex * 3 / 4) {
+        mm_mesh_shown = mm_state.mesh_version;
+        mm_draw_outline(map, mm_state, wanted);
+        if (new_mesh) {
+            mm_have_last = false;
+        }
+    }
+
+    // World -> box pixels: the texture's mapping, scaled to the zoomed map,
+    // then slid so Brian is in the middle (not at all when zoomed out).
+    float map_px = size * zoom;
+    float to_map = map_px / mm_tex;
+    float brian_mx = (mm_state.brian_x * mm_scale + mm_off_x) * to_map;
+    float brian_my = (mm_state.brian_z * mm_scale + mm_off_z) * to_map;
+    float slide_x = zoom > 1.0f ? size / 2.0f - brian_mx : 0.0f;
+    float slide_y = zoom > 1.0f ? size / 2.0f - brian_my : 0.0f;
+    auto at = [&](float x, float z, float& bx, float& by) {
+        bx = (x * mm_scale + mm_off_x) * to_map + slide_x;
+        by = (z * mm_scale + mm_off_z) * to_map + slide_y;
+    };
+    map->SetProperty(Rml::PropertyId::Left, Rml::Property(slide_x, Rml::Unit::PX));
+    map->SetProperty(Rml::PropertyId::Top, Rml::Property(slide_y, Rml::Unit::PX));
+    map->SetProperty(Rml::PropertyId::Width, Rml::Property(map_px, Rml::Unit::PX));
+    map->SetProperty(Rml::PropertyId::Height, Rml::Property(map_px, Rml::Unit::PX));
+
+    size_t used = 0;
+    auto dot = [&](float x, float z, const char* kind, bool done, float diameter) {
+        float bx, by;
+        at(x, z, bx, by);
+        if (bx < -diameter || by < -diameter || bx > size + diameter || by > size + diameter) {
+            return;   // off the zoomed view
+        }
+        if (used == mm_dots.size()) {
+            Rml::ElementPtr made = document->CreateElement("div");
+            made->SetClass("mm-dot", true);
+            mm_dots.push_back(markers->AppendChild(std::move(made)));
+        }
+        Rml::Element* d = mm_dots[used++];
+        d->SetClassNames(std::string("mm-dot ") + kind + (done ? " mm-chest--open" : ""));
+        d->SetProperty("display", "block");
+        d->SetProperty(Rml::PropertyId::Left, Rml::Property(bx - diameter / 2.0f, Rml::Unit::PX));
+        d->SetProperty(Rml::PropertyId::Top, Rml::Property(by - diameter / 2.0f, Rml::Unit::PX));
+        d->SetProperty(Rml::PropertyId::Width, Rml::Property(diameter, Rml::Unit::PX));
+        d->SetProperty(Rml::PropertyId::Height, Rml::Property(diameter, Rml::Unit::PX));
+    };
+    float marker = std::max(4.0f, size * 0.045f);
+    for (const auto& m : mm_state.exits) dot(m.x, m.z, "mm-exit", false, marker);
+    for (const auto& m : mm_state.spirits) dot(m.x, m.z, "mm-spirit", false, marker);
+    for (const auto& m : mm_state.chests) dot(m.x, m.z, "mm-chest", m.done, marker);
+    for (size_t i = used; i < mm_dots.size(); i++) {
+        mm_dots[i]->SetProperty("display", "none");
+    }
+
+    // Brian, pointing the way he last moved.
+    float bx = mm_state.brian_x, bz = mm_state.brian_z;
+    if (mm_have_last) {
+        float dx = bx - mm_last_x, dz = bz - mm_last_z;
+        if (dx * dx + dz * dz > 0.25f) {
+            mm_angle = std::atan2(dx, -dz);   // screen: 0 = up, clockwise
+            mm_have_angle = true;
+        }
+    }
+    if (!mm_have_angle) {
+        mm_angle = 3.14159265f - mm_state.heading;
+    }
+    mm_last_x = bx;
+    mm_last_z = bz;
+    mm_have_last = true;
+    float arrow = std::max(8.0f, size * 0.11f);
+    float px_x, px_y;
+    at(bx, bz, px_x, px_y);
+    brian->SetProperty(Rml::PropertyId::Left, Rml::Property(px_x - arrow / 2.0f, Rml::Unit::PX));
+    brian->SetProperty(Rml::PropertyId::Top, Rml::Property(px_y - arrow / 2.0f, Rml::Unit::PX));
+    brian->SetProperty(Rml::PropertyId::Width, Rml::Property(arrow, Rml::Unit::PX));
+    brian->SetProperty(Rml::PropertyId::Height, Rml::Property(arrow, Rml::Unit::PX));
+    brian->SetProperty("transform", "rotate(" + std::to_string(mm_angle * 57.29578f) + "deg)");
+}
+
 // Notification overlay (include/notify.h). Its own draw-only context like
 // the timer, up while the game runs. Each posted line becomes a .notice
 // appended under the ones showing, held and then faded on its own; when it
@@ -2028,9 +2498,10 @@ namespace {
     constexpr float preview_h_dp = 180.0f;
 
 }
-HudBox hud_boxes[2] = {
+HudBox hud_boxes[3] = {
     { "hud_hp_box", &enhancements_context.edited.hud_hp_custom, &enhancements_context.edited.hud_hp_x, &enhancements_context.edited.hud_hp_y, hud_hp_anchor_y, hud_hp_w, hud_hp_h },
     { "hud_sp_box", &enhancements_context.edited.hud_sp_custom, &enhancements_context.edited.hud_sp_x, &enhancements_context.edited.hud_sp_y, hud_sp_anchor_y, hud_sp_w, hud_sp_h },
+    { "hud_mm_box", &enhancements_context.edited.minimap_custom, &enhancements_context.edited.minimap_x, &enhancements_context.edited.minimap_y, 8.0f, 0.0f, 0.0f, &enhancements_context.edited.minimap_size },
 };
 namespace {
 
@@ -2055,6 +2526,10 @@ void hud_box_position(const HudBox& box, float& x, float& y) {
     if (*box.custom) {
         x = *box.x;
         y = *box.y;
+    }
+    else if (box.size != nullptr) {
+        x = (frame_width() + frame_w_43) / 2.0f - static_cast<float>(*box.size) - 8.0f;
+        y = box.anchor_y;
     }
     else {
         x = (frame_width() - frame_w_43) / 2.0f;
@@ -2155,10 +2630,16 @@ void recompui::update_hud_preview() {
         }
         float x, y;
         hud_box_position(box, x, y);
+        float w = box.size ? static_cast<float>(*box.size) : box.w;
+        float h = box.size ? static_cast<float>(*box.size) : box.h;
+        if (box.size != nullptr) {
+            // Only there while the minimap is on.
+            element->SetProperty("display", enhancements_context.edited.minimap ? "block" : "none");
+        }
         element->SetProperty(Rml::PropertyId::Left, Rml::Property(x * dp_per_px, Rml::Unit::DP));
         element->SetProperty(Rml::PropertyId::Top, Rml::Property(y * dp_per_px, Rml::Unit::DP));
-        element->SetProperty(Rml::PropertyId::Width, Rml::Property(box.w * dp_per_px, Rml::Unit::DP));
-        element->SetProperty(Rml::PropertyId::Height, Rml::Property(box.h * dp_per_px, Rml::Unit::DP));
+        element->SetProperty(Rml::PropertyId::Width, Rml::Property(w * dp_per_px, Rml::Unit::DP));
+        element->SetProperty(Rml::PropertyId::Height, Rml::Property(h * dp_per_px, Rml::Unit::DP));
     }
 
     // The notification marker: where the stack's first line sits for the
@@ -2255,11 +2736,15 @@ public:
     }
     void load_document() override {
 		config_context = recompui::create_context(zelda64::get_asset_path("config_menu.rml"));
+        // Before any document asks for it: an image asked for before it is
+        // queued is cached as missing for good.
+        load_title_logo_texture();
         // The timer and the notification stack share one overlay document.
         speedrun_context = recompui::create_context(zelda64::get_asset_path("notifications.rml"));
         // Draw only: the game keeps every button and the mouse.
         speedrun_context.set_captures_input(false);
         speedrun_context.set_captures_mouse(false);
+        recompui::init_tracker();
         statfx_context = recompui::create_context(zelda64::get_asset_path("stat_effects.rml"));
         statfx_context.set_captures_input(false);
         statfx_context.set_captures_mouse(false);
@@ -2366,10 +2851,26 @@ public:
             [](const std::string& param, Rml::Event& event) {
                 zelda64::audio::preview_track(-1);
             });
+        // Both tracker windows back to where they start.
+        recompui::register_event(listener, "trk_reset_positions",
+            [](const std::string&, Rml::Event&) {
+                zelda64::tracker::Options o = zelda64::tracker::options();
+                zelda64::tracker::Options d;
+                o.item_x = d.item_x;
+                o.item_y = d.item_y;
+                o.check_x = d.check_x;
+                o.check_y = d.check_y;
+                zelda64::tracker::set_options(o);
+            });
         recompui::register_event(listener, "hud_reset_hp",
             [](const std::string& param, Rml::Event& event) {
                 enhancements_context.edited.hud_hp_custom = false;
                 push_hud_layout();
+                enhancements_option_changed(false);
+            });
+        recompui::register_event(listener, "hud_reset_mm",
+            [](const std::string& param, Rml::Event& event) {
+                enhancements_context.edited.minimap_custom = false;
                 enhancements_option_changed(false);
             });
         recompui::register_event(listener, "hud_reset_sp",
@@ -3029,6 +3530,7 @@ public:
         make_speedrun_bindings(context);
         make_randomizer_bindings(context);
         make_audio_bindings(context);
+        make_tracker_bindings(context);
     }
 };
 

@@ -187,6 +187,13 @@ namespace zelda64::randomizer {
         // stats and spell damage are scaled to the area it appears in (spread
         // any/any, scaling full, as the sheet's Settings tab). One switch.
         bool enemy_randomizer = false;
+        // Archipelago: the apworld's enemy placement, so the seed's logic
+        // knows where every monster is. One entry per progression area
+        // (merrow::progression::areas order): the monster file it uses, and
+        // which entries of that file (0-based within the file) must appear.
+        // Empty unless a seed sent one; never saved to disk.
+        std::vector<int> ap_enemy_tables;
+        std::vector<std::vector<int>> ap_enemy_rosters;
     };
 
     // Options as saved on disk; a missing file gives defaults.
@@ -242,6 +249,10 @@ namespace zelda64::randomizer {
         // Boss order moved Beigis out of his own arena, which the native hook
         // for his map check needs to know about.
         bool beigis_moved = false;
+        // "Boss - Area" for each arena in story order, and whether the order
+        // was shuffled: what the Grand Abbott says (abbott_message).
+        std::vector<std::string> boss_lines;
+        bool boss_order_shuffled = false;
         // The Spirit Randomizer's plan, one list per table slot.
         std::vector<std::vector<SpiritPlacement>> spirit_slots;
         // The Chest Randomizer's plan, in chest id order. Empty when off.
@@ -253,6 +264,10 @@ namespace zelda64::randomizer {
     // the patch is generated at boot; all false before that.
     struct NativeState {
         bool beigis_moved = false;
+        // Who is in each boss arena, and whether the order was shuffled
+        // (abbott_message).
+        std::vector<std::string> boss_lines;
+        bool boss_order_shuffled = false;
         // The Spirit Randomizer's plan, grouped into the 43 slots of the
         // table func_80012220 reads. Empty when the option is off.
         // quest64_randomizer_spirits writes it into RAM.
@@ -261,6 +276,13 @@ namespace zelda64::randomizer {
         std::vector<ChestPlacement> chest_placements;
     };
     const NativeState& native_state();
+
+    // What the Grand Abbott says in Melrode Monastery, encoded (A0C0 header,
+    // FF end), or empty to leave him his own line. In an Archipelago seed,
+    // what opens Mammon's World Portal (its mammon_portal setting), with the
+    // boss list where bosses count; otherwise the boss list when boss order
+    // is shuffled.
+    std::vector<uint8_t> abbott_message();
 
     // Drops the memory the native hooks took out of librecomp's heap last
     // launch, which a relaunch re-initialises. Called from apply_at_boot.

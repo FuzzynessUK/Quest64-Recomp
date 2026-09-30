@@ -220,6 +220,9 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/notify.cpp
     ${CMAKE_SOURCE_DIR}/src/game/itemnotice.cpp
     ${CMAKE_SOURCE_DIR}/src/game/speedrun.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/tracker.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/tracker_data.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/minimap.cpp
     ${CMAKE_SOURCE_DIR}/src/game/hardmode/hardmode.cpp
     ${CMAKE_SOURCE_DIR}/src/game/hardmode/hooks.cpp
     ${CMAKE_BINARY_DIR}/hardmode_rup.c
@@ -234,6 +237,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/ui/ui_state.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/ui_launcher.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/ui_config.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/ui_tracker.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/ui_prompt.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/ui_config_sub_menu.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/ui_color_hack.cpp

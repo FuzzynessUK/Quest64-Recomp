@@ -70,6 +70,7 @@ namespace recompui {
         Enhancements,
         Layout,
         Audio,
+        Tracker,
         Debug,
     };
 
@@ -82,6 +83,13 @@ namespace recompui {
     void update_speedrun_model();
     // The JP stat-up burst: spawns and moves its particles. Every frame.
     void update_stat_effects();
+    // The Archipelago logo on the title screen while connected. Every frame.
+    void update_title_logo();
+    // The minimap (include/minimap.h), on the notification overlay. Every frame.
+    void update_minimap();
+    // The tracker windows (src/ui/ui_tracker.cpp): the context once, then every frame.
+    void init_tracker();
+    void update_tracker();
     // The notification stack (include/notify.h): appends, holds and fades. Every frame.
     // Keeps the Archipelago status line in the menu current.
     void update_archipelago();

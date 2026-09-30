@@ -1,0 +1,145 @@
+<rml>
+	<head>
+		<title>Tracker</title>
+		<link type="text/rcss" href="rml.rcss"/>
+		<link type="text/rcss" href="recomp.rcss"/>
+		<link type="text/rcss" href="tracker_list.rcss"/>
+		<style>
+			body
+			{
+				width: 100%;
+				height: 100%;
+			}
+			/* The two windows. ui_tracker.cpp builds their contents, places
+			   them from the Tracker tab's settings and moves them while
+			   they are dragged by the title. */
+			.trk-window
+			{
+				position: absolute;
+				display: none;
+				width: 270dp;
+				padding: 8dp 10dp;
+				border-width: 2dp;
+				border-color: #00000000;
+				border-radius: 8dp;
+				background-color: #0c1018d0;
+				font-family: "latolatin";
+				font-size: 15dp;
+				color: #ffffff;
+			}
+			.trk-window--solid { background-color: #0c1018; }
+			/* With no background behind it, the text gets a dark edge to read against the game. */
+			.trk-window--clear { background-color: #00000000; font-effect: outline(1dp #000000d0); }
+			.trk-window--unlocked { border-color: #ffd24a; }
+			/* Hide Borders: no outline, locked or not. */
+			.trk-window--borderless { border-color: #00000000; }
+			/* Hide Titles, while locked. */
+			.trk-window--notitle .trk-title { display: none; }
+			/* The Notes window: sized from ui_tracker.cpp, resized from its corner. */
+			.trk-notes-text
+			{
+				display: block;
+				font-family: "latolatin";
+				font-size: 19dp;
+				color: #ffffff;
+				/* Clear: the window's own background is the only one. */
+				background-color: #00000000;
+				border-width: 0dp;
+				padding: 4dp;
+				border-radius: 4dp;
+				cursor: text;
+				/* Out of the tab order: the controller's navigation never lands here;
+				   only a mouse click focuses it. */
+				tab-index: none;
+			}
+			.trk-notes-text:focus { background-color: #ffffff0a; }
+			.trk-resize
+			{
+				position: absolute;
+				right: 0dp;
+				bottom: 0dp;
+				width: 16dp;
+				height: 16dp;
+				border-radius: 0dp 0dp 8dp 0dp;
+				background-color: #ffd24a60;
+				drag: drag;
+				cursor: resize;
+			}
+			.trk-resize:hover { background-color: #ffd24ac0; }
+			.trk-title
+			{
+				display: block;
+				font-size: 17dp;
+				font-weight: bold;
+				padding-bottom: 4dp;
+				color: #ffe9a8;
+			}
+			.trk-window--unlocked .trk-title
+			{
+				drag: drag;
+				cursor: move;
+			}
+			.trk-section
+			{
+				display: block;
+				margin-top: 6dp;
+				margin-bottom: 3dp;
+				font-size: 13dp;
+				font-weight: bold;
+				color: #c8d0e0;
+			}
+			.trk-grid { display: block; }
+			.trk-item
+			{
+				display: inline-block;
+				width: 105dp;
+				margin: 2dp;
+				padding: 3dp 6dp;
+				border-radius: 4dp;
+				background-color: #ffffff1c;
+				white-space: nowrap;
+			}
+			.trk-item--missing
+			{
+				background-color: #ffffff10;
+				color: #ffffff9c;
+			}
+			.trk-dot
+			{
+				display: inline-block;
+				width: 10dp;
+				height: 10dp;
+				margin-right: 6dp;
+				border-radius: 5dp;
+			}
+			.trk-item--missing .trk-dot { background-color: #ffffff70; }
+			.trk-line { display: block; padding: 2dp 0dp; }
+			.trk-scroll
+			{
+				display: block;
+				overflow-y: auto;
+				/* Press and drag to scroll it (ui_tracker.cpp), as well as the wheel. */
+				drag: drag;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="item_tracker" class="trk-window">
+			<div id="trk_item_title" class="trk-title">Tracker</div>
+			<div class="trk-section">Boss Items</div>
+			<div id="trk_boss_items" class="trk-grid"></div>
+			<div id="trk_wings_heading" class="trk-section">Wings</div>
+			<div id="trk_wings" class="trk-grid"></div>
+		</div>
+		<div id="check_tracker" class="trk-window">
+			<div id="trk_check_title" class="trk-title">Checks</div>
+			<div id="trk_areas" class="trk-scroll"></div>
+			<div id="trk_check_resize" class="trk-resize"></div>
+		</div>
+		<div id="notes_window" class="trk-window">
+			<div id="trk_notes_title" class="trk-title">Notes</div>
+			<textarea id="trk_notes_text" class="trk-notes-text" wrap="soft"></textarea>
+			<div id="trk_notes_resize" class="trk-resize"></div>
+		</div>
+	</body>
+</rml>

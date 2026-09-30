@@ -190,6 +190,26 @@ func = "func_8001C8C4"
 text = "quest64_randomizer_beigis_map_check(ctx);"
 before_vram = 0x8001C8DC
 
+# Hide Compass (Enhancements): the field HUD's compass routine, skipped whole.
+[[patches.hook]]
+func = "func_8001EA84"
+text = "if (quest64_enh_hide_compass(rdram, ctx)) return;"
+before_vram = 0x8001EA84
+
+# Boss max MP (Enhancements): the boss reward's shared exit, after max HP
+# has been raised and HP refilled, on both paths.
+[[patches.hook]]
+func = "func_8000BB68"
+text = "quest64_enh_boss_max_mp(rdram, ctx);"
+before_vram = 0x8000BCF4
+
+# Boss order: the Grand Abbott lists which boss is in which arena. Right after
+# func_80008A00 has DMA'd the NPC's message into its buffer.
+[[patches.hook]]
+func = "func_80008A00"
+text = "quest64_randomizer_abbott_text(rdram, ctx);"
+before_vram = 0x80008A34
+
 # Speedrun timer. func_80007A50 calls the message display with
 # gMsg_Shannon_Mammon_has_been_destroyed (0x80054C04) once Mammon is down, so
 # hooking that call is the exact end of a run.

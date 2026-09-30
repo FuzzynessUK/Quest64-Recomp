@@ -501,3 +501,29 @@ void quest64_randomizer_chests(uint8_t* rdram, recomp_context* ctx) {
 }
 
 }
+
+// --- Boss order: the Grand Abbott's text ------------------------------------
+// func_80008A00 shows an NPC's line by DMAing 0x400 bytes from ROM
+// 0xD305E0 + a1 (a u16 offset, saved at 0x1C($sp)) into the message buffer
+// at 0x8007C570. The Grand Abbott's record in Melrode Monastery (ROM
+// 0x4395CC, type 5) has two lines, picked by story progress: 0x24C0 "When
+// you leave the monastery..." and 0x2620 "There are four magic stones...".
+// The boss list replaces both. It is longer than either slot and a u16
+// offset cannot reach the ROM's free tail, so this hook, right after the
+// DMA, writes the list over the buffer instead.
+extern "C" void quest64_randomizer_abbott_text(uint8_t* rdram, recomp_context* ctx) {
+    constexpr int32_t message_buffer = 0x8007C570;
+    uint32_t message = static_cast<uint32_t>(MEM_W(0x1C, ctx->r29));
+    if (!randomizing() || (message != 0x24C0 && message != 0x2620)) {
+        return;
+    }
+    // Built now rather than at boot: in an Archipelago seed it says what the
+    // server's mammon_portal asks for.
+    std::vector<uint8_t> text = zelda64::randomizer::abbott_message();
+    if (text.empty() || text.size() > 0x400) {
+        return;
+    }
+    for (size_t i = 0; i < text.size(); i++) {
+        MEM_B(static_cast<int32_t>(i), message_buffer) = static_cast<int8_t>(text[i]);
+    }
+}

@@ -22,11 +22,38 @@ class WingsmithWings(Toggle):
     display_name = "Wingsmiths Give Wings"
 
 
+class WingsInPool(Choice):
+    """How many of each pair of wings go in the item pool. The wings are
+    handy for getting about but no rule needs them, so fewer leaves room
+    for filler instead.
+
+    two           two of each of the six (the default)
+    one           one of each
+    none          no wings at all; the wingsmiths can still hand theirs
+                  over with Wingsmiths Give Wings"""
+    display_name = "Wings in Pool"
+    option_none = 0
+    option_one = 1
+    option_two = 2
+    default = 2
+
+
 class Enemysanity(Toggle):
     """Defeating a kind of regular monster is an Archipelago check. One check
     per kind, sent the first time you beat one of them and never again -
     there are 67 kinds, so 67 checks, and a lot of hunting."""
     display_name = "Enemysanity"
+
+
+class EnsureAllEnemies(DefaultOnToggle):
+    """Only matters with the Enemy Randomizer on. Every one of the 67 kinds of
+    regular monster appears somewhere before Mammon's World: each of the six
+    monster sets is given at least one area with room for all of it.
+
+    Off, a set can be left out entirely, or only partly fit the areas it
+    lands in. A monster that appears nowhere is simply not a check, and the
+    "all monsters" portal only counts the ones that do appear."""
+    display_name = "Ensure All Enemies Appear"
 
 
 class ShuffleOrbs(DefaultOnToggle):
@@ -178,6 +205,32 @@ class JPMagicBarrier(Toggle):
     display_name = "JP Magic Barrier"
 
 
+class JPBossMPRewards(Toggle):
+    """Enhancements. Beating a boss raises max MP as well as max HP and
+    refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10,
+    15, 15)."""
+    display_name = "JP Boss MP Rewards"
+
+
+class DoubleExperience(Choice):
+    """Enhancements. Levels need half the experience. both: level (combat)
+    experience and the hidden experience that raises HP, MP, Agility and
+    Defense; stat_only: just the hidden stat experience; level_only: just
+    the level experience."""
+    display_name = "Double Experience"
+    option_off = 0
+    option_both = 1
+    option_stat_only = 2
+    option_level_only = 3
+    default = 0
+
+
+class FastMPRecovery(Toggle):
+    """Enhancements. MP comes back as you walk at the fastest rate, as in
+    Easy Mode."""
+    display_name = "Fast MP Recovery"
+
+
 class JPStatUpEffect(Toggle):
     """Enhancements. A colour burst over Brian when a stat rises, as in the
     Japanese release."""
@@ -257,7 +310,9 @@ class Q64Options(PerGameCommonOptions):
     chestsanity: Chestsanity
     giftsanity: Giftsanity
     wingsmith_wings: WingsmithWings
+    wings_in_pool: WingsInPool
     enemysanity: Enemysanity
+    ensure_all_enemies: EnsureAllEnemies
     spiritsanity: Spiritsanity
     extra_level_ups: ExtraLevelUps
     shuffle_spells: ShuffleSpells
@@ -271,6 +326,9 @@ class Q64Options(PerGameCommonOptions):
     element_cap_99: ElementCap99
     jp_healing: JPHealing
     jp_magic_barrier: JPMagicBarrier
+    jp_boss_mp_rewards: JPBossMPRewards
+    double_exp: DoubleExperience
+    fast_mp_recovery: FastMPRecovery
     jp_stat_up_effect: JPStatUpEffect
     exit_from_anywhere: ExitFromAnywhere
     fast_walking: FastWalking

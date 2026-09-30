@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -126,6 +127,9 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("jp_healing", o.jp_healing);
     get("exit_from_anywhere", o.exit_from_anywhere);
     get("longer_magic_barrier", o.longer_magic_barrier);
+    get("boss_max_mp", o.boss_max_mp);
+    get("double_exp", o.double_exp);
+    get("fast_mp_recovery", o.fast_mp_recovery);
     get("faster_walk", o.faster_walk);
     get("stack_items", o.stack_items);
     get("remove_borders", o.remove_borders);
@@ -135,6 +139,14 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("hud_sp_custom", o.hud_sp_custom);
     get("hud_sp_x", o.hud_sp_x);
     get("hud_sp_y", o.hud_sp_y);
+    get("minimap", o.minimap);
+    get("minimap_custom", o.minimap_custom);
+    get("minimap_x", o.minimap_x);
+    get("minimap_y", o.minimap_y);
+    get("minimap_size", o.minimap_size);
+    get("minimap_zoom", o.minimap_zoom);
+    get("minimap_background", o.minimap_background);
+    get("hide_compass", o.hide_compass);
     get("stat_up_effect", o.stat_up_effect);
     get("spell_notice", o.spell_notice);
     get("song_notice", o.song_notice);
@@ -165,6 +177,9 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["jp_healing"] = o.jp_healing;
     j["exit_from_anywhere"] = o.exit_from_anywhere;
     j["longer_magic_barrier"] = o.longer_magic_barrier;
+    j["boss_max_mp"] = o.boss_max_mp;
+    j["double_exp"] = o.double_exp;
+    j["fast_mp_recovery"] = o.fast_mp_recovery;
     j["faster_walk"] = o.faster_walk;
     j["stack_items"] = o.stack_items;
     j["remove_borders"] = o.remove_borders;
@@ -174,6 +189,14 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["hud_sp_custom"] = o.hud_sp_custom;
     j["hud_sp_x"] = o.hud_sp_x;
     j["hud_sp_y"] = o.hud_sp_y;
+    j["minimap"] = o.minimap;
+    j["minimap_custom"] = o.minimap_custom;
+    j["minimap_x"] = o.minimap_x;
+    j["minimap_y"] = o.minimap_y;
+    j["minimap_size"] = o.minimap_size;
+    j["minimap_zoom"] = o.minimap_zoom;
+    j["minimap_background"] = o.minimap_background;
+    j["hide_compass"] = o.hide_compass;
     j["stat_up_effect"] = o.stat_up_effect;
     j["spell_notice"] = o.spell_notice;
     j["song_notice"] = o.song_notice;
@@ -223,6 +246,13 @@ void zelda64::enhancements::apply_at_boot(uint8_t* rdram) {
     zelda64::renderer::set_hud_layout(options.hud_hp_custom, options.hud_hp_x, options.hud_hp_y,
         options.hud_sp_custom, options.hud_sp_x, options.hud_sp_y);
     zelda64::renderer::set_borders_removed(options.remove_borders);
+    set_hide_compass(options.hide_compass);
+    // Fast MP Recovery: the walking regen byte is in the boot segment, which
+    // is in RAM already and never read from the ROM again, so it is written
+    // there. 0x28 is the fastest of Merrow's tiers (vanilla 0x41).
+    if (options.fast_mp_recovery && !zelda64::hardmode::active()) {
+        MEM_B(0, 0x80070F39) = 0x28;
+    }
     std::vector<Write> writes = build_writes(options);
     if (writes.empty()) {
         return;
@@ -323,9 +353,10 @@ namespace {
     constexpr int stack_ids = 32;
     constexpr int bag_empty = 0xFF;
     constexpr int max_stack = 99;
-    // Hard Mode's stackable set among the vanilla items: the consumables,
-    // the flute, the bell, the Replica, the shoes and the two amulets.
-    constexpr int stackable_last = 0x0D;
+    // Hard Mode's stackable set among the vanilla items - the consumables,
+    // the flute, the bell, the Replica, the shoes and the two amulets - and
+    // the six wings (0x0E-0x13), which Hard Mode leaves apart.
+    constexpr int stackable_last = 0x13;
     constexpr int32_t item_text_table = 0x803A9954;
     constexpr int description_entry = 32;
     constexpr int32_t item_menu_mask = 0x8007B2E4;
@@ -362,10 +393,93 @@ namespace {
         return true;
     }
 
-    void stack_bag(uint8_t* rdram) {
+    // The bag as stack_bag last left it. Using an item (0x800220FC,
+    // func_80021434) takes its entry out by moving every later byte of all
+    // 150 down one - the counts at 75 + id with them - so after a use the
+    // bag cannot be read by position: a count sits one slot too low and is
+    // taken for the id below (Spirit Light's lands in the list, and then
+    // nothing is stacked again). But nothing but this code ever writes a
+    // count, and the game only shifts them or leaves them, so they are still
+    // the ones last_bag had, in the same order. Matched up that way, each
+    // count is known to be its own id's wherever it has ended up.
+    uint8_t last_bag[bag_slots];
+    bool have_last = false;
+
+    // The counts per id from the bag as it is now, with the count bytes
+    // matched to last_bag by order. False if they do not match.
+    bool counts_since_last(uint8_t* rdram, int (&counts)[256]) {
+        int last_ids[stack_ids];
+        uint8_t last_values[stack_ids];
+        int last_n = 0;
+        for (int id = 0; id < stack_ids; id++) {
+            uint8_t b = last_bag[stack_base + id];
+            if (b != bag_empty) {
+                last_ids[last_n] = id;
+                last_values[last_n++] = b;
+            }
+        }
+        for (int& c : counts) c = 0;
+        int k = 0;
+        for (int slot = 0; slot < bag_slots; slot++) {
+            uint8_t b = static_cast<uint8_t>(MEM_BU(slot, bag));
+            if (b == bag_empty) {
+                continue;
+            }
+            if (b & 0x80) {
+                if (k >= last_n || b != last_values[k]) {
+                    return false;
+                }
+                counts[last_ids[k++]] += b & 0x7F;
+                continue;
+            }
+            counts[b]++;
+        }
+        return k == last_n;
+    }
+
+    // menu_open: the list on screen is only rewritten when that leaves it
+    // as it was before or as the game has just made it - an item used, its
+    // entry put back while more are left - so nothing moves under the
+    // cursor. A new item waits for the menu to close.
+    // A bag saved while the above went wrong: its counts slid down by the
+    // items used since, and nothing read it again. Take the smallest slide
+    // that puts every count back on an id that stacks.
+    bool read_slid_bag(uint8_t* rdram, int (&counts)[256]) {
+        for (int slide = 1; slide < stack_base; slide++) {
+            bool fits = true;
+            for (int& c : counts) c = 0;
+            for (int slot = 0; slot < bag_slots && fits; slot++) {
+                int b = MEM_BU(slot, bag);
+                if (b == bag_empty) {
+                    continue;
+                }
+                if (b & 0x80) {
+                    int id = slot + slide - stack_base;
+                    fits = stackable(id);
+                    if (fits) counts[id] += b & 0x7F;
+                    continue;
+                }
+                counts[b]++;
+            }
+            if (fits) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void stack_bag(uint8_t* rdram, bool menu_open) {
         int counts[256];
-        if (!read_bag(rdram, counts, nullptr)) {
-            return;
+        if (!(have_last && counts_since_last(rdram, counts))) {
+            if (menu_open) {
+                return;
+            }
+            if (!read_bag(rdram, counts, nullptr) && !read_slid_bag(rdram, counts)) {
+                return;
+            }
+        }
+        for (int id = 0; id <= stackable_last; id++) {
+            counts[id] = std::min(counts[id], max_stack);
         }
         uint8_t shaped[bag_slots];
         std::memset(shaped, bag_empty, sizeof shaped);
@@ -376,16 +490,27 @@ namespace {
             }
             int entries = stackable(id) ? 1 : counts[id];
             if (n + entries > list_slots) {
+                have_last = false;
                 return;   // more than the list holds: leave the bag as it is
             }
             for (int k = 0; k < entries; k++) {
                 shaped[n++] = static_cast<uint8_t>(id);
             }
             if (stackable(id)) {
-                int extra = std::min(counts[id], max_stack) - 1;
+                int extra = counts[id] - 1;
                 if (extra > 0) {
                     shaped[stack_base + id] = static_cast<uint8_t>(0x80 | extra);
                 }
+            }
+        }
+        if (menu_open) {
+            bool as_before = std::memcmp(shaped, last_bag, list_slots) == 0;
+            bool as_now = true;
+            for (int slot = 0; slot < list_slots && as_now; slot++) {
+                as_now = MEM_BU(slot, bag) == shaped[slot];
+            }
+            if (!as_before && !as_now) {
+                return;
             }
         }
         for (int slot = 0; slot < bag_slots; slot++) {
@@ -393,9 +518,11 @@ namespace {
                 for (int s = 0; s < bag_slots; s++) {
                     MEM_B(s, bag) = static_cast<int8_t>(shaped[s]);
                 }
-                return;
+                break;
             }
         }
+        std::memcpy(last_bag, shaped, sizeof last_bag);
+        have_last = true;
     }
 
     // The option is off: a bag that was stacked goes back to a slot a copy.
@@ -568,14 +695,18 @@ void zelda64::enhancements::on_frame(uint8_t* rdram) {
 
     if (!zelda64::hardmode::active() && in_game(rdram)) {
         if (options.stack_items) {
-            if (!item_menu_open(rdram)) {
-                stack_bag(rdram);
-            }
+            stack_bag(rdram, item_menu_open(rdram));
             show_counts(rdram);
         }
         else {
             unstack_bag(rdram);
         }
+    }
+    else if (static_cast<int32_t>(MEM_W(0, next_map)) == -1) {
+        // No save loaded (the title, or a reset): the next bag is a save's
+        // own, read afresh. Not in modes 2 and 4, where a battle's item
+        // uses still have to be caught up with afterwards.
+        have_last = false;
     }
 
     // The element-choice screen (bit 3 of the menu mask 0x8007B2E4) opened
@@ -713,4 +844,59 @@ extern "C" void quest64_enh_walk_unscale(uint8_t* rdram, recomp_context*) {
     write_f32(rdram, scaled_player + 0x18, read_f32(rdram, scaled_player + 0x18) / applied_scale);
     write_f32(rdram, scaled_player + 0x20, read_f32(rdram, scaled_player + 0x20) / applied_scale);
     applied_scale = 1.0f;
+}
+
+// ---- Boss max MP ----------------------------------------------------------
+//
+// func_8000BB68 is the boss reward. For every boss but Mammon (a0 = 7) it adds
+// the halfword at 0x8004C2C0 + 2 * boss to max HP (capped at 500) and refills
+// HP; both paths leave through 0x8000BCF4, where this hook runs. With the
+// option on, max MP rises too and MP is refilled, the way the Japanese
+// release does it: Eltale Monsters' copy of this routine (ROM 0xE128, RAM
+// 0x8000D528) reads a second table straight after the HP one and treats it
+// exactly like HP - add, cap at 500, refill. That table is copied here, since
+// the US ROM has only zeroes after its HP table. a1 still holds the boss's
+// number at the hook. Every call is logged to boss_mp.txt.
+namespace {
+    // Eltale Monsters, 0x8004DD60: Solvaring, Zelse, Nepty, Shilf, Fargo,
+    // Guilty, Beigis.
+    constexpr int jp_boss_mp_bonus[7] = { 5, 5, 5, 10, 10, 15, 15 };
+}
+
+extern "C" void quest64_enh_boss_max_mp(uint8_t* rdram, recomp_context* ctx) {
+    constexpr int32_t player_main = 0x8007BA80;   // +6 max HP, +8 MP, +0xA max MP
+    constexpr int max_mp_cap = 500;
+    int boss = static_cast<int>(ctx->r5);
+    bool on = zelda64::enhancements::active_options().boss_max_mp && !zelda64::hardmode::active();
+    int before = MEM_HU(0xA, player_main);
+    if (on && boss >= 0 && boss < 7) {
+        int max_mp = std::min(before + jp_boss_mp_bonus[boss], max_mp_cap);
+        MEM_H(0xA, player_main) = static_cast<int16_t>(max_mp);
+        MEM_H(0x8, player_main) = static_cast<int16_t>(max_mp);
+    }
+    std::ofstream out(zelda64::get_app_folder_path() / "boss_mp.txt", std::ios::app);
+    out << "boss " << boss << ": option " << (on ? "on" : "off") << ", max HP " << MEM_HU(0x6, player_main)
+        << ", max MP " << before << " -> " << MEM_HU(0xA, player_main) << "\n";
+}
+
+// ---- Hide Compass --------------------------------------------------------
+//
+// func_8001E25C draws the field HUD: the HP/MP block, the spirits, and - in
+// the field, not in a battle - the compass, func_8001EA84. That routine puts
+// it at (260, 24) (the HUD's shared position slot, 0x8008C648/C64C, which
+// every HUD element sets for itself before drawing), turns the disc
+// (display list 0x803A8EA0) by the camera's angle and draws the arrow over it
+// through func_800210FC. Hooked at its entry, returning skips all of it.
+namespace {
+    std::atomic<bool> compass_hidden{ false };
+}
+
+void zelda64::enhancements::set_hide_compass(bool hide) {
+    compass_hidden.store(hide);
+}
+
+extern "C" int quest64_enh_hide_compass(uint8_t* rdram, recomp_context* ctx) {
+    (void)rdram;
+    (void)ctx;
+    return compass_hidden.load() ? 1 : 0;
 }

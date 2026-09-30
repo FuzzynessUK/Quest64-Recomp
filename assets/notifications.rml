@@ -72,6 +72,59 @@
 			.speedrun-timer--top-middle    { position: absolute; top: 16dp;    left: 50%; margin-left: -130dp; text-align: center; }
 			.speedrun-timer--bottom-middle { position: absolute; bottom: 16dp; left: 50%; margin-left: -130dp; text-align: center; }
 			.speedrun-timer--done         { color: #7cfc7c; }
+			/* The Archipelago logo, under the Quest 64 logo on the title
+			   screen while connected. ui_config.cpp loads the texture from
+			   assets/archipelago_logo.png and slides it into place. */
+			#aplogo
+			{
+				position: absolute;
+				display: none;
+			}
+			/* The minimap (include/minimap.h): the submap's outline as a
+			   texture ui_config.cpp draws, with the markers placed over it
+			   every frame. */
+			#minimap
+			{
+				position: absolute;
+				display: none;
+				background-color: #0c1018b8;
+				border-width: 2dp;
+				border-color: #ffffff38;
+				border-radius: 6dp;
+				/* Zoomed in, the map is bigger than the box. */
+				overflow: hidden;
+			}
+			/* Minimap "On (no background)": no box, just the map. */
+			#minimap.minimap--bare
+			{
+				background-color: #00000000;
+				border-color: #00000000;
+			}
+			#mm_map
+			{
+				position: absolute;
+				left: 0px;
+				top: 0px;
+				width: 100%;
+				height: 100%;
+			}
+			.mm-dot
+			{
+				position: absolute;
+				display: block;
+				/* Round: RmlUi takes no percentages here, and a radius past half the
+				   size is clamped to it. */
+				border-radius: 64dp;
+			}
+			.mm-chest { background-color: #ffc83c; border-radius: 1dp; }
+			.mm-chest--open { background-color: #8a8a8a80; }
+			.mm-spirit { background-color: #6cf0ff; }
+			.mm-exit { background-color: #b08cff; border-radius: 1dp; }
+			#mm_brian
+			{
+				position: absolute;
+				display: block;
+			}
 		</style>
 	</head>
 	<body>
@@ -95,6 +148,12 @@
 			     data-class-speedrun-timer--bottom-middle="timer_position == 5"
 			     data-class-speedrun-timer--done="timer_finished">{{timer_text}}</div>
 			</div>
+		</div>
+		<div id="aplogo"></div>
+		<div id="minimap">
+			<div id="mm_map"></div>
+			<div id="mm_markers"></div>
+			<div id="mm_brian"></div>
 		</div>
 	</body>
 </rml>

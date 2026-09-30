@@ -81,6 +81,17 @@ namespace zelda64::archipelago {
     // element-choice screen for yet.
     int pending_level_ups();
 
+    // For the tracker. False unless a seed is being played; otherwise, per
+    // location id asked about, whether this slot has it and whether the
+    // server says it is checked.
+    // The seed's mammon_portal (0 vanilla, 1 bosses, 2 monsters, 3 both), or
+    // -1 when no seed is being played; `monsters` is how many kinds the
+    // monster condition counts.
+    int portal_requirement(int& monsters);
+
+    bool tracker_view(const std::vector<int64_t>& locations, std::vector<uint8_t>& in_seed,
+                      std::vector<uint8_t>& checked);
+
     // Phase 3 calls these; they are no-ops until the connector is on.
 
     // Tell the server a location has been checked. Sending one twice is

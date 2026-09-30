@@ -296,6 +296,16 @@ public:
             return;
         }
 
+        // A document that takes the mouse but not the controller (the tracker
+        // windows, include/tracker.h) is left alone: moving focus into it for
+        // the controller's sake put a blinking caret in its note on every
+        // stick or button press. It manages its own focus with the mouse.
+        for (ContextDetails& details : shown_contexts) {
+            if (details.document == current_document && !details.context.captures_input()) {
+                return;
+            }
+        }
+
         if (cont_is_active || non_mouse_interacted) {
             if (non_mouse_interacted) {
                 auto focusedEl = current_document->GetFocusLeafNode();
@@ -787,6 +797,9 @@ void draw_hook(plume::RenderCommandList* command_list, plume::RenderFramebuffer*
         // The timer overlay is live while the game runs, not just in menus.
         recompui::update_speedrun_model();
         recompui::update_stat_effects();
+        recompui::update_title_logo();
+        recompui::update_tracker();
+        recompui::update_minimap();
         recompui::update_notifications();
         recompui::update_archipelago();
 
