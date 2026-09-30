@@ -119,15 +119,22 @@ namespace {
     std::vector<int64_t> server_items;
     int items_applied = 0;
     std::set<int64_t> checked_locations;
-    // Every location this slot has, done or not: slot_data "locations", which
-    // the apworld sends because APCpp does not pass on the Connected packet's
-    // missing_locations. A gift NPC whose location is not in it (giftsanity
-    // off) is left to give its own item.
+    // Every location this slot has, done or not. APCpp does not pass on the
+    // Connected packet's missing_locations, so this is worked out from the
+    // slot's options the way the apworld decides which locations to create
+    // (in_slot). The 1.4.x and 1.5.0 apworlds sent the list itself as
+    // slot_data "locations"; when a seed has it, it is used as it is.
     std::set<int64_t> slot_locations;
-    // A seed made by an apworld from before "locations" has no list; for one
-    // of those the sanity switches in slot_data decide instead.
     bool slot_locations_known = false;
     bool chestsanity = true, giftsanity = true, enemysanity = true, spiritsanity = true;
+    int mammon_portal = 0;   // 0 vanilla, 1 bosses, 2 monsters, 3 both
+    // With the Enemy Randomizer, the kinds of monster the apworld placed
+    // (from slot_data "enemy_plan"): the only enemy locations the slot has.
+    std::set<int> planned_monsters;
+    bool monsters_planned = false;
+    // The gift NPC who holds the Eletale's Book (the Brannoch Castle Shannon):
+    // a location of her own whenever the portal does not want the Book.
+    constexpr int book_giver = 8;
     // The yaml's settings for the game itself (slot_data "settings") and the
     // seed its randomizer rolls with, as last received. Null until a
     // Connected packet carries them.
@@ -150,10 +157,15 @@ namespace {
         if (checked_locations.count(location) != 0) {
             return true;
         }
-        switch ((location - zelda64::archipelago::id_base) & 0xF000) {
+        // The apworld's own rules for which locations it creates.
+        int64_t offset = location - zelda64::archipelago::id_base;
+        int index = static_cast<int>(offset & 0xFFF);
+        switch (offset & 0xF000) {
             case zelda64::archipelago::group_chest:  return chestsanity;
-            case zelda64::archipelago::group_giver:  return giftsanity;
-            case zelda64::archipelago::group_enemy:  return enemysanity;
+            case zelda64::archipelago::group_giver:
+                return giftsanity || (index == book_giver && mammon_portal != 0);
+            case zelda64::archipelago::group_enemy:
+                return enemysanity && (!monsters_planned || planned_monsters.count(index) != 0);
             case zelda64::archipelago::group_spirit: return spiritsanity;
             default:                                 return true;
         }
@@ -167,7 +179,6 @@ namespace {
         std::lock_guard lock{ server_mutex };
         return in_slot(zelda64::archipelago::id_base + group + index);
     }
-    int mammon_portal = 0;   // 0 vanilla, 1 bosses, 2 monsters, 3 both
     // 0 off, 1 the seven before Mammon, 2 with Mammon as well.
     std::atomic<int> boss_souls{ 0 };
     // The yaml's wingsmith_wings: a wingsmith hands over its wings as well
@@ -242,6 +253,24 @@ namespace {
         }
         else if (key == "enemy_plan" && v.is_object()) {
             enemy_plan_live = v;
+            // Which kinds of monster it placed: an entry of a file is the
+            // global id of the file's first monster plus its place in it.
+            static constexpr int file_first[6] = { 0, 12, 27, 38, 51, 63 };
+            planned_monsters.clear();
+            const json& tables = v.value("tables", json());
+            const json& rosters = v.value("rosters", json());
+            monsters_planned = tables.is_array() && rosters.is_array() && tables.size() == rosters.size();
+            for (size_t a = 0; monsters_planned && a < tables.size(); a++) {
+                int file = tables[a].is_number_integer() ? tables[a].get<int>() : -1;
+                if (file < 0 || file >= 6 || !rosters[a].is_array()) {
+                    continue;
+                }
+                for (const json& entry : rosters[a]) {
+                    if (entry.is_number_integer()) {
+                        planned_monsters.insert(file_first[file] + entry.get<int>());
+                    }
+                }
+            }
         }
         else if (key == "portal_monsters" && v.is_array()) {
             portal_monsters.clear();
@@ -288,6 +317,8 @@ namespace {
                     slot_locations_known = false;
                     wingsmith_wings.store(false);
                     enemy_plan_live = json();
+                    planned_monsters.clear();
+                    monsters_planned = false;
                     portal_monsters.clear();
                     break;
                 case q64ap::EventType::ItemReceived: {

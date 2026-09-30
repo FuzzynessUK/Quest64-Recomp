@@ -192,17 +192,17 @@ class Q64World(World):
             pool.append(self.create_item("Level Up"))
 
         # Too many items for the locations in play: shed the ones no rule
-        # waits on - filler, then useful (the wings), then Level Ups, which
-        # are progression in name only. The gate items and the Souls are
-        # what the seed is beaten with, so they are never dropped; if they
-        # alone do not fit, the options cannot make a winnable seed.
+        # waits on - filler, then the wings, then Level Ups (useful too, but
+        # worth more to a run than a pair of wings). The gate items and the
+        # Souls are what the seed is beaten with, so they are never dropped;
+        # if they alone do not fit, the options cannot make a winnable seed.
         def expendable(item: Q64Item) -> int:
             if item.classification == ItemClassification.filler:
                 return 0
-            if item.classification == ItemClassification.useful:
-                return 1
             if item.name == "Level Up":
                 return 2
+            if item.classification == ItemClassification.useful:
+                return 1
             return 3
 
         excess = len(pool) - open_locations
@@ -237,11 +237,6 @@ class Q64World(World):
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),
-            # Every location id this slot has. The game's client (APCpp) is
-            # not given the server's missing_locations, and it needs to know
-            # which chests, spirits and givers are checks in this seed.
-            "locations": sorted(loc.address for loc in self.multiworld.get_locations(self.player)
-                                if loc.address is not None),
             # The game's own settings from the yaml, and the seed its
             # randomizer rolls them with, so every session of this slot
             # plays the same shuffle.

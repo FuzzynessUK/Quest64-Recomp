@@ -18,7 +18,7 @@ class Q64ItemData(NamedTuple):
 
 
 item_data_table: Dict[str, Q64ItemData] = {
-    "Level Up": Q64ItemData(code=0x51640F00, type=ItemClassification.progression, num_exist=98, can_create=lambda options: bool(options.spiritsanity) or options.extra_level_ups.value > 0),
+    "Level Up": Q64ItemData(code=0x51640F00, type=ItemClassification.useful, num_exist=98, can_create=lambda options: bool(options.spiritsanity) or options.extra_level_ups.value > 0),
     "Solvaring's Soul": Q64ItemData(code=0x51640E01, type=ItemClassification.progression, num_exist=1, can_create=lambda options: options.boss_souls.value >= 1),
     "Zelse's Soul": Q64ItemData(code=0x51640E02, type=ItemClassification.progression, num_exist=1, can_create=lambda options: options.boss_souls.value >= 1),
     "Nepty's Soul": Q64ItemData(code=0x51640E03, type=ItemClassification.progression, num_exist=1, can_create=lambda options: options.boss_souls.value >= 1),
