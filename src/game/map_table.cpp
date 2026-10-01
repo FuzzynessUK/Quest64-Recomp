@@ -748,3 +748,12 @@ std::string zelda64::entrance_label(int map, int submap, int entrance) {
     }
     return label;
 }
+
+void zelda64::exit_destinations(int map, int submap, std::vector<std::pair<int, int>>& out) {
+    out.clear();
+    for (const Exit& exit : exits) {
+        if (exit.src_map == map && exit.src_submap == submap) {
+            out.emplace_back(exit.dst_map, exit.dst_submap);
+        }
+    }
+}

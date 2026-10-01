@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <utility>
 
 namespace zelda64 {
     struct SceneWarps {
@@ -40,6 +41,8 @@ namespace zelda64 {
     // "N: to A, B" / "N: from A" descriptions built from the game's exit data.
     std::string submap_label(int map, int submap);
     std::string entrance_label(int map, int submap, int entrance);
+    // Every {map, submap} an exit in this submap leads to (repeats kept).
+    void exit_destinations(int map, int submap, std::vector<std::pair<int, int>>& out);
 
     // Fields of gPlayerMainData that the cheats menu edits. The order matches
     // the element bytes in memory.

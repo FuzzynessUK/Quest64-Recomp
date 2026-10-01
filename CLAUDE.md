@@ -59,7 +59,17 @@ menu (F5 Cheats, F6 Randomizer, Enhancements tab):
     and places markers on the notification overlay; north up = world -z;
     Brian's arrow follows his last movement; placed/sized as a third HUD box
     in Layout, `minimap*` in enhancements.json, live; zoom via the bindable
-    MINIMAP_ZOOM_IN/OUT inputs, centred on Brian), Hide Compass (live: hook
+    MINIMAP_ZOOM_IN/OUT inputs, centred on Brian; 1.5.0: map/submap read
+    from 0x80084EE4/EE8, not the exit record D_80085368 which changes
+    before the new map loads; its own Minimap group on Layout with Hide
+    spirits / chests / gift NPCs and Checks Guide; plain doors never drawn,
+    a door to an unopened chest, untaken spirit or (AP seed) unchecked gift
+    NPC, or to any gift NPC, is a white "?", and the building outline the
+    door sits on is drawn heavier white; gift NPC rooms/positions are a
+    table in minimap.cpp read from each map's NPC list, map table +0x38,
+    first u16 of a 0x2C record = submap; hidden while a text window
+    (0x800905E0, 4 x 0x89C, flags 0x30000000, rect s16 at +4) overlaps it),
+    Hide Compass (live: hook
     at func_8001EA84's entry returns; that routine is the compass, called
     from the field HUD func_8001E25C - HP block, spirits, compass; the HUD
     routines are 0x8001E1F0-0x800210FC per Rainchus/Quest64-Decomp's

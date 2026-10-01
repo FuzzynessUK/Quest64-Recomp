@@ -146,6 +146,10 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("minimap_size", o.minimap_size);
     get("minimap_zoom", o.minimap_zoom);
     get("minimap_background", o.minimap_background);
+    get("minimap_hide_spirits", o.minimap_hide_spirits);
+    get("minimap_hide_chests", o.minimap_hide_chests);
+    get("minimap_hide_givers", o.minimap_hide_givers);
+    get("minimap_checks_guide", o.minimap_checks_guide);
     get("hide_compass", o.hide_compass);
     get("stat_up_effect", o.stat_up_effect);
     get("spell_notice", o.spell_notice);
@@ -196,6 +200,10 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["minimap_size"] = o.minimap_size;
     j["minimap_zoom"] = o.minimap_zoom;
     j["minimap_background"] = o.minimap_background;
+    j["minimap_hide_spirits"] = o.minimap_hide_spirits;
+    j["minimap_hide_chests"] = o.minimap_hide_chests;
+    j["minimap_hide_givers"] = o.minimap_hide_givers;
+    j["minimap_checks_guide"] = o.minimap_checks_guide;
     j["hide_compass"] = o.hide_compass;
     j["stat_up_effect"] = o.stat_up_effect;
     j["spell_notice"] = o.spell_notice;

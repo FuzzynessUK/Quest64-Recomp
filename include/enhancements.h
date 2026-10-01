@@ -114,6 +114,16 @@ namespace zelda64::enhancements {
         // No box behind the minimap: the walls and markers straight over the
         // game.
         bool minimap_background = true;
+        // What the minimap leaves off: spirits and chests. Plain doors are
+        // never drawn; only those the Checks Guide or a gift NPC marks.
+        bool minimap_hide_spirits = false;
+        bool minimap_hide_chests = false;
+        // Gift NPCs (on by default: false shows them).
+        bool minimap_hide_givers = false;
+        // Checks Guide: exits that lead somewhere with a check still to get
+        // (unopened chest, spirit not taken, gift NPC in an Archipelago seed)
+        // are lit up, and the building the door is in with them.
+        bool minimap_checks_guide = true;
 
         // Hide Compass (Quality of Life): the turning compass the field HUD
         // draws at the top right is not drawn. Applies straight away.

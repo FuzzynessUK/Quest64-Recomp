@@ -120,6 +120,22 @@
 			.mm-chest--open { background-color: #8a8a8a80; }
 			.mm-spirit { background-color: #6cf0ff; }
 			.mm-exit { background-color: #b08cff; border-radius: 1dp; }
+			/* A gift NPC: green, ringed while it is a check to get, grey once given. */
+			.mm-giver { background-color: #6fe07a; }
+			.mm-giver--check { border-width: 1dp; border-color: #ffffff; }
+			.mm-giver--done { background-color: #8a8a8a80; }
+			/* A door with checks behind it (Checks Guide). */
+			.mm-exit--checks, .mm-exit--giver
+			{
+				background-color: #101010e0;
+				border-width: 1dp;
+				border-radius: 64dp;
+				font-family: "latolatin";
+				font-weight: bold;
+				text-align: center;
+			}
+			.mm-exit--checks, .mm-exit--giver { color: #ffffff; border-color: #ffffff; }
+			/* A door with a gift NPC behind it (while gift NPCs are shown). */
 			#mm_brian
 			{
 				position: absolute;

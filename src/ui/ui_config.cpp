@@ -956,6 +956,20 @@ void make_enhancements_bindings(Rml::Context* context) {
             enhancements_option_changed(false);
         }
     );
+    // The minimap's markers: four On/Off settings, live like the rest.
+    auto bind_minimap_flag = [&constructor](const char* name, bool zelda64::enhancements::Options::*field) {
+        constructor.BindFunc(name,
+            [field](Rml::Variant& out) { out = (enhancements_context.edited.*field) ? 1 : 0; },
+            [field](const Rml::Variant& in) {
+                enhancements_context.edited.*field = in.Get<int>() != 0;
+                enhancements_option_changed(false);
+            }
+        );
+    };
+    bind_minimap_flag("enh_minimap_hide_spirits", &zelda64::enhancements::Options::minimap_hide_spirits);
+    bind_minimap_flag("enh_minimap_hide_chests", &zelda64::enhancements::Options::minimap_hide_chests);
+    bind_minimap_flag("enh_minimap_hide_givers", &zelda64::enhancements::Options::minimap_hide_givers);
+    bind_minimap_flag("enh_minimap_checks_guide", &zelda64::enhancements::Options::minimap_checks_guide);
     constructor.BindFunc("enh_minimap_size",
         [](Rml::Variant& out) { out = enhancements_context.edited.minimap_size; },
         [](const Rml::Variant& in) {
@@ -2044,9 +2058,17 @@ namespace {
     std::vector<Rml::Element*> mm_dots;
     float mm_last_x = 0.0f, mm_last_z = 0.0f, mm_angle = 0.0f;
     bool mm_have_last = false, mm_have_angle = false;
+    // How each outline is lit, as last drawn: 0 plain, 1 a building with a
+    // gift NPC inside, 2 one with checks inside. Both are drawn the same,
+    // bright white and heavier; 2 only wins where they meet.
+    std::vector<int> mm_lit;
 
-    void mm_plot(std::vector<char>& px, int n, float x, float y) {
+    void mm_plot(std::vector<char>& px, int n, float x, float y, int lit) {
         // A soft two-pixel pen: every pixel within 1.6 of the point, fading out.
+        // A lit wall wins over a plain one where they meet.
+        static constexpr uint8_t colours[3][3] = { { 0xE8, 0xE0, 0xC8 }, { 0xFF, 0xFF, 0xFF }, { 0xFF, 0xFF, 0xFF } };
+        const float pen = lit != 0 ? 2.3f : 1.6f;
+        const uint8_t* rgb = colours[std::clamp(lit, 0, 2)];
         for (int dy = -2; dy <= 2; dy++) {
             for (int dx = -2; dx <= 2; dx++) {
                 int ix = static_cast<int>(std::floor(x)) + dx, iy = static_cast<int>(std::floor(y)) + dy;
@@ -2054,13 +2076,13 @@ namespace {
                     continue;
                 }
                 float d = std::hypot(ix + 0.5f - x, iy + 0.5f - y);
-                uint8_t alpha = static_cast<uint8_t>(std::clamp(1.6f - d, 0.0f, 1.0f) * 235.0f);
+                uint8_t alpha = static_cast<uint8_t>(std::clamp(pen - d, 0.0f, 1.0f) * (lit != 0 ? 255.0f : 235.0f));
                 size_t at = (static_cast<size_t>(iy) * n + static_cast<size_t>(ix)) * 4;
-                if (alpha > static_cast<uint8_t>(px[at + 3])) {
-                    px[at] = static_cast<char>(0xE8);
-                    px[at + 1] = static_cast<char>(0xE0);
-                    px[at + 2] = static_cast<char>(0xC8);
-                    px[at + 3] = static_cast<char>(alpha);
+                if (alpha > static_cast<uint8_t>(px[at + 3]) || (lit != 0 && alpha > 0)) {
+                    px[at] = static_cast<char>(rgb[0]);
+                    px[at + 1] = static_cast<char>(rgb[1]);
+                    px[at + 2] = static_cast<char>(rgb[2]);
+                    px[at + 3] = static_cast<char>(lit != 0 ? std::max<uint8_t>(alpha, static_cast<uint8_t>(px[at + 3])) : alpha);
                 }
             }
         }
@@ -2074,14 +2096,21 @@ namespace {
         mm_off_x = pad + (n - 2 * pad - w * mm_scale) / 2.0f - s.min_x * mm_scale;
         mm_off_z = pad + (n - 2 * pad - h * mm_scale) / 2.0f - s.min_z * mm_scale;
         std::vector<char> px(static_cast<size_t>(n) * n * 4, 0);
-        for (const auto& chain : s.outline) {
+        // Plain walls first, then the lit ones over them.
+        for (int pass = 0; pass < 3; pass++)
+        for (size_t g = 0; g < s.outline.size(); g++) {
+            int lit = g < mm_lit.size() ? mm_lit[g] : 0;
+            if (lit != pass) {
+                continue;
+            }
+            const auto& chain = s.outline[g];
             for (size_t i = 1; i < chain.size(); i++) {
                 float x0 = chain[i - 1].x * mm_scale + mm_off_x, y0 = chain[i - 1].z * mm_scale + mm_off_z;
                 float x1 = chain[i].x * mm_scale + mm_off_x, y1 = chain[i].z * mm_scale + mm_off_z;
                 int steps = std::max(1, static_cast<int>(std::hypot(x1 - x0, y1 - y0) * 2.0f));
                 for (int k = 0; k <= steps; k++) {
                     float t = static_cast<float>(k) / steps;
-                    mm_plot(px, n, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+                    mm_plot(px, n, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, lit);
                 }
             }
         }
@@ -2176,6 +2205,20 @@ void recompui::update_minimap() {
         fy = 8.0f;
     }
     float size = size_frame * px_per_frame;
+    // Out of the way of the game's text boxes: the overlay is drawn over the
+    // finished frame, so it cannot go behind one, and is hidden instead
+    // while one overlaps it. Boxes are in the 4:3 picture, centred.
+    {
+        float frame_w = 240.0f * window.x / std::max(window.y, 1);
+        float left = (frame_w - 320.0f) / 2.0f;
+        for (const auto& t : mm_state.text_boxes) {
+            float tx = t.x + left;
+            if (tx < fx + size_frame && tx + t.w > fx && t.y < fy + size_frame && t.y + t.h > fy) {
+                box->SetProperty("display", "none");
+                return;
+            }
+        }
+    }
     box->SetProperty("display", "block");
     box->SetClass("minimap--bare", !e.minimap_background);
     box->SetProperty(Rml::PropertyId::Left, Rml::Property(fx * px_per_frame, Rml::Unit::PX));
@@ -2183,11 +2226,24 @@ void recompui::update_minimap() {
     box->SetProperty(Rml::PropertyId::Width, Rml::Property(size, Rml::Unit::PX));
     box->SetProperty(Rml::PropertyId::Height, Rml::Property(size, Rml::Unit::PX));
 
-    // The texture, drawn again for a new submap or when the size it is shown
-    // at has moved far from what it was drawn for.
+    // Buildings to light: the outline each door is on, with checks behind it
+    // (Checks Guide) or a gift NPC (while they are shown).
+    std::vector<int> lit(mm_state.outline.size(), 0);
+    for (const auto& m : mm_state.exits) {
+        if (m.group < 0 || m.group >= static_cast<int>(lit.size())) {
+            continue;
+        }
+        int how = e.minimap_checks_guide && m.checks ? 2 : !e.minimap_hide_givers && m.giver ? 1 : 0;
+        lit[m.group] = std::max(lit[m.group], how);
+    }
+
+    // The texture, drawn again for a new submap, when the lit buildings
+    // change, or when the size it is shown at has moved far from what it was
+    // drawn for.
     int wanted = std::clamp(static_cast<int>(size * zoom), 128, 2048);
     bool new_mesh = mm_state.mesh_version != mm_mesh_shown;
-    if (new_mesh || mm_tex == 0 || wanted > mm_tex * 5 / 4 || wanted < mm_tex * 3 / 4) {
+    if (new_mesh || mm_tex == 0 || lit != mm_lit || wanted > mm_tex * 5 / 4 || wanted < mm_tex * 3 / 4) {
+        mm_lit = std::move(lit);
         mm_mesh_shown = mm_state.mesh_version;
         mm_draw_outline(map, mm_state, wanted);
         if (new_mesh) {
@@ -2213,7 +2269,9 @@ void recompui::update_minimap() {
     map->SetProperty(Rml::PropertyId::Height, Rml::Property(map_px, Rml::Unit::PX));
 
     size_t used = 0;
-    auto dot = [&](float x, float z, const char* kind, bool done, float diameter) {
+    // `text` is drawn inside the marker (the question mark on a door that
+    // leads somewhere worth going), sized to it.
+    auto dot = [&](float x, float z, const char* kind, const char* extra, float diameter, const char* text = "") {
         float bx, by;
         at(x, z, bx, by);
         if (bx < -diameter || by < -diameter || bx > size + diameter || by > size + diameter) {
@@ -2225,17 +2283,44 @@ void recompui::update_minimap() {
             mm_dots.push_back(markers->AppendChild(std::move(made)));
         }
         Rml::Element* d = mm_dots[used++];
-        d->SetClassNames(std::string("mm-dot ") + kind + (done ? " mm-chest--open" : ""));
+        d->SetClassNames(std::string("mm-dot ") + kind + extra);
         d->SetProperty("display", "block");
         d->SetProperty(Rml::PropertyId::Left, Rml::Property(bx - diameter / 2.0f, Rml::Unit::PX));
         d->SetProperty(Rml::PropertyId::Top, Rml::Property(by - diameter / 2.0f, Rml::Unit::PX));
         d->SetProperty(Rml::PropertyId::Width, Rml::Property(diameter, Rml::Unit::PX));
         d->SetProperty(Rml::PropertyId::Height, Rml::Property(diameter, Rml::Unit::PX));
+        if (d->GetInnerRML() != text) {
+            d->SetInnerRML(text);
+        }
+        if (text[0] != '\0') {
+            d->SetProperty(Rml::PropertyId::FontSize, Rml::Property(diameter * 0.8f, Rml::Unit::PX));
+            d->SetProperty(Rml::PropertyId::LineHeight, Rml::Property(diameter, Rml::Unit::PX));
+        }
     };
     float marker = std::max(4.0f, size * 0.045f);
-    for (const auto& m : mm_state.exits) dot(m.x, m.z, "mm-exit", false, marker);
-    for (const auto& m : mm_state.spirits) dot(m.x, m.z, "mm-spirit", false, marker);
-    for (const auto& m : mm_state.chests) dot(m.x, m.z, "mm-chest", m.done, marker);
+    // Plain doors are not drawn. A door to checks (Checks Guide) or to a gift
+    // NPC (while they are shown) is a white question mark.
+    for (const auto& m : mm_state.exits) {
+        bool lead = e.minimap_checks_guide && m.checks;
+        bool giver = !lead && !e.minimap_hide_givers && m.giver;
+        if (lead || giver) {
+            dot(m.x, m.z, "mm-exit", lead ? " mm-exit--checks" : giver ? " mm-exit--giver" : "",
+                lead || giver ? marker * 2.0f : marker, lead || giver ? "?" : "");
+        }
+    }
+    if (!e.minimap_hide_spirits) {
+        for (const auto& m : mm_state.spirits) dot(m.x, m.z, "mm-spirit", "", marker);
+    }
+    if (!e.minimap_hide_chests) {
+        for (const auto& m : mm_state.chests) dot(m.x, m.z, "mm-chest", m.done ? " mm-chest--open" : "", marker);
+    }
+    // Gift NPCs: grey once given (Archipelago), ringed white while a check.
+    if (!e.minimap_hide_givers) {
+        for (const auto& m : mm_state.givers) {
+            bool lead = e.minimap_checks_guide && m.checks;
+            dot(m.x, m.z, "mm-giver", m.done ? " mm-giver--done" : lead ? " mm-giver--check" : "", marker);
+        }
+    }
     for (size_t i = used; i < mm_dots.size(); i++) {
         mm_dots[i]->SetProperty("display", "none");
     }
