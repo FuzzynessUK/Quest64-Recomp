@@ -101,6 +101,13 @@ namespace {
 
     std::deque<int64_t> outgoing_checks;    // locations the game has reached
     bool goal_pending = false;
+    bool death_pending = false;             // DeathLink: Brian died, tell the room
+
+    // DeathLink the other way: someone else died and Brian is to follow,
+    // as soon as the game is somewhere he can (see apply_link_death). The
+    // second is set while the death we caused runs, so it is not sent back.
+    std::atomic<bool> link_death_waiting{ false };
+    std::atomic<bool> link_death_running{ false };
 
     // What the server says this slot has already checked, and what the yaml
     // asked for. Both arrive with Connected, so both survive everything the
@@ -344,6 +351,14 @@ namespace {
                 case q64ap::EventType::SlotData:
                     take_slot_data(ev.key, ev.value);
                     break;
+                case q64ap::EventType::DeathReceived: {
+                    link_death_waiting.store(true);
+                    std::string line = "DeathLink: " + (ev.key.empty() ? std::string("someone") : ev.key) + " died" +
+                                       (ev.value.empty() ? std::string() : " (" + ev.value + ")");
+                    zelda64::notify::post(line, zelda64::notify::Kind::ApReceived);
+                    log_line(line);
+                    break;
+                }
             }
         }
         if (items_changed) {
@@ -445,6 +460,7 @@ namespace {
                 // Anything the game has queued up.
                 std::vector<int64_t> to_send;
                 bool send_goal = false;
+                bool send_death = false;
                 {
                     std::lock_guard lock{ queue_mutex };
                     while (!outgoing_checks.empty()) {
@@ -453,6 +469,12 @@ namespace {
                     }
                     send_goal = goal_pending;
                     goal_pending = false;
+                    send_death = death_pending;
+                    death_pending = false;
+                }
+                if (send_death) {
+                    q64ap::send_death("%YOU% was defeated in Quest 64.");
+                    log_line("DeathLink: told the room Brian died");
                 }
                 if (!to_send.empty()) {
                     q64ap::send_locations(to_send);
@@ -587,7 +609,9 @@ void zelda64::archipelago::apply_options(const Options& options) {
         std::lock_guard lock{ queue_mutex };
         outgoing_checks.clear();
         goal_pending = false;
+        death_pending = false;
     }
+    link_death_waiting.store(false);
     {
         // The item list is the server's to state, and it states all of it
         // again on connecting, so it goes rather than being carried into
@@ -1244,7 +1268,192 @@ namespace {
     void open_boss_locks(uint8_t* rdram);
 }
 
+// DeathLink, Brian's side. The game has no "die now": HP at 0 by itself
+// does nothing, because only the damage routine looks. What it does after a
+// hit is the way in. func_80006BEC puts Brian in field/battle state 5
+// (0x8007BAB8, the state table at 0x8004C230 runs func_80004040 for it)
+// with a stun timer at +4; when that runs out, func_80004040 reads HP
+// through the pointer at +0x10 and, at 0, plays the collapse, the death
+// jingle and sends him back to his last save point - the whole of a lost
+// battle. So a death from the room is HP 0, state 5 and a short timer,
+// and the game does the rest itself.
+//
+// Only from one of the plain states (0-2, func_80003B60: standing, walking,
+// battle movement), so never mid-hit, mid-conversation, mid-door or in a
+// menu; it waits until Brian is somewhere it can happen.
+namespace {
+    constexpr int32_t player_state = 0x8007BAB8;      // u16 state, +4 u16 timer
+    constexpr int32_t player_object = 0x8007BACC;     // +0x60 u16 flags
+    constexpr int32_t player_hp = 0x8007BA84;         // gPlayerMainData + 4
+    constexpr int32_t game_mode_addr = 0x8007B2E0;    // gGameMode, u16: 1 in the field
+    constexpr uint16_t state_hit = 5;
+    constexpr uint32_t moving_or_menu = 0xC0 | menu_spirit;
+
+    // Held after a won battle, so Brian is never killed between beating
+    // something and getting what it gives - a boss killed and then lost to a
+    // death would not come back.
+    //
+    // The enemies are six 0x128-byte slots from 0x8007C998 (func_80008F6C
+    // walks them): +0x74 is -1 for an empty slot (it is the enemy object's
+    // +0x50, the object being at +0x24), +0xA the enemy's HP and +0xC its
+    // maximum (func_80008FE0 fills both from the stat entry's HP). A boss's
+    // HP reaches 0 well before the game counts the battle won: his death
+    // runs first, and a death of Brian's landing in it loses the boss. So:
+    //   1. the hold starts as soon as every enemy in the battle is at 0 HP
+    //      (or when the fanfare is asked for, if that comes first), and
+    //      lasts while the battle is still running;
+    //   2. then five seconds have to pass;
+    //   3. which only run while no level-up (the element screen, menu mask
+    //      bit 3) and no text box (the item's message) is up - they pause
+    //      it, and it carries on when they close.
+    constexpr int32_t enemy_slots = 0x8007C998;
+    constexpr int32_t enemy_slot_size = 0x128;
+    constexpr int enemy_slot_count = 6;
+
+    // In a battle: true once there are enemies and every one is at 0 HP.
+    bool all_enemies_down(uint8_t* rdram) {
+        int present = 0;
+        for (int i = 0; i < enemy_slot_count; i++) {
+            int32_t slot = enemy_slots + i * enemy_slot_size;
+            if (MEM_H(0x74, slot) == -1) {
+                continue;
+            }
+            present++;
+            if (MEM_HU(0xA, slot) != 0) {
+                return false;
+            }
+        }
+        return present > 0;
+    }
+
+    std::string enemy_slots_note(uint8_t* rdram) {
+        std::string out;
+        for (int i = 0; i < enemy_slot_count; i++) {
+            int32_t slot = enemy_slots + i * enemy_slot_size;
+            char part[48];
+            std::snprintf(part, sizeof part, " [%d: %d %u/%u]", i, MEM_H(0x74, slot), MEM_HU(0xA, slot), MEM_HU(0xC, slot));
+            out += part;
+        }
+        return out;
+    }
+    constexpr int32_t text_windows = 0x800905E0;    // four, 0x89C bytes, flags at +0
+    constexpr int32_t text_window_size = 0x89C;
+    constexpr uint32_t text_window_open = 0x30000000;
+    constexpr auto hold_after = std::chrono::seconds(5);
+    constexpr auto battle_cap = std::chrono::seconds(120);
+    std::atomic<bool> fanfare_started{ false };
+    bool hold = false;
+    bool hold_paused = false;
+    std::chrono::steady_clock::time_point hold_at, last_tick;
+    std::chrono::steady_clock::duration hold_counted{};
+
+    bool text_box_open(uint8_t* rdram) {
+        for (int i = 0; i < 4; i++) {
+            if ((static_cast<uint32_t>(MEM_W(0, text_windows + i * text_window_size)) & text_window_open) != 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Every frame: true while a death from the room has to wait.
+    bool victory_hold(uint8_t* rdram) {
+        auto now = std::chrono::steady_clock::now();
+        bool in_battle = (MEM_HU(0, gBattleState) & 1) != 0;
+        bool cleared = in_battle && all_enemies_down(rdram);
+        bool fanfare = fanfare_started.exchange(false);
+        if (!hold && (cleared || fanfare)) {
+            hold = true;
+            hold_paused = false;
+            hold_at = now;
+            last_tick = now;
+            hold_counted = {};
+            log_line((fanfare ? "DeathLink: victory fanfare, holding deaths; enemies"
+                              : "DeathLink: every enemy down, holding deaths; enemies") + enemy_slots_note(rdram));
+        }
+        if (!hold) {
+            return false;
+        }
+        auto step = now - last_tick;
+        last_tick = now;
+        if (in_battle) {
+            // Still winding up the battle (or a stuck one: let go eventually).
+            if (now - hold_at >= battle_cap) {
+                hold = false;
+                log_line("DeathLink: battle never ended, deaths can land again");
+                return false;
+            }
+            return true;
+        }
+        bool paused = (static_cast<uint32_t>(MEM_W(0, menu_mask)) & menu_spirit) != 0 || text_box_open(rdram);
+        if (paused != hold_paused) {
+            hold_paused = paused;
+            log_line(paused ? "DeathLink: level-up or text box up, the five seconds wait"
+                            : "DeathLink: window closed, the five seconds carry on");
+        }
+        if (!paused) {
+            hold_counted += step;
+        }
+        if (hold_counted >= hold_after) {
+            hold = false;
+            log_line("DeathLink: five seconds after the battle, deaths can land again");
+            return false;
+        }
+        return true;
+    }
+
+    void apply_link_death(uint8_t* rdram) {
+        if (link_death_running.load() && MEM_HU(0, player_state) != state_hit && MEM_HU(0, player_hp) != 0) {
+            // Whatever we started did not end in the death branch (it would
+            // have cleared this); a death of Brian's own counts again.
+            link_death_running.store(false);
+        }
+        if (!link_death_waiting.load()) {
+            return;
+        }
+        if (victory_hold(rdram)) {
+            return;
+        }
+        bool ready = MEM_W(0, gNextMap) != -1 && MEM_HU(0, game_mode_addr) == 1 &&
+                     (static_cast<uint32_t>(MEM_W(0, menu_mask)) & moving_or_menu) == 0 &&
+                     MEM_HU(0, player_state) <= 2 && MEM_HU(0, player_hp) != 0 &&
+                     !zelda64::enhancements::item_menu_open(rdram);
+        if (!ready) {
+            // Why it is waiting, about once a second, so a wait that never
+            // ends can be read off the log.
+            static int waited = 0;
+            if (waited++ % 60 == 0) {
+                char note[200];
+                std::snprintf(note, sizeof note,
+                              "DeathLink: waiting - map %d mode %u flags 0x%08X state %u timer %u hp %u item menu %d",
+                              static_cast<int>(MEM_W(0, gNextMap)), MEM_HU(0, game_mode_addr),
+                              static_cast<uint32_t>(MEM_W(0, menu_mask)), MEM_HU(0, player_state),
+                              MEM_HU(4, player_state), MEM_HU(0, player_hp),
+                              zelda64::enhancements::item_menu_open(rdram) ? 1 : 0);
+                log_line(note);
+            }
+            return;
+        }
+        link_death_waiting.store(false);
+        link_death_running.store(true);
+        MEM_H(0, player_hp) = 0;
+        MEM_H(0, player_state) = static_cast<int16_t>(state_hit);
+        MEM_H(4, player_state) = 2;
+        MEM_H(0x60, player_object) = static_cast<int16_t>(MEM_HU(0x60, player_object) | 1);
+        log_line(std::string("DeathLink: Brian falls") +
+                 ((MEM_HU(0, gBattleState) & 1) != 0 ? "; in battle, enemies" + enemy_slots_note(rdram) : std::string()));
+    }
+}
+
+void zelda64::archipelago::victory_fanfare(int track) {
+    (void)track;
+    fanfare_started.store(true);
+}
+
 void zelda64::archipelago::on_frame(uint8_t* rdram) {
+    // Kept up to date every frame, so a death that arrives during the hold
+    // finds it already running.
+    victory_hold(rdram);
     if (!ap_enabled.load()) {
         return;
     }
@@ -1262,6 +1471,7 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
     }
     guard_portal(rdram);
     open_boss_locks(rdram);
+    apply_link_death(rdram);
 
     // Hand over whatever the server has sent that this save has not had.
     // Nothing happens until a file is loaded: items put in the bag before
@@ -1968,4 +2178,20 @@ void zelda64::archipelago::load_progress(const std::string& save_key) {
     // either: what this save is due is the mark, and nothing else.
     level_ups_waiting.store(0);
     log_line("loaded: " + save_key + " has had " + std::to_string(applied) + " item(s)");
+}
+
+// func_80004040 at 0x800040C0, the branch where Brian has run out of HP and
+// dies (see apply_link_death): tell the room, unless the room started it.
+extern "C" void quest64_archipelago_death(uint8_t* rdram) {
+    (void)rdram;
+    if (!playing_seed()) {
+        return;
+    }
+    if (link_death_running.exchange(false)) {
+        log_line("DeathLink: the death from the room has run");
+        return;
+    }
+    log_line("DeathLink: Brian died");
+    std::lock_guard lock{ queue_mutex };
+    death_pending = true;
 }

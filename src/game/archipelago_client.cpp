@@ -126,6 +126,14 @@ namespace {
         push_event(std::move(e));
     }
 
+    void on_death(std::string source, std::string cause) {
+        drain_messages();
+        Event e = make_event(EventType::DeathReceived);
+        e.key = std::move(source);
+        e.value = std::move(cause);
+        push_event(std::move(e));
+    }
+
     std::string strip_scheme(const std::string& address) {
         for (const char* prefix : { "wss://", "ws://" }) {
             std::string p = prefix;
@@ -162,6 +170,11 @@ bool connect(const ConnectInfo& info) {
         AP_SetItemClearCallback(on_items_cleared);
         AP_SetItemRecvCallback(on_item_received);
         AP_SetLocationCheckedCallback(on_location_checked);
+        // DeathLink is offered on every connection; APCpp only turns it on
+        // (tags the connection, delivers deaths) when slot_data death_link
+        // is true, so a slot without it never sees one.
+        AP_SetDeathLinkSupported(true);
+        AP_SetDeathLinkRecvCallback(on_death);
         for (const std::string& key : info.slot_data_keys) {
             AP_RegisterSlotDataRawCallback(key, [key](std::string value) { on_slot_data(key, value); });
         }
@@ -227,6 +240,13 @@ void send_goal_complete() {
     OurCall guard;
     if (active) {
         AP_StoryComplete();
+    }
+}
+
+void send_death(const std::string& cause) {
+    OurCall guard;
+    if (active) {
+        AP_DeathLinkSend(cause);
     }
 }
 

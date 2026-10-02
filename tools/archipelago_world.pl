@@ -493,7 +493,7 @@ my $seed_yaml = '';
 my $options_py = <<'PY';
 from dataclasses import dataclass
 
-from Options import Choice, DefaultOnToggle, PerGameCommonOptions, Range, Toggle
+from Options import Choice, DeathLink, DefaultOnToggle, PerGameCommonOptions, Range, Toggle
 
 
 class Chestsanity(DefaultOnToggle):
@@ -658,6 +658,7 @@ class Q64Options(PerGameCommonOptions):
     ensure_all_enemies: EnsureAllEnemies
     spiritsanity: Spiritsanity
     extra_level_ups: ExtraLevelUps
+    death_link: DeathLink
 SEED_FIELDS_HERE
 PY
 $options_py =~ s/SEED_CLASSES_HERE\n/$seed_classes/;
@@ -970,6 +971,9 @@ class Q64World(World):
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),
+            # Read by APCpp itself (the game declares DeathLink support and
+            # APCpp tags the connection when this is true).
+            "death_link": bool(self.options.death_link),
             # The game's own settings from the yaml, and the seed its
             # randomizer rolls them with, so every session of this slot
             # plays the same shuffle.
@@ -1104,6 +1108,13 @@ $game:
 
   goal:
     mammon: 1
+
+  # DeathLink: when Brian dies, everyone else in the room with DeathLink on
+  # dies too, and when any of them dies, Brian collapses and is sent back to
+  # his last save point the same way a lost battle does.
+  death_link:
+    'false': 1
+    'true': 0
 $seed_yaml  progression_balancing: 50
   accessibility: full
 YAML
@@ -1120,7 +1131,7 @@ my %files = (
     "$out/quest64/__init__.py"  => $init_py,
     # The apworld manifest. Rule Builder (rule_builder) is what sets the
     # floor at 0.6.7.
-    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.5.2", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
+    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.6.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
     "$out/quest64/docs/en_quest64.md" => "# Quest 64 Recompiled\n\nEvery chest, gift, boss and spirit can hold an item from any world in the\nmultiworld. Turn the Archipelago Connector on in the port's menu and give it\nthe server address and your slot name.\n",
     "$out/quest64/docs/guide_en.md"   => "# Quest 64 Recompiled Setup Guide\n\n1. Put `quest64.apworld` in `Archipelago/custom_worlds`.\n2. Put your filled-in `Quest64Recompiled.yaml` in `Archipelago/Players`.\n3. Generate and host as usual.\n4. In Quest 64 Recompiled, open the config menu, turn on the Archipelago\n   Connector and enter the server address, your slot name and the password\n   if the room has one.\n",
     "$out/Quest64Recompiled.yaml" => $yaml,

@@ -113,6 +113,10 @@ namespace zelda64::archipelago {
 
     // Tell the server the goal is done.
     void goal_reached();
+    // The victory fanfare is starting (`track` is what will play, after any
+    // music shuffle). A death from the room is held from the moment every
+    // enemy is down, so the battle's rewards are in hand first.
+    void victory_fanfare(int track);
 
     // --- the seed's own settings -------------------------------------------
     // The yaml chooses the game's randomizer, enhancement and cosmetic

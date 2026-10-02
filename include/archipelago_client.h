@@ -33,6 +33,7 @@ namespace q64ap {
         ItemReceived,       // item `id` is at `index` in the server's list
         LocationChecked,    // the server says location `id` is checked
         SlotData,           // slot_data[key] = value, as JSON text
+        DeathReceived,      // a DeathLink death: key = who, value = cause (may be empty)
     };
 
     struct Event {
@@ -62,6 +63,9 @@ namespace q64ap {
 
     void send_locations(const std::vector<int64_t>& location_ids);
     void send_goal_complete();
+    // DeathLink: tell the room Brian died. APCpp sends nothing unless the
+    // slot has DeathLink on (slot_data death_link).
+    void send_death(const std::string& cause);
 
     bool poll_event(Event& out);
     bool poll_message(Message& out);

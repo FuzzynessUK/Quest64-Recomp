@@ -321,6 +321,19 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   slot_data `portal_monsters` is what the all_monsters portal counts:
   every kind outside Mammon's World (the four Mammon's World kinds were
   Late in the workbook and counted by the portal, which could never open).
+- **DeathLink** (yaml `death_link`, slot_data `death_link`, read by APCpp
+  itself: the client calls `AP_SetDeathLinkSupported(true)` on every
+  connect and APCpp only tags the connection when the slot has it on).
+  Sending: hook in `func_80004040` (player state 5, hit stun) at 0x800040C0,
+  the branch where HP is 0 and the death starts. Receiving: HP 0
+  (0x8007BA84), state 5 (0x8007BAB8) with timer 2 at +4, object +0x60 |= 1
+  - the game's own lost-battle path; only from states 0-2, never in a
+  menu/door/text. Held from the moment every enemy slot (6 x 0x128 from
+  0x8007C998, +0x74 -1 = empty, +0xA HP) is at 0 HP - before a boss's death
+  sequence - until the battle ends, then 5 s that pause while the spirit
+  screen (menu bit 3) or a text window is up. Dying inside that window
+  lost Solvaring's Earth Orb and left him gone (softlock).
+  `0x8008C990` is the battle's starting enemy count, not enemies left.
 - Gift NPCs: talk routine `func_800086E4`, hooks at 0x80008814 (the "held?"
   answer) and `func_800212A0` entry (skip the add).
 - A save read counts as a load only when the Pak menu was opened from the

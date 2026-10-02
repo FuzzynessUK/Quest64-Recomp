@@ -237,6 +237,9 @@ class Q64World(World):
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
             "shuffle_orbs": bool(self.options.shuffle_orbs),
+            # Read by APCpp itself (the game declares DeathLink support and
+            # APCpp tags the connection when this is true).
+            "death_link": bool(self.options.death_link),
             # The game's own settings from the yaml, and the seed its
             # randomizer rolls them with, so every session of this slot
             # plays the same shuffle.

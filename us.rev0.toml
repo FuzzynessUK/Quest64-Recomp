@@ -61,7 +61,7 @@ before_vram = 0x80005A08
 # queued or direct, ends in func_80025B8C with its id in a0.
 [[patches.hook]]
 func = "func_800267F8"
-text = "if (quest64_audio_skip_bgm(rdram, ctx)) return; quest64_audio_bgm(rdram, ctx);"
+text = "quest64_audio_victory(rdram, ctx); if (quest64_audio_skip_bgm(rdram, ctx)) return; quest64_audio_bgm(rdram, ctx);"
 before_vram = 0x800267F8
 [[patches.hook]]
 func = "func_80025B8C"
@@ -558,3 +558,11 @@ before_vram = 0x80011B70
 func = "func_8001C5F4"
 text = "if (quest64_cheat_no_encounters()) return;"
 before_vram = 0x8001C5F4
+
+# DeathLink. func_80004040 is player state 5 (hit stun); at 0x800040C0 it
+# has found HP at 0 and starts the death: collapse, jingle, back to the
+# last save point. Tells the room, unless the death came from the room.
+[[patches.hook]]
+func = "func_80004040"
+text = "quest64_archipelago_death(rdram);"
+before_vram = 0x800040C0

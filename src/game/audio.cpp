@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "archipelago.h"
 #include "audio.h"
 #include "enhancements.h"
 #include "notify.h"
@@ -1091,6 +1092,21 @@ extern "C" void quest64_audio_jingle(uint8_t*, recomp_context* ctx) {
     if (usable_track(track)) {
         ctx->r4 = S32(bgm_remap[track]);
     }
+}
+
+// func_800267F8, first of all: the battle code asks for the victory fanfare
+// here (0x8001D1B4, a0 = 0x2B, a1 = 8) once the last enemy is down.
+// DeathLink holds off until it is over; it is told the track that will
+// actually play, after quest64_audio_bgm's shuffle.
+extern "C" void quest64_audio_victory(uint8_t*, recomp_context* ctx) {
+    int track = static_cast<int8_t>(ctx->r4 & 0xFF);
+    if (track != 0x2B) {
+        return;
+    }
+    if (zelda64::audio::active_options().music_shuffle == MusicShuffle::All && usable_track(track)) {
+        track = bgm_remap[track];
+    }
+    zelda64::archipelago::victory_fanfare(track);
 }
 
 // func_80025B8C: the routine every sound effect ends in, queued or not,

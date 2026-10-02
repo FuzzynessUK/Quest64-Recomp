@@ -111,6 +111,13 @@ Quest 64 Recompiled:
   goal:
     mammon: 1
 
+  # DeathLink: when Brian dies, everyone else in the room with DeathLink on
+  # dies too, and when any of them dies, Brian collapses and is sent back to
+  # his last save point the same way a lost battle does.
+  death_link:
+    'false': 1
+    'true': 0
+
   # ==== Randomizer
   # These three groups are the game's own settings. When the game is
   # connected to the room as it starts, it plays with these instead of

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from Options import Choice, DefaultOnToggle, PerGameCommonOptions, Range, Toggle
+from Options import Choice, DeathLink, DefaultOnToggle, PerGameCommonOptions, Range, Toggle
 
 
 class Chestsanity(DefaultOnToggle):
@@ -315,6 +315,7 @@ class Q64Options(PerGameCommonOptions):
     ensure_all_enemies: EnsureAllEnemies
     spiritsanity: Spiritsanity
     extra_level_ups: ExtraLevelUps
+    death_link: DeathLink
     shuffle_spells: ShuffleSpells
     early_healing: EarlyHealing
     enemy_randomizer: EnemyRandomizer
