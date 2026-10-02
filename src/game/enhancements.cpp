@@ -259,7 +259,7 @@ void zelda64::enhancements::apply_at_boot(uint8_t* rdram) {
     // is in RAM already and never read from the ROM again, so it is written
     // there. 0x28 is the fastest of Merrow's tiers (vanilla 0x41).
     if (options.fast_mp_recovery && !zelda64::hardmode::active()) {
-        MEM_B(0, 0x80070F39) = 0x28;
+        MEM_B(0, static_cast<int32_t>(0x80070F39)) = 0x28;
     }
     std::vector<Write> writes = build_writes(options);
     if (writes.empty()) {
