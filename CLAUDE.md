@@ -334,6 +334,32 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   screen (menu bit 3) or a text window is up. Dying inside that window
   lost Solvaring's Earth Orb and left him gone (softlock).
   `0x8008C990` is the battle's starting enemy count, not enemies left.
+- **Traps** (2026-10-02, apworld 1.7.0): items 0xD00 + 0 Death, 1 HP, 2 MP,
+  3 Ice (`item_trap`), class trap, swapped in for filler by `add_traps` per
+  yaml `traps` (OoT's seven choices; normal/extra/mayhem/onslaught = 10/25/
+  50/100 % of the filler), HP/MP/Ice toggles and `death_traps` off/rare/
+  normal/custom (weight 1 vs 4 at rare; custom = exactly `death_trap_count`). Game side
+  `src/game/traps.cpp`: queued on arrival, sprung when Brian is in plain
+  play and 0.8 s past any door/map load. Death goes through DeathLink's fall
+  (same victory hold, never sent to the room). Ice zeroes velocity in the
+  Faster walking entry hook, masks A/B/Z and the stick in
+  `get_n64_input`, and shows Ice Knife's ice block by calling
+  `func_8001FCF8(brian, 8, 1, -1)` then taking the effect out of the status
+  slot (+0x68 block, +0x44) so the game never sees the frozen status (bit
+  0x8, turns at +4) and its updater `func_8001FEEC` leaves it alone; visual 0
+  is Restriction's rings. A door during a freeze suspends it; it restarts in
+  full once Brian has stood 0.8 s in the new room.
+- **Page Hunt** (2026-10-02): item 0x1A "Torn Page" (`include/pageitem.h`:
+  icon slot 26 of ROM 0xD3C240, 16x16 CI8 on palette 0xD3BE40; name/desc
+  pointer slot 26 of RAM 0x803A9954/0x803A99D4 into librecomp's heap; the
+  usable check func_800212E4 says no; not under Hard Mode, which owns
+  0x1A-0x1F). yaml `goal: page_hunt`, `pages_required` 5-100,
+  `page_placement` (local_items / non_local_items); pages replace filler,
+  then wings, then Level Ups, else OptionError. Game counts pages in the bag
+  and on reaching the target calls `request_ending()` (debug.cpp: gGameState
+  |= 0x4080, countdown 0x31 - the field loop then sets gGameMode 5, the
+  credits, as the game itself does) and `goal_reached()`. Mammon only sends
+  the goal when the seed's goal is mammon.
 - Gift NPCs: talk routine `func_800086E4`, hooks at 0x80008814 (the "held?"
   answer) and `func_800212A0` entry (skip the add).
 - A save read counts as a load only when the Pak menu was opened from the

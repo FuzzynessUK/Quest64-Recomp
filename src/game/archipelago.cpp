@@ -21,6 +21,8 @@
 #include "randomizer.h"
 #include "notify.h"
 #include "tracker.h"
+#include "traps.h"
+#include "pageitem.h"
 #include "randomizer/chest_data.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
@@ -108,6 +110,9 @@ namespace {
     // second is set while the death we caused runs, so it is not sent back.
     std::atomic<bool> link_death_waiting{ false };
     std::atomic<bool> link_death_running{ false };
+    // A Death Trap (traps.h) goes through the same fall, connected or not,
+    // and is never sent to the room either.
+    std::atomic<bool> trap_death_waiting{ false };
 
     // What the server says this slot has already checked, and what the yaml
     // asked for. Both arrive with Connected, so both survive everything the
@@ -135,6 +140,13 @@ namespace {
     bool slot_locations_known = false;
     bool chestsanity = true, giftsanity = true, enemysanity = true, spiritsanity = true;
     int mammon_portal = 0;   // 0 vanilla, 1 bosses, 2 monsters, 3 both
+    // The yaml's goal: 0 Mammon, 1 Page Hunt with pages_required pages. Read
+    // by boss_beaten on the game thread, hence atomic.
+    std::atomic<int> seed_goal{ 0 };
+    int seed_pages_required = 0;
+    void apply_page_hunt() {
+        zelda64::page_item::set_hunt(seed_goal.load() == 1 ? seed_pages_required : 0);
+    }
     // With the Enemy Randomizer, the kinds of monster the apworld placed
     // (from slot_data "enemy_plan"): the only enemy locations the slot has.
     std::set<int> planned_monsters;
@@ -214,6 +226,7 @@ namespace {
         "goal", "mammon_portal", "boss_souls", "chestsanity", "giftsanity",
         "wingsmith_wings", "enemysanity", "spiritsanity", "shuffle_orbs",
         "rando_seed", "settings", "locations", "enemy_plan", "portal_monsters",
+        "pages_required",
     };
 
     // One slot_data value, as JSON text. It comes from the server, so
@@ -232,7 +245,15 @@ namespace {
                 field = v.get<int64_t>() != 0;
             }
         };
-        if (key == "mammon_portal" && v.is_number_integer()) {
+        if (key == "goal" && v.is_number_integer()) {
+            seed_goal.store(v.get<int>());
+            apply_page_hunt();
+        }
+        else if (key == "pages_required" && v.is_number_integer()) {
+            seed_pages_required = v.get<int>();
+            apply_page_hunt();
+        }
+        else if (key == "mammon_portal" && v.is_number_integer()) {
             mammon_portal = v.get<int>();
         }
         else if (key == "boss_souls" && v.is_number_integer()) {
@@ -327,6 +348,9 @@ namespace {
                     planned_monsters.clear();
                     monsters_planned = false;
                     portal_monsters.clear();
+                    seed_goal.store(0);
+                    seed_pages_required = 0;
+                    apply_page_hunt();
                     break;
                 case q64ap::EventType::ItemReceived: {
                     std::vector<int64_t>& list = replaying ? incoming_items : server_items;
@@ -338,7 +362,10 @@ namespace {
                         replaying = false;
                     }
                     items_changed = items_changed || !replaying;
-                    if (ev.notify) {
+                    // Not a trap: it says so itself when it springs, which may be later.
+                    bool trap = ev.id >= zelda64::archipelago::item_trap &&
+                                ev.id < zelda64::archipelago::item_trap + zelda64::archipelago::trap_kinds;
+                    if (ev.notify && !trap) {
                         std::string line = "Received " + pretty_item(ev.id);
                         zelda64::notify::post(line, zelda64::notify::Kind::ApReceived);
                         log_line(line);
@@ -986,6 +1013,14 @@ namespace {
         if (item == zelda64::archipelago::item_level_up) {
             return "Level Up";
         }
+        if (item == zelda64::archipelago::id_base + zelda64::archipelago::group_item + zelda64::page_item::item_id) {
+            return zelda64::page_item::name;
+        }
+        int64_t trap = item - zelda64::archipelago::item_trap;
+        if (trap >= 0 && trap < zelda64::archipelago::trap_kinds) {
+            static const char* const trap_names[] = { "Death Trap", "HP Trap", "MP Trap", "Ice Trap" };
+            return trap_names[trap];
+        }
         int64_t soul = item - zelda64::archipelago::item_boss_soul;
         if (soul >= 1 && soul <= boss_count) {
             return std::string(boss_names[soul - 1]) + "'s Soul";
@@ -1221,8 +1256,9 @@ namespace {
         zelda64::archipelago::send_check(zelda64::archipelago::id_base +
                                          zelda64::archipelago::group_boss + order);
         log_line(std::string(how) + " boss " + std::to_string(order) + " (" + boss_names[order - 1] + "), checked");
-        // Mammon is the last of them, and the run is over.
-        if (order == boss_count) {
+        // Mammon is the last of them, and the run is over - unless the goal
+        // is the Page Hunt, which ends when the pages are in (pageitem.h).
+        if (order == boss_count && seed_goal.load() == 0) {
             zelda64::archipelago::goal_reached();
             log_line("Mammon is down: the goal is reached");
         }
@@ -1408,7 +1444,8 @@ namespace {
             // have cleared this); a death of Brian's own counts again.
             link_death_running.store(false);
         }
-        if (!link_death_waiting.load()) {
+        bool from_trap = trap_death_waiting.load();
+        if (!link_death_waiting.load() && !from_trap) {
             return;
         }
         if (victory_hold(rdram)) {
@@ -1434,13 +1471,21 @@ namespace {
             }
             return;
         }
-        link_death_waiting.store(false);
+        if (from_trap) {
+            trap_death_waiting.store(false);
+        }
+        else {
+            link_death_waiting.store(false);
+        }
         link_death_running.store(true);
         MEM_H(0, player_hp) = 0;
         MEM_H(0, player_state) = static_cast<int16_t>(state_hit);
         MEM_H(4, player_state) = 2;
         MEM_H(0x60, player_object) = static_cast<int16_t>(MEM_HU(0x60, player_object) | 1);
-        log_line(std::string("DeathLink: Brian falls") +
+        if (from_trap) {
+            zelda64::notify::post("Death Trap!");
+        }
+        log_line(std::string(from_trap ? "Death Trap: Brian falls" : "DeathLink: Brian falls") +
                  ((MEM_HU(0, gBattleState) & 1) != 0 ? "; in battle, enemies" + enemy_slots_note(rdram) : std::string()));
     }
 }
@@ -1454,6 +1499,10 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
     // Kept up to date every frame, so a death that arrives during the hold
     // finds it already running.
     victory_hold(rdram);
+    if (trap_death_waiting.load() && !(ap_enabled.load() && playing_seed())) {
+        // A Death Trap unconnected (the test keys): the call below never runs.
+        apply_link_death(rdram);
+    }
     if (!ap_enabled.load()) {
         return;
     }
@@ -1494,6 +1543,16 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
                 // Nothing said here: the arrival already shows as "Received
                 // Level Up", and the screen announces itself when it opens.
                 log_line("a Level Up to hand over; " + std::to_string(waiting) + " waiting");
+                continue;
+            }
+            // A trap goes to traps.h, which springs it once Brian is somewhere it
+            // can be (and announces it then: nothing is said on arrival).
+            int64_t trap = item - item_trap;
+            if (trap >= 0 && trap < trap_kinds) {
+                static const zelda64::traps::Trap kinds[] = { zelda64::traps::Trap::Death, zelda64::traps::Trap::Hp,
+                                                              zelda64::traps::Trap::Mp, zelda64::traps::Trap::Ice };
+                zelda64::traps::queue(kinds[trap]);
+                log_line(std::string("a trap arrived: ") + zelda64::traps::name(kinds[trap]));
                 continue;
             }
             // A Soul is not handed over at all - refresh_souls works those
@@ -1617,6 +1676,14 @@ int zelda64::archipelago::portal_requirement(int& monsters) {
     std::lock_guard lock{ server_mutex };
     monsters = portal_monsters.empty() ? monster_kinds : static_cast<int>(portal_monsters.size());
     return mammon_portal;
+}
+
+int zelda64::archipelago::page_hunt_pages() {
+    if (!playing_seed()) {
+        return 0;
+    }
+    std::lock_guard lock{ server_mutex };
+    return seed_goal.load() == 1 ? seed_pages_required : 0;
 }
 
 bool zelda64::archipelago::tracker_view(const std::vector<int64_t>& locations, std::vector<uint8_t>& in_seed,
@@ -2194,4 +2261,8 @@ extern "C" void quest64_archipelago_death(uint8_t* rdram) {
     log_line("DeathLink: Brian died");
     std::lock_guard lock{ queue_mutex };
     death_pending = true;
+}
+
+void zelda64::archipelago::queue_trap_death() {
+    trap_death_waiting.store(true);
 }

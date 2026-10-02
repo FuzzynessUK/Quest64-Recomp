@@ -2982,9 +2982,19 @@ std::vector<uint8_t> zelda64::randomizer::abbott_message() {
     if (portal < 0 && !native.boss_order_shuffled) {
         return {};   // not connected and nothing moved: his own line
     }
+    int pages = zelda64::archipelago::page_hunt_pages();
     std::string text = "Requirement for Mammon's#World Portal:#";
     bool list_bosses = true;
+    if (pages > 0) {
+        // Page Hunt: the run ends with the pages, not with Mammon, so that is
+        // what he tells you; the bosses follow if they have moved.
+        text = "Restore the Eletale Book:#Find " + std::to_string(pages) + " Torn Pages";
+        list_bosses = native.boss_order_shuffled;
+        portal = -2;
+    }
     switch (portal) {
+        case -2:
+            break;   // the Page Hunt, above
         case 0:
             text += "The Eletale Book";
             list_bosses = false;

@@ -9,6 +9,7 @@
 #include <string>
 
 #include "itemnotice.h"
+#include "pageitem.h"
 #include "enhancements.h"
 #include "notify.h"
 #include "randomizer/merrow_data.h"
@@ -31,6 +32,9 @@ namespace {
     // "FRESH BREAD" -> "Fresh Bread"; ids the table does not know (Hard
     // Mode's specials) fall back to their number.
     std::string item_name(int id) {
+        if (id == zelda64::page_item::item_id && zelda64::page_item::available()) {
+            return zelda64::page_item::name;
+        }
         size_t index = static_cast<size_t>(id) * 3;
         if (index >= data::items.size()) {
             return "item " + std::to_string(id);

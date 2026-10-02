@@ -18,6 +18,8 @@
 #include "itemnotice.h"
 #include "audio.h"
 #include "archipelago.h"
+#include "traps.h"
+#include "pageitem.h"
 #include "librecomp/helpers.hpp"
 
 namespace {
@@ -105,6 +107,17 @@ namespace {
         std::chrono::steady_clock::time_point requested_at;
     };
 
+    // The ending: the field loop (func_80001800, 0x80001CD8) runs the exit
+    // countdown, and when it reaches zero with bit 0x4000 of gGameState set it
+    // switches to gGameMode 5, the ending (func_800025E8: the credits overlay
+    // and track 0x14), instead of loading a map. The game starts its own
+    // ending that way (0x80001A8C: 0x4080, 0x31 frames), fade included.
+    constexpr int32_t game_state_ending = 0x4000;
+    constexpr int32_t ending_countdown_frames = 0x31;
+    constexpr int32_t gNextMapLoaded = 0x80084EE4;   // map and submap loaded
+    constexpr int32_t gNextSubmapLoaded = 0x80084EE8;
+    std::atomic<bool> ending_requested = false;
+
     std::mutex pending_map_warp_mutex;
     std::optional<MapWarp> pending_map_warp;
     // Lets the per-frame hook skip the mutex when nothing is queued.
@@ -122,6 +135,29 @@ void zelda64::do_map_warp(int map, int submap, int entrance, bool from_cheats, b
     pending_map_warp = MapWarp{map, submap, entrance, from_cheats, drop_if_busy,
         std::chrono::steady_clock::now()};
     map_warp_queued.store(true);
+}
+
+void zelda64::request_ending() {
+    ending_requested.store(true);
+}
+
+static void apply_ending(uint8_t* rdram) {
+    if (!ending_requested.load()) {
+        return;
+    }
+    bool ready = MEM_HU(0, gGameMode) == game_mode_field
+        && (MEM_W(0, gGameState) & game_state_busy) == 0
+        && (MEM_HU(0, gBattleState) & battle_running) == 0;
+    if (!ready) {
+        return;
+    }
+    ending_requested.store(false);
+    // Where Brian is, should anything read the record after all.
+    MEM_W(0, D_80085368) = MEM_W(0, gNextMapLoaded);
+    MEM_W(0, D_8008536C) = MEM_W(0, gNextSubmapLoaded);
+    MEM_W(0, D_80085370) = 0;
+    MEM_W(0, gGameState) |= game_state_exiting | game_state_ending;
+    MEM_W(0, D_8007B2EC) = ending_countdown_frames;
 }
 
 // The request stays queued until the game is in the field and idle, so a warp
@@ -266,16 +302,21 @@ void zelda64::set_player_stat(PlayerStat stat, int value) {
 // battle, menus) runs once per frame.
 extern "C" void quest64_cheats_frame(uint8_t* rdram, recomp_context* ctx) {
     apply_map_warp(rdram);
+    apply_ending(rdram);
     sync_player_stats(rdram);
     apply_pending_item(rdram);
     live_current_map.store(static_cast<int32_t>(MEM_W(0, gCurrentMap)));
     zelda64::enhancements::on_frame(rdram);
     zelda64::statfx::on_frame(rdram);
     zelda64::spellnotice::on_frame(rdram);
+    // Before the hand-over below, so the Page Hunt counts a page that arrives
+    // as a save loads as found then (pageitem.h).
+    zelda64::page_item::on_frame(rdram);
     // Before the item notice: in Archipelago mode a gift NPC's item is
     // taken straight back, and doing it first means it is never announced.
     // Items the server sends are placed here too, so those still are.
     zelda64::archipelago::on_frame(rdram);
+    zelda64::traps::on_frame(rdram, ctx);
     zelda64::itemnotice::on_frame(rdram);
     zelda64::audio::on_frame(rdram, ctx);
     zelda64::hardmode::on_frame(rdram);
@@ -362,11 +403,18 @@ extern "C" int quest64_cheat_no_encounters() {
 }
 
 const std::vector<std::string>& zelda64::item_names() {
-    return merrow::data::itemcapitalcase;
+    // The game's 26, then the Torn Page (item 0x1A, pageitem.h).
+    static const std::vector<std::string> names = [] {
+        std::vector<std::string> list = merrow::data::itemcapitalcase;
+        list.push_back(zelda64::page_item::name);
+        return list;
+    }();
+    return names;
 }
 
 void zelda64::give_item(int item_id) {
-    if (item_id < 0 || static_cast<size_t>(item_id) >= merrow::data::itemcapitalcase.size()) {
+    if (item_id < 0 || static_cast<size_t>(item_id) >= item_names().size() ||
+        (item_id == zelda64::page_item::item_id && !zelda64::page_item::available())) {
         return;
     }
     std::lock_guard lock{ pending_mutex };

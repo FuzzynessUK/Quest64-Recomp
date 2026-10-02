@@ -65,6 +65,10 @@ namespace zelda64::archipelago {
     // no such thing and never sees one. Until it arrives that boss is not
     // spawned at all.
     constexpr int64_t item_boss_soul = id_base + group_item + 0xE00;
+    // Traps (traps.h), + 0 Death, 1 HP, 2 MP, 3 Ice. Archipelago's own too:
+    // they take the place of filler and fire when they arrive.
+    constexpr int64_t item_trap = id_base + group_item + 0xD00;
+    constexpr int trap_kinds = 4;
 
     // --- the game side -----------------------------------------------------
     // Boot, after the randomizer: with the connector on, the chests' own
@@ -88,6 +92,9 @@ namespace zelda64::archipelago {
     // -1 when no seed is being played; `monsters` is how many kinds the
     // monster condition counts.
     int portal_requirement(int& monsters);
+    // Page Hunt: the pages the seed wants, 0 when the goal is not a Page Hunt
+    // (or no seed is being played).
+    int page_hunt_pages();
 
     bool tracker_view(const std::vector<int64_t>& locations, std::vector<uint8_t>& in_seed,
                       std::vector<uint8_t>& checked);
@@ -117,6 +124,9 @@ namespace zelda64::archipelago {
     // music shuffle). A death from the room is held from the moment every
     // enemy is down, so the battle's rewards are in hand first.
     void victory_fanfare(int track);
+    // Death Trap: Brian falls as a death from the room makes him (same wait,
+    // same hold after a won battle), without the room being told.
+    void queue_trap_death();
 
     // --- the seed's own settings -------------------------------------------
     // The yaml chooses the game's randomizer, enhancement and cosmetic

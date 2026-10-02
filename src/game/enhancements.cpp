@@ -11,6 +11,8 @@
 #include "enhancements.h"
 #include "archipelago.h"
 #include "hardmode.h"
+#include "traps.h"
+#include "pageitem.h"
 #include "randomizer.h"
 #include "zelda_render.h"
 #include "randomizer/merrow_data.h"
@@ -372,7 +374,13 @@ namespace {
     constexpr int32_t game_mode = 0x8007B2E0;
     constexpr int32_t next_map = 0x80084EE4;
 
-    bool stackable(int id) { return id >= 0 && id <= stackable_last; }
+    // The Torn Page stacks too (pageitem.h), up to the most a count byte
+    // holds, since a Page Hunt can want 100 of them.
+    constexpr int max_page_stack = 0x7F;
+    bool stackable(int id) {
+        return (id >= 0 && id <= stackable_last) ||
+               (id == zelda64::page_item::item_id && zelda64::page_item::available());
+    }
 
     bool in_game(uint8_t* rdram) {
         int mode = MEM_HU(0, game_mode);
@@ -489,6 +497,7 @@ namespace {
         for (int id = 0; id <= stackable_last; id++) {
             counts[id] = std::min(counts[id], max_stack);
         }
+        counts[zelda64::page_item::item_id] = std::min(counts[zelda64::page_item::item_id], max_page_stack);
         uint8_t shaped[bag_slots];
         std::memset(shaped, bag_empty, sizeof shaped);
         int n = 0;
@@ -680,6 +689,23 @@ namespace {
     }
 }
 
+int zelda64::enhancements::bag_count(uint8_t* rdram, int id) {
+    if (id < 0 || id > 0xFF) {
+        return 0;
+    }
+    int counts[256];
+    if (have_last && counts_since_last(rdram, counts)) {
+        return counts[id];
+    }
+    // Not stacked by us yet (or stacking off): read by position. A frame
+    // where that fails reads as none, which can only delay a count, never
+    // raise one.
+    if (read_bag(rdram, counts, nullptr)) {
+        return counts[id];
+    }
+    return 0;
+}
+
 bool zelda64::enhancements::item_menu_open(uint8_t* rdram) {
     return (static_cast<uint32_t>(MEM_W(0, item_menu_mask)) & item_menu_bit) != 0 ||
            MEM_HU(0, game_mode) == 2;
@@ -826,6 +852,14 @@ namespace {
 
 extern "C" void quest64_enh_walk_scale(uint8_t* rdram, recomp_context* ctx) {
     applied_scale = 1.0f;
+    if (zelda64::traps::frozen()) {
+        // Ice Trap: no step this frame. Every one of Brian's movement states
+        // (field, battle, skid) moves through here, so he stays put in all.
+        int32_t frozen_player = static_cast<int32_t>(ctx->r5);
+        write_f32(rdram, frozen_player + 0x18, 0.0f);
+        write_f32(rdram, frozen_player + 0x20, 0.0f);
+        return;
+    }
     if (!zelda64::enhancements::active_options().faster_walk || zelda64::hardmode::active()) {
         return;
     }

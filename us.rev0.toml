@@ -86,6 +86,13 @@ func = "func_8002513C"
 text = "quest64_audio_seq_buffer_1(rdram, ctx);"
 before_vram = 0x800251B8
 
+# The Torn Page (pageitem.h): the usable check answers no for item 0x1A,
+# whose properties slot would otherwise read a name string.
+[[patches.hook]]
+func = "func_800212E4"
+text = "if (quest64_page_item_unusable(rdram, ctx)) return;"
+before_vram = 0x800212E4
+
 # Randomizer "Wings never expire" (also part of Easier Quest). func_80021524
 # removes a used item when its handler (func_800212E4) returned non-zero;
 # this sits on the test.

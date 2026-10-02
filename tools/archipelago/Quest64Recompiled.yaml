@@ -11,6 +11,13 @@ requires:
   version: 0.6.7
 
 Quest 64 Recompiled:
+  # DeathLink: when Brian dies, everyone else in the room with DeathLink on
+  # dies too, and when any of them dies, Brian collapses and is sent back to
+  # his last save point the same way a lost battle does.
+  death_link:
+    'false': 1
+    'true': 0
+
   # Which groups of locations are Archipelago checks.
   #
   # chestsanity   the 88 treasure chests
@@ -32,15 +39,16 @@ Quest 64 Recompiled:
   # With giftsanity on, the six wingsmiths still hand over their wings as
   # well as sending their check (once each).
   wingsmith_wings:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
 
-  # How many of each pair of wings go in the item pool: two (the default),
-  # one, or none. No rule needs wings; the room left goes to filler.
+  # How many of each pair of wings go in the item pool: none (the default),
+  # one, or two. No rule needs wings; the room left goes to filler.
   wings_in_pool:
-    two: 1
+    none: 1
     one: 0
-    none: 0
+    two: 0
+
   enemysanity:
     'true': 0
     'false': 1
@@ -57,12 +65,12 @@ Quest 64 Recompiled:
     'true': 1
     'false': 0
 
-  # Leave the way-openers where the game puts them: the Earth Orb, Wind Jade,
-  # Water Jewel and Fire Ruby on their bosses, and the Eletale's Book and
-  # Dark Gaol Key with the two Shannons. Everything else still moves.
+  # false keeps the boss rewards on their bosses (the Earth Orb, Wind Jade,
+  # Water Jewel and Fire Ruby), and the Eletale's Book and Dark Gaol Key
+  # with the Shannons who give them. true shuffles them with everything else.
   shuffle_orbs:
-    'true': 1
-    'false': 0
+    'false': 1
+    'true': 0
 
   # Extra "Level Up" items on top of the one per spirit, 0 to 99. Nothing is
   # added to the game world for these - they arrive like any other item and
@@ -108,15 +116,94 @@ Quest 64 Recompiled:
     bosses: 0
     with_mammon: 0
 
+  # What finishes the run.
+  #
+  # mammon      beat King Mammon
+  # page_hunt   find pages_required Torn Pages of the Eletale's Book (set
+  #             pages_required below, anywhere from 5 to 100). The moment the
+  #             last one is in your bag, the game fades into the credits and
+  #             the goal is done
   goal:
     mammon: 1
+    page_hunt: 0
 
-  # DeathLink: when Brian dies, everyone else in the room with DeathLink on
-  # dies too, and when any of them dies, Brian collapses and is sent back to
-  # his last save point the same way a lost battle does.
-  death_link:
-    'false': 1
-    'true': 0
+  # Page Hunt: how many Torn Pages finish the run (5 to 100). They take the
+  # place of filler, then wings, then Level Ups; if there is still not room
+  # for them all the seed will not generate and says why, so switch on more
+  # of the *sanity options for a big hunt.
+  pages_required: 20
+
+  # Page Hunt: where the Torn Pages can be.
+  #
+  # quest64_only       only in Quest 64's own locations
+  # all_games          anywhere in the multiworld
+  # other_games_only   only in the other games' locations; needs at least one
+  #                    other game in the seed with room for them all
+  page_placement:
+    quest64_only: 0
+    all_games: 1
+    other_games_only: 0
+
+  # Traps take the place of filler (herbs, potions and the like) in your
+  # pool, as Ocarina of Time's Ice Traps do. The pool does not grow, and a
+  # trap never replaces a gem, the Book, the key, a Soul, wings or a Level Up.
+  #
+  # no_traps            none
+  # normal              about 1 filler item in 10
+  # extra               about 1 in 4
+  # mayhem              about half
+  # onslaught           every filler item
+  # custom_count        exactly trap_count traps (as many as there is filler for)
+  # custom_percentage   trap_percentage percent of the filler
+  traps:
+    no_traps: 1
+    normal: 0
+    extra: 0
+    mayhem: 0
+    onslaught: 0
+    custom_count: 0
+    custom_percentage: 0
+
+  # With traps: custom_count, how many (0 to 300).
+  trap_count: 10
+
+  # With traps: custom_percentage, the share of the filler (0 to 100).
+  trap_percentage: 20
+
+  # Which kinds of trap can turn up. With all four off there are no traps.
+  #
+  # Death Trap   Brian falls and is sent back to his last save point, as a
+  #              DeathLink death does. Held until a won battle's rewards are
+  #              in hand. The most brutal, so it has its own amount:
+  #                off      none
+  #                rare     a quarter as likely as each other kind (about 1
+  #                         trap in 13 with all four on)
+  #                normal   as likely as the others
+  #                custom   exactly death_trap_count of them
+  # HP Trap      HP drops by half of max HP; it stops at 1, never kills.
+  # MP Trap      MP drops by half of max MP.
+  # Ice Trap     Brian is frozen in ice for five seconds, in the field or in
+  #              battle: no moving, attacking, casting, talking or opening.
+  death_traps:
+    off: 0
+    rare: 1
+    normal: 0
+    custom: 0
+
+  # With death_traps: custom, exactly this many of the traps are Death Traps
+  # (0 to 50), the rest drawn from the other kinds switched on.
+  death_trap_count: 1
+
+  hp_traps:
+    'true': 1
+    'false': 0
+  mp_traps:
+    'true': 1
+    'false': 0
+  ice_traps:
+    'true': 1
+    'false': 0
+
 
   # ==== Randomizer
   # These three groups are the game's own settings. When the game is
@@ -152,22 +239,6 @@ Quest 64 Recompiled:
     'false': 1
     'true': 0
 
-  # Faster Areas: Fast Monastery, Fast Blue Cave, Fast Shamwood and Fast
-  # Mammon's World together: the long empty stretches are skipped.
-  faster_areas:
-    'false': 1
-    'true': 0
-
-  # Wings Never Expire: Using a pair of wings does not use them up.
-  wings_never_expire:
-    'false': 1
-    'true': 0
-
-  # No Enemy Drop Limit: Monsters keep dropping items past the vanilla limit.
-  no_enemy_drop_limit:
-    'false': 1
-    'true': 0
-
   # Element Cap 99: Each element can be raised to 99 instead of 50, by
   # spirits, level-ups and Level Up items alike.
   element_cap_99:
@@ -175,25 +246,6 @@ Quest 64 Recompiled:
     'true': 0
 
   # ==== Enhancements
-
-  # JP Healing Amounts: Healing Lv2 restores 16 HP instead of 8, as in the
-  # Japanese release.
-  jp_healing:
-    'false': 1
-    'true': 0
-
-  # JP Magic Barrier: Magic Barrier holds two turns longer, as in the Japanese
-  # release.
-  jp_magic_barrier:
-    'false': 1
-    'true': 0
-
-  # JP Boss MP Rewards: Beating a boss raises max MP as well as max HP and
-  # refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10,
-  # 15, 15).
-  jp_boss_mp_rewards:
-    'false': 1
-    'true': 0
 
   # Double Experience: Levels need half the experience. both: level (combat)
   # experience and the hidden experience that raises HP, MP, Agility and
@@ -205,34 +257,69 @@ Quest 64 Recompiled:
     stat_only: 0
     level_only: 0
 
+  # JP Healing Amounts: Healing Lv2 restores 16 HP instead of 8, as in the
+  # Japanese release.
+  jp_healing:
+    'true': 1
+    'false': 0
+
+  # JP Magic Barrier: Magic Barrier holds two turns longer, as in the Japanese
+  # release.
+  jp_magic_barrier:
+    'true': 1
+    'false': 0
+
+  # JP Boss MP Rewards: Beating a boss raises max MP as well as max HP and
+  # refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10,
+  # 15, 15).
+  jp_boss_mp_rewards:
+    'true': 1
+    'false': 0
+
   # Fast MP Recovery: MP comes back as you walk at the fastest rate, as in
   # Easy Mode.
   fast_mp_recovery:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
 
   # JP Stat Up Effect: A colour burst over Brian when a stat rises, as in the
   # Japanese release.
   jp_stat_up_effect:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
 
   # Exit from Anywhere: The bound Exit Spell control warps out of an area
   # without the spell or the MP.
   exit_from_anywhere:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
 
   # Fast Walking: Brian walks 50% faster.
   fast_walking:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
 
   # Text Improvements: Merrow's clearer wording for a number of the game's
   # messages.
   text_improvements:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
+
+  # Faster Areas: Fast Monastery, Fast Blue Cave, Fast Shamwood and Fast
+  # Mammon's World together: the long empty stretches are skipped.
+  faster_areas:
+    'true': 1
+    'false': 0
+
+  # Wings Never Expire: Using a pair of wings does not use them up.
+  wings_never_expire:
+    'true': 1
+    'false': 0
+
+  # No Enemy Drop Limit: Monsters keep dropping items past the vanilla limit.
+  no_enemy_drop_limit:
+    'true': 1
+    'false': 0
 
   # ==== Cosmetics
 

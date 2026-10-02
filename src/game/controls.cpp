@@ -6,6 +6,7 @@
 #include "zelda_game.h"
 #include "enhancements.h"
 #include "minimap.h"
+#include "traps.h"
 
 // Arrays that hold the mappings for every input for keyboard and controller respectively.
 using input_mapping = std::array<recomp::InputField, recomp::bindings_per_input>;
@@ -151,6 +152,15 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
 
         cur_y = recomp::get_input_analog(keyboard_input_mappings[(size_t)GameInput::Y_AXIS_POS])
                 - recomp::get_input_analog(keyboard_input_mappings[(size_t)GameInput::Y_AXIS_NEG]) + joystick_y;
+    }
+
+    // Ice Trap: Brian is frozen, so nothing he could do with A, B, Z or the
+    // stick reaches the game (Start still opens the menu).
+    if (zelda64::traps::input_locked()) {
+        constexpr uint16_t a_b_z = 0x8000 | 0x4000 | 0x2000;
+        cur_buttons &= static_cast<uint16_t>(~a_b_z);
+        cur_x = 0.0f;
+        cur_y = 0.0f;
     }
 
     *buttons_out = cur_buttons;

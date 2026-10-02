@@ -218,6 +218,12 @@ namespace zelda64::enhancements {
     // the cursor; it all happens the frame the menu closes.
     bool item_menu_open(uint8_t* rdram);
 
+    // Game thread: how many of an item are in the bag, read the way Stack
+    // Items reads it (stacked or not, and right through the frame after an
+    // item is used, when the game has shifted the count bytes). 0 if the bag
+    // cannot be read this frame.
+    int bag_count(uint8_t* rdram, int id);
+
     // Warps the player to the start of the area they are in, the way the
     // Exit spell does, without needing the spell or the MP. Takes effect on
     // the next frame the game is in the field and not already transitioning.

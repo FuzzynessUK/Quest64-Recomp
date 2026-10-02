@@ -1,6 +1,8 @@
+import logging
 from typing import Dict, List
 
 from BaseClasses import ItemClassification, LocationProgressType, Region, Tutorial
+from rule_builder.rules import Has
 from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 
@@ -8,7 +10,7 @@ from .Enemies import ENEMY_AREAS, ENEMY_IDS, ENEMY_LOCATIONS, FILE_MONSTERS, REG
 from .Items import Q64Item, item_data_table, item_table, code_to_item_table, filler_items
 from .Locations import (Q64Location, Q64LocationData, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
-from .Options import Q64Options
+from .Options import DeathTraps, Goal, PagePlacement, Q64Options, Traps
 from .Regions import regions, connections
 from .Rules import set_all_rules
 
@@ -45,6 +47,17 @@ class Q64World(World):
         # or a spirit does. So the monster checks have to exist.
         if self.options.mammon_portal.value & 2:
             self.options.enemysanity.value = 1
+        # Page Hunt: where the pages may go.
+        if self.options.goal.value == Goal.option_page_hunt:
+            placement = self.options.page_placement.value
+            if placement == PagePlacement.option_quest64_only:
+                self.options.local_items.value.add("Torn Page")
+            elif placement == PagePlacement.option_other_games_only:
+                if len(self.multiworld.player_ids) < 2:
+                    raise OptionError(
+                        f"Quest 64: player {self.player_name} wants the Torn Pages in other games only, "
+                        f"but there is no other game in this seed. Choose quest64_only or all_games.")
+                self.options.non_local_items.value.add("Torn Page")
         self.plan_enemies()
 
     def plan_enemies(self) -> None:
@@ -196,14 +209,7 @@ class Q64World(World):
         # worth more to a run than a pair of wings). The gate items and the
         # Souls are what the seed is beaten with, so they are never dropped;
         # if they alone do not fit, the options cannot make a winnable seed.
-        def expendable(item: Q64Item) -> int:
-            if item.classification == ItemClassification.filler:
-                return 0
-            if item.name == "Level Up":
-                return 2
-            if item.classification == ItemClassification.useful:
-                return 1
-            return 3
+        expendable = self.expendable
 
         excess = len(pool) - open_locations
         if excess > 0:
@@ -219,16 +225,110 @@ class Q64World(World):
         while len(pool) < open_locations:
             pool.append(self.create_item(self.get_filler_item_name()))
 
+        self.add_pages(pool)
+        self.add_traps(pool)
         self.multiworld.itempool += pool
+
+    @staticmethod
+    def expendable(item: Q64Item) -> int:
+        """What goes first when room is needed: filler, then wings, then Level
+        Ups (useful too, but worth more to a run than a pair of wings).
+        Gate items, Souls and pages are never given up."""
+        if item.classification == ItemClassification.filler:
+            return 0
+        if item.name == "Level Up":
+            return 2
+        if item.classification == ItemClassification.useful:
+            return 1
+        return 3
+
+    def add_pages(self, pool: List[Q64Item]) -> None:
+        """Page Hunt: put pages_required Torn Pages in the pool, in place of
+        filler first, then wings, then Level Ups. A seed with no room for
+        them all cannot be finished, so it is stopped here with the reason."""
+        if self.options.goal.value != Goal.option_page_hunt:
+            return
+        wanted = self.options.pages_required.value
+        order = sorted((i for i in range(len(pool)) if self.expendable(pool[i]) < 3),
+                       key=lambda i: self.expendable(pool[i]))
+        if len(order) < wanted:
+            raise OptionError(
+                f"Quest 64: player {self.player_name} wants {wanted} Torn Pages, but the options leave room "
+                f"for only {len(order)} (every location is taken by an item the run needs). "
+                f"Lower pages_required or switch on more of the *sanity options.")
+        taken = order[:wanted]
+        lost = sum(1 for i in taken if self.expendable(pool[i]) > 0)
+        if lost:
+            logging.warning(f"Quest 64: player {self.player_name}: {lost} wing or Level Up item(s) made room "
+                            f"for the {wanted} Torn Pages; switch on more locations to keep them.")
+        if self.options.page_placement.value == PagePlacement.option_other_games_only:
+            room = sum(1 for location in self.multiworld.get_locations()
+                       if location.player != self.player and location.item is None and location.address is not None)
+            if wanted > room:
+                raise OptionError(
+                    f"Quest 64: player {self.player_name} wants {wanted} Torn Pages in other games only, "
+                    f"but the other games have only {room} locations. Lower pages_required or allow all_games.")
+            if wanted * 4 > room:
+                logging.warning(f"Quest 64: player {self.player_name}: {wanted} Torn Pages will take up "
+                                f"{wanted * 100 // room}% of the other games' {room} locations.")
+        if self.options.page_placement.value == PagePlacement.option_quest64_only and wanted * 2 > len(pool):
+            logging.warning(f"Quest 64: player {self.player_name}: {wanted} Torn Pages fill more than half "
+                            f"of Quest 64's {len(pool)} locations.")
+        for i in taken:
+            pool[i] = self.create_item("Torn Page")
+
+    # Share of the filler each Traps choice turns into traps, in percent.
+    TRAP_PERCENT = {1: 10, 2: 25, 3: 50, 4: 100}
+
+    def add_traps(self, pool: List[Q64Item]) -> None:
+        """Swap filler for traps as the yaml's Traps options ask.
+
+        Only filler is ever replaced, so the pool keeps its size and nothing
+        a run is won with (or helped by) is lost to a trap."""
+        others = [name for name, on in (("HP Trap", self.options.hp_traps),
+                                        ("MP Trap", self.options.mp_traps),
+                                        ("Ice Trap", self.options.ice_traps)) if on]
+        death = self.options.death_traps.value
+        choice = self.options.traps.value
+        if choice == Traps.option_no_traps or (not others and death == DeathTraps.option_off):
+            return
+        filler = [i for i, item in enumerate(pool) if item.classification == ItemClassification.filler]
+        if choice == Traps.option_custom_count:
+            count = self.options.trap_count.value
+        else:
+            percent = (self.options.trap_percentage.value if choice == Traps.option_custom_percentage
+                       else self.TRAP_PERCENT[choice])
+            count = round(len(filler) * percent / 100)
+        slots = self.random.sample(filler, min(count, len(filler)))
+
+        if death == DeathTraps.option_custom:
+            # An exact number of Death Traps; the other kinds fill the rest
+            # (or, with none of them on, there are only the Death Traps).
+            deaths = min(self.options.death_trap_count.value, len(slots))
+            if not others:
+                slots = slots[:deaths]
+            names = ["Death Trap"] * deaths + [self.random.choice(others) for _ in range(len(slots) - deaths)]
+            self.random.shuffle(names)
+        else:
+            # Each other kind weighs 4; a Death Trap 4 at normal, 1 at rare.
+            kinds = others + (["Death Trap"] if death != DeathTraps.option_off else [])
+            weights = [4] * len(others) + ([4 if death == DeathTraps.option_normal else 1]
+                                           if death != DeathTraps.option_off else [])
+            names = self.random.choices(kinds, weights=weights, k=len(slots))
+        for i, name in zip(slots, names):
+            pool[i] = self.create_item(name)
 
     def set_rules(self) -> None:
         set_all_rules(self)
+        if self.options.goal.value == Goal.option_page_hunt:
+            self.set_completion_rule(Has("Torn Page", self.options.pages_required.value))
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
         # the id bases so it can turn a location id back into a check.
         return {
             "goal": self.options.goal.value,
+            "pages_required": self.options.pages_required.value,
             "mammon_portal": self.options.mammon_portal.value,
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
@@ -260,19 +360,19 @@ class Q64World(World):
                 "enemy_randomizer": self.options.enemy_randomizer.value,
                 "shuffle_boss_order": self.options.shuffle_boss_order.value,
                 "random_guilty_element": self.options.random_guilty_element.value,
-                "faster_areas": self.options.faster_areas.value,
-                "wings_never_expire": self.options.wings_never_expire.value,
-                "no_enemy_drop_limit": self.options.no_enemy_drop_limit.value,
                 "element_cap_99": self.options.element_cap_99.value,
+                "double_exp": self.options.double_exp.value,
                 "jp_healing": self.options.jp_healing.value,
                 "jp_magic_barrier": self.options.jp_magic_barrier.value,
                 "jp_boss_mp_rewards": self.options.jp_boss_mp_rewards.value,
-                "double_exp": self.options.double_exp.value,
                 "fast_mp_recovery": self.options.fast_mp_recovery.value,
                 "jp_stat_up_effect": self.options.jp_stat_up_effect.value,
                 "exit_from_anywhere": self.options.exit_from_anywhere.value,
                 "fast_walking": self.options.fast_walking.value,
                 "text_improvements": self.options.text_improvements.value,
+                "faster_areas": self.options.faster_areas.value,
+                "wings_never_expire": self.options.wings_never_expire.value,
+                "no_enemy_drop_limit": self.options.no_enemy_drop_limit.value,
                 "text_palette": self.options.text_palette.value,
                 "staff_palette": self.options.staff_palette.value,
                 "cloak_colour": self.options.cloak_colour.value,

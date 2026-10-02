@@ -29,6 +29,10 @@ namespace zelda64 {
     // `drop_if_busy` discards the request if the game is not in the field and
     // idle when it is next checked, instead of holding it until it is.
     void do_map_warp(int map, int submap, int entrance, bool from_cheats = true, bool drop_if_busy = false);
+    // Fade out of the field into the credits, as beating Mammon does, once
+    // Brian is in the field with no battle or transition under way (any
+    // thread; the Page Hunt goal).
+    void request_ending();
     // The map the player is currently in, or -1 before the game has loaded one.
     int current_map();
 

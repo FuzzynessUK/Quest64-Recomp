@@ -125,6 +125,27 @@ for my $b (@{ $checks->{bosses} }) {
                        note => "Until this arrives, $b->{name} is not in the game" };
 }
 
+# The Torn Page, for the Page Hunt goal: the game's own item 0x1A (pageitem.h),
+# so it needs no translation on arrival. create_items puts in as many as the
+# yaml asks for.
+push @item_rows, { name => 'Torn Page', id => $BASE + $GROUP{item} + 0x1A, type => 'progression', count => 0,
+                   create => 'lambda options: options.goal.value == 1',
+                   note => 'A page of the Eletale\x27s Book; enough of them finish a Page Hunt' };
+
+# Traps, Archipelago's own as well (the game springs them through traps.h):
+# 0xD00 + 0 Death, 1 HP, 2 MP, 3 Ice. None is counted here; create_items
+# swaps them in for filler as the yaml's traps options ask.
+{
+    my @traps = (['Death Trap', 'Brian falls, as a DeathLink death makes him'],
+                 ['HP Trap', 'HP drops by half of max HP, not below 1'],
+                 ['MP Trap', 'MP drops by half of max MP'],
+                 ['Ice Trap', 'Brian is frozen in ice for five seconds']);
+    for my $k (0 .. $#traps) {
+        push @item_rows, { name => $traps[$k][0], id => $BASE + $GROUP{item} + 0xD00 + $k, type => 'trap',
+                           count => 0, create => 'lambda options: True', note => $traps[$k][1] };
+    }
+}
+
 my $next = 1;
 for my $i (0 .. $#items) {
     my $n = $items[$i];
@@ -340,7 +361,8 @@ class Q64ItemData(NamedTuple):
 
 item_data_table: Dict[str, Q64ItemData] = {
 PY
-my %cls = (progression => 'ItemClassification.progression', useful => 'ItemClassification.useful', filler => 'ItemClassification.filler');
+my %cls = (progression => 'ItemClassification.progression', useful => 'ItemClassification.useful', filler => 'ItemClassification.filler',
+           trap => 'ItemClassification.trap');
 for my $r (@item_rows) {
     my $create = $r->{create} // 'lambda options: True';
     $items_py .= sprintf("    %s: Q64ItemData(code=0x%08X, type=%s, num_exist=%d, can_create=%s),\n",
@@ -394,33 +416,33 @@ my @seed_settings = (
       'The seven bosses before Mammon swap arenas.', 'toggle' ],
     [ 'random_guilty_element', 'RandomGuiltyElement', 'Randomizer', 'Randomize Guilty Element',
       'Guilty takes a random element instead of his own.', 'toggle' ],
-    [ 'faster_areas', 'FasterAreas', 'Randomizer', 'Faster Areas',
-      "Fast Monastery, Fast Blue Cave, Fast Shamwood and Fast Mammon's World together: the long empty stretches are skipped.", 'toggle' ],
-    [ 'wings_never_expire', 'WingsNeverExpire', 'Randomizer', 'Wings Never Expire',
-      'Using a pair of wings does not use them up.', 'toggle' ],
-    [ 'no_enemy_drop_limit', 'NoEnemyDropLimit', 'Randomizer', 'No Enemy Drop Limit',
-      'Monsters keep dropping items past the vanilla limit.', 'toggle' ],
     [ 'element_cap_99', 'ElementCap99', 'Randomizer', 'Element Cap 99',
       'Each element can be raised to 99 instead of 50, by spirits, level-ups and Level Up items alike.', 'toggle' ],
-    [ 'jp_healing', 'JPHealing', 'Enhancements', 'JP Healing Amounts',
-      'Healing Lv2 restores 16 HP instead of 8, as in the Japanese release.', 'toggle' ],
-    [ 'jp_magic_barrier', 'JPMagicBarrier', 'Enhancements', 'JP Magic Barrier',
-      'Magic Barrier holds two turns longer, as in the Japanese release.', 'toggle' ],
-    [ 'jp_boss_mp_rewards', 'JPBossMPRewards', 'Enhancements', 'JP Boss MP Rewards',
-      'Beating a boss raises max MP as well as max HP and refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10, 15, 15).', 'toggle' ],
     [ 'double_exp', 'DoubleExperience', 'Enhancements', 'Double Experience',
       'Levels need half the experience. both: level (combat) experience and the hidden experience that raises HP, MP, Agility and Defense; stat_only: just the hidden stat experience; level_only: just the level experience.',
       'choice:off,both,stat_only,level_only' ],
+    [ 'jp_healing', 'JPHealing', 'Enhancements', 'JP Healing Amounts',
+      'Healing Lv2 restores 16 HP instead of 8, as in the Japanese release.', 'toggle_on' ],
+    [ 'jp_magic_barrier', 'JPMagicBarrier', 'Enhancements', 'JP Magic Barrier',
+      'Magic Barrier holds two turns longer, as in the Japanese release.', 'toggle_on' ],
+    [ 'jp_boss_mp_rewards', 'JPBossMPRewards', 'Enhancements', 'JP Boss MP Rewards',
+      'Beating a boss raises max MP as well as max HP and refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10, 15, 15).', 'toggle_on' ],
     [ 'fast_mp_recovery', 'FastMPRecovery', 'Enhancements', 'Fast MP Recovery',
-      'MP comes back as you walk at the fastest rate, as in Easy Mode.', 'toggle' ],
+      'MP comes back as you walk at the fastest rate, as in Easy Mode.', 'toggle_on' ],
     [ 'jp_stat_up_effect', 'JPStatUpEffect', 'Enhancements', 'JP Stat Up Effect',
-      'A colour burst over Brian when a stat rises, as in the Japanese release.', 'toggle' ],
+      'A colour burst over Brian when a stat rises, as in the Japanese release.', 'toggle_on' ],
     [ 'exit_from_anywhere', 'ExitFromAnywhere', 'Enhancements', 'Exit from Anywhere',
-      'The bound Exit Spell control warps out of an area without the spell or the MP.', 'toggle' ],
+      'The bound Exit Spell control warps out of an area without the spell or the MP.', 'toggle_on' ],
     [ 'fast_walking', 'FastWalking', 'Enhancements', 'Fast Walking',
-      'Brian walks 50% faster.', 'toggle' ],
+      'Brian walks 50% faster.', 'toggle_on' ],
     [ 'text_improvements', 'TextImprovements', 'Enhancements', 'Text Improvements',
-      "Merrow's clearer wording for a number of the game's messages.", 'toggle' ],
+      "Merrow's clearer wording for a number of the game's messages.", 'toggle_on' ],
+    [ 'faster_areas', 'FasterAreas', 'Enhancements', 'Faster Areas',
+      "Fast Monastery, Fast Blue Cave, Fast Shamwood and Fast Mammon's World together: the long empty stretches are skipped.", 'toggle_on' ],
+    [ 'wings_never_expire', 'WingsNeverExpire', 'Enhancements', 'Wings Never Expire',
+      'Using a pair of wings does not use them up.', 'toggle_on' ],
+    [ 'no_enemy_drop_limit', 'NoEnemyDropLimit', 'Enhancements', 'No Enemy Drop Limit',
+      'Monsters keep dropping items past the vanilla limit.', 'toggle_on' ],
     [ 'text_palette', 'TextPalette', 'Cosmetics', 'Text Palette',
       'The colour of the text boxes.', 'random' ],
     [ 'staff_palette', 'StaffPalette', 'Cosmetics', 'Staff Palette',
@@ -451,6 +473,10 @@ for my $o (@seed_settings) {
     if ($kind eq 'toggle') {
         $seed_classes .= "class $class(Toggle):\n$body\"\"\"\n    display_name = \"$display\"\n\n\n";
     }
+    elsif ($kind eq 'toggle_on') {
+        # On unless the yaml says otherwise.
+        $seed_classes .= "class $class(DefaultOnToggle):\n$body\"\"\"\n    display_name = \"$display\"\n\n\n";
+    }
     elsif ($kind =~ /^choice:(.+)/) {
         # choice:a,b,c - the options in order; the first is 0 and the default.
         my @names = split /,/, $1;
@@ -480,6 +506,9 @@ my $seed_yaml = '';
         if ($kind eq 'toggle') {
             $seed_yaml .= "  $name:\n    'false': 1\n    'true': 0\n";
         }
+        elsif ($kind eq 'toggle_on') {
+            $seed_yaml .= "  $name:\n    'true': 1\n    'false': 0\n";
+        }
         elsif ($kind =~ /^choice:(.+)/) {
             my @names = split /,/, $1;
             $seed_yaml .= "  $name:\n" . join('', map { "    $names[$_]: " . ($_ == 0 ? 1 : 0) . "\n" } 0 .. $#names);
@@ -508,7 +537,7 @@ class Giftsanity(DefaultOnToggle):
     display_name = "Giftsanity"
 
 
-class WingsmithWings(Toggle):
+class WingsmithWings(DefaultOnToggle):
     """The six wingsmiths still hand over their wings, on top of their
     Archipelago check. Only matters with giftsanity on; each gives its wings
     once, the first time you talk to them."""
@@ -520,15 +549,15 @@ class WingsInPool(Choice):
     handy for getting about but no rule needs them, so fewer leaves room
     for filler instead.
 
-    two           two of each of the six (the default)
+    none          no wings at all (the default); the wingsmiths can still
+                  hand theirs over with Wingsmiths Give Wings
     one           one of each
-    none          no wings at all; the wingsmiths can still hand theirs
-                  over with Wingsmiths Give Wings"""
+    two           two of each of the six"""
     display_name = "Wings in Pool"
     option_none = 0
     option_one = 1
     option_two = 2
-    default = 2
+    default = 0
 
 
 class Enemysanity(Toggle):
@@ -549,13 +578,10 @@ class EnsureAllEnemies(DefaultOnToggle):
     display_name = "Ensure All Enemies Appear"
 
 
-class ShuffleOrbs(DefaultOnToggle):
-    """Shuffle the items that open the way on: the Earth Orb, Wind Jade,
-    Water Jewel and Fire Ruby, the Eletale's Book and the Dark Gaol Key.
-
-    Turn this off to leave all six where the game puts them - the four gems
-    on their bosses, the book and the key with the two Shannons - so the run
-    follows the usual route and only everything else moves."""
+class ShuffleOrbs(Toggle):
+    """Off keeps the boss rewards on their bosses (the Earth Orb, Wind Jade,
+    Water Jewel and Fire Ruby), and the Eletale's Book and Dark Gaol Key with
+    the Shannons who give them. On shuffles them with everything else."""
     display_name = "Shuffle Orbs"
 
 
@@ -636,17 +662,135 @@ class BossSouls(Choice):
     default = 0
 
 
+class Traps(Choice):
+    """How many traps take the place of filler (herbs, potions and the like)
+    in your pool, in the style of Ocarina of Time's Ice Traps. The pool does
+    not grow: a trap always replaces a filler item, never a gem, the Book,
+    the key, a Soul, a pair of wings or a Level Up. Which kinds can appear
+    is set by the four trap options below.
+
+    no_traps            none
+    normal              about 1 filler item in 10 is a trap
+    extra               about 1 in 4
+    mayhem              about half
+    onslaught           every filler item
+    custom_count        exactly trap_count traps (as many as there is filler for)
+    custom_percentage   trap_percentage percent of the filler"""
+    display_name = "Traps"
+    option_no_traps = 0
+    option_normal = 1
+    option_extra = 2
+    option_mayhem = 3
+    option_onslaught = 4
+    option_custom_count = 5
+    option_custom_percentage = 6
+    default = 0
+
+
+class TrapCount(Range):
+    """How many traps, when Traps is custom_count."""
+    display_name = "Trap Count"
+    range_start = 0
+    range_end = 300
+    default = 10
+
+
+class TrapPercentage(Range):
+    """What percentage of the filler becomes traps, when Traps is
+    custom_percentage."""
+    display_name = "Trap Percentage"
+    range_start = 0
+    range_end = 100
+    default = 20
+
+
+class DeathTraps(Choice):
+    """Death Trap: Brian falls, the way a DeathLink death makes him, and is
+    sent back to his last save point. It waits until a battle is won and its
+    rewards are in hand, like DeathLink. The most brutal kind, so it has its
+    own amount.
+
+    off      none
+    rare     a quarter as likely as each other kind (about 1 trap in 13
+             with all four kinds on)
+    normal   as likely as each other kind
+    custom   exactly death_trap_count of the traps (as many as there are
+             traps for); the rest come from the other kinds"""
+    display_name = "Death Traps"
+    option_off = 0
+    option_rare = 1
+    option_normal = 2
+    option_custom = 3
+    default = 1
+
+
+class DeathTrapCount(Range):
+    """How many Death Traps, when Death Traps is custom."""
+    display_name = "Death Trap Count"
+    range_start = 0
+    range_end = 50
+    default = 1
+
+
+class HPTraps(DefaultOnToggle):
+    """HP Trap: HP drops by half of max HP. It never kills: it stops at 1."""
+    display_name = "HP Traps"
+
+
+class MPTraps(DefaultOnToggle):
+    """MP Trap: MP drops by half of max MP."""
+    display_name = "MP Traps"
+
+
+class IceTraps(DefaultOnToggle):
+    """Ice Trap: Brian is frozen in a block of ice for five seconds, in the
+    field or in battle. He cannot move, attack, cast, talk or open anything
+    until it melts."""
+    display_name = "Ice Traps"
+
+
 SEED_CLASSES_HERE
 class Goal(Choice):
-    """What finishes the run."""
+    """What finishes the run.
+
+    mammon      beat King Mammon
+    page_hunt   find pages_required Torn Pages of the Eletale's Book. Anywhere
+                from 5 to 100. The
+                moment the last one is in your bag the game fades into the
+                credits and the goal is done."""
     display_name = "Goal"
     option_mammon = 0
+    option_page_hunt = 1
     default = 0
+
+
+class PagesRequired(Range):
+    """How many Torn Pages finish a Page Hunt."""
+    display_name = "Pages Required"
+    range_start = 5
+    range_end = 100
+    default = 20
+
+
+class PagePlacement(Choice):
+    """Where the Torn Pages can be.
+
+    quest64_only       only in Quest 64's own locations
+    all_games          anywhere in the multiworld
+    other_games_only   only in the other games' locations (needs at least
+                       one other game in the seed, with room for them)"""
+    display_name = "Page Placement"
+    option_quest64_only = 0
+    option_all_games = 1
+    option_other_games_only = 2
+    default = 1
 
 
 @dataclass
 class Q64Options(PerGameCommonOptions):
     goal: Goal
+    pages_required: PagesRequired
+    page_placement: PagePlacement
     mammon_portal: MammonPortal
     boss_souls: BossSouls
     shuffle_orbs: ShuffleOrbs
@@ -658,6 +802,14 @@ class Q64Options(PerGameCommonOptions):
     ensure_all_enemies: EnsureAllEnemies
     spiritsanity: Spiritsanity
     extra_level_ups: ExtraLevelUps
+    traps: Traps
+    trap_count: TrapCount
+    trap_percentage: TrapPercentage
+    death_traps: DeathTraps
+    death_trap_count: DeathTrapCount
+    hp_traps: HPTraps
+    mp_traps: MPTraps
+    ice_traps: IceTraps
     death_link: DeathLink
 SEED_FIELDS_HERE
 PY
@@ -732,9 +884,11 @@ PY
 }
 
 my $init_py = <<'PY';
+import logging
 from typing import Dict, List
 
 from BaseClasses import ItemClassification, LocationProgressType, Region, Tutorial
+from rule_builder.rules import Has
 from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 
@@ -742,7 +896,7 @@ from .Enemies import ENEMY_AREAS, ENEMY_IDS, ENEMY_LOCATIONS, FILE_MONSTERS, REG
 from .Items import Q64Item, item_data_table, item_table, code_to_item_table, filler_items
 from .Locations import (Q64Location, Q64LocationData, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
-from .Options import Q64Options
+from .Options import DeathTraps, Goal, PagePlacement, Q64Options, Traps
 from .Regions import regions, connections
 from .Rules import set_all_rules
 
@@ -779,6 +933,17 @@ class Q64World(World):
         # or a spirit does. So the monster checks have to exist.
         if self.options.mammon_portal.value & 2:
             self.options.enemysanity.value = 1
+        # Page Hunt: where the pages may go.
+        if self.options.goal.value == Goal.option_page_hunt:
+            placement = self.options.page_placement.value
+            if placement == PagePlacement.option_quest64_only:
+                self.options.local_items.value.add("Torn Page")
+            elif placement == PagePlacement.option_other_games_only:
+                if len(self.multiworld.player_ids) < 2:
+                    raise OptionError(
+                        f"Quest 64: player {self.player_name} wants the Torn Pages in other games only, "
+                        f"but there is no other game in this seed. Choose quest64_only or all_games.")
+                self.options.non_local_items.value.add("Torn Page")
         self.plan_enemies()
 
     def plan_enemies(self) -> None:
@@ -930,14 +1095,7 @@ class Q64World(World):
         # worth more to a run than a pair of wings). The gate items and the
         # Souls are what the seed is beaten with, so they are never dropped;
         # if they alone do not fit, the options cannot make a winnable seed.
-        def expendable(item: Q64Item) -> int:
-            if item.classification == ItemClassification.filler:
-                return 0
-            if item.name == "Level Up":
-                return 2
-            if item.classification == ItemClassification.useful:
-                return 1
-            return 3
+        expendable = self.expendable
 
         excess = len(pool) - open_locations
         if excess > 0:
@@ -953,16 +1111,110 @@ class Q64World(World):
         while len(pool) < open_locations:
             pool.append(self.create_item(self.get_filler_item_name()))
 
+        self.add_pages(pool)
+        self.add_traps(pool)
         self.multiworld.itempool += pool
+
+    @staticmethod
+    def expendable(item: Q64Item) -> int:
+        """What goes first when room is needed: filler, then wings, then Level
+        Ups (useful too, but worth more to a run than a pair of wings).
+        Gate items, Souls and pages are never given up."""
+        if item.classification == ItemClassification.filler:
+            return 0
+        if item.name == "Level Up":
+            return 2
+        if item.classification == ItemClassification.useful:
+            return 1
+        return 3
+
+    def add_pages(self, pool: List[Q64Item]) -> None:
+        """Page Hunt: put pages_required Torn Pages in the pool, in place of
+        filler first, then wings, then Level Ups. A seed with no room for
+        them all cannot be finished, so it is stopped here with the reason."""
+        if self.options.goal.value != Goal.option_page_hunt:
+            return
+        wanted = self.options.pages_required.value
+        order = sorted((i for i in range(len(pool)) if self.expendable(pool[i]) < 3),
+                       key=lambda i: self.expendable(pool[i]))
+        if len(order) < wanted:
+            raise OptionError(
+                f"Quest 64: player {self.player_name} wants {wanted} Torn Pages, but the options leave room "
+                f"for only {len(order)} (every location is taken by an item the run needs). "
+                f"Lower pages_required or switch on more of the *sanity options.")
+        taken = order[:wanted]
+        lost = sum(1 for i in taken if self.expendable(pool[i]) > 0)
+        if lost:
+            logging.warning(f"Quest 64: player {self.player_name}: {lost} wing or Level Up item(s) made room "
+                            f"for the {wanted} Torn Pages; switch on more locations to keep them.")
+        if self.options.page_placement.value == PagePlacement.option_other_games_only:
+            room = sum(1 for location in self.multiworld.get_locations()
+                       if location.player != self.player and location.item is None and location.address is not None)
+            if wanted > room:
+                raise OptionError(
+                    f"Quest 64: player {self.player_name} wants {wanted} Torn Pages in other games only, "
+                    f"but the other games have only {room} locations. Lower pages_required or allow all_games.")
+            if wanted * 4 > room:
+                logging.warning(f"Quest 64: player {self.player_name}: {wanted} Torn Pages will take up "
+                                f"{wanted * 100 // room}% of the other games' {room} locations.")
+        if self.options.page_placement.value == PagePlacement.option_quest64_only and wanted * 2 > len(pool):
+            logging.warning(f"Quest 64: player {self.player_name}: {wanted} Torn Pages fill more than half "
+                            f"of Quest 64's {len(pool)} locations.")
+        for i in taken:
+            pool[i] = self.create_item("Torn Page")
+
+    # Share of the filler each Traps choice turns into traps, in percent.
+    TRAP_PERCENT = {1: 10, 2: 25, 3: 50, 4: 100}
+
+    def add_traps(self, pool: List[Q64Item]) -> None:
+        """Swap filler for traps as the yaml's Traps options ask.
+
+        Only filler is ever replaced, so the pool keeps its size and nothing
+        a run is won with (or helped by) is lost to a trap."""
+        others = [name for name, on in (("HP Trap", self.options.hp_traps),
+                                        ("MP Trap", self.options.mp_traps),
+                                        ("Ice Trap", self.options.ice_traps)) if on]
+        death = self.options.death_traps.value
+        choice = self.options.traps.value
+        if choice == Traps.option_no_traps or (not others and death == DeathTraps.option_off):
+            return
+        filler = [i for i, item in enumerate(pool) if item.classification == ItemClassification.filler]
+        if choice == Traps.option_custom_count:
+            count = self.options.trap_count.value
+        else:
+            percent = (self.options.trap_percentage.value if choice == Traps.option_custom_percentage
+                       else self.TRAP_PERCENT[choice])
+            count = round(len(filler) * percent / 100)
+        slots = self.random.sample(filler, min(count, len(filler)))
+
+        if death == DeathTraps.option_custom:
+            # An exact number of Death Traps; the other kinds fill the rest
+            # (or, with none of them on, there are only the Death Traps).
+            deaths = min(self.options.death_trap_count.value, len(slots))
+            if not others:
+                slots = slots[:deaths]
+            names = ["Death Trap"] * deaths + [self.random.choice(others) for _ in range(len(slots) - deaths)]
+            self.random.shuffle(names)
+        else:
+            # Each other kind weighs 4; a Death Trap 4 at normal, 1 at rare.
+            kinds = others + (["Death Trap"] if death != DeathTraps.option_off else [])
+            weights = [4] * len(others) + ([4 if death == DeathTraps.option_normal else 1]
+                                           if death != DeathTraps.option_off else [])
+            names = self.random.choices(kinds, weights=weights, k=len(slots))
+        for i, name in zip(slots, names):
+            pool[i] = self.create_item(name)
 
     def set_rules(self) -> None:
         set_all_rules(self)
+        if self.options.goal.value == Goal.option_page_hunt:
+            self.set_completion_rule(Has("Torn Page", self.options.pages_required.value))
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
         # the id bases so it can turn a location id back into a check.
         return {
             "goal": self.options.goal.value,
+            "pages_required": self.options.pages_required.value,
             "mammon_portal": self.options.mammon_portal.value,
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
@@ -1009,6 +1261,13 @@ requires:
   version: 0.6.7
 
 $game:
+  # DeathLink: when Brian dies, everyone else in the room with DeathLink on
+  # dies too, and when any of them dies, Brian collapses and is sent back to
+  # his last save point the same way a lost battle does.
+  death_link:
+    'false': 1
+    'true': 0
+
   # Which groups of locations are Archipelago checks.
   #
   # chestsanity   the @{[ $by_group{chest} // 0 ]} treasure chests
@@ -1030,15 +1289,16 @@ $game:
   # With giftsanity on, the six wingsmiths still hand over their wings as
   # well as sending their check (once each).
   wingsmith_wings:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
 
-  # How many of each pair of wings go in the item pool: two (the default),
-  # one, or none. No rule needs wings; the room left goes to filler.
+  # How many of each pair of wings go in the item pool: none (the default),
+  # one, or two. No rule needs wings; the room left goes to filler.
   wings_in_pool:
-    two: 1
+    none: 1
     one: 0
-    none: 0
+    two: 0
+
   enemysanity:
     'true': 0
     'false': 1
@@ -1055,12 +1315,12 @@ $game:
     'true': 1
     'false': 0
 
-  # Leave the way-openers where the game puts them: the Earth Orb, Wind Jade,
-  # Water Jewel and Fire Ruby on their bosses, and the Eletale's Book and
-  # Dark Gaol Key with the two Shannons. Everything else still moves.
+  # false keeps the boss rewards on their bosses (the Earth Orb, Wind Jade,
+  # Water Jewel and Fire Ruby), and the Eletale's Book and Dark Gaol Key
+  # with the Shannons who give them. true shuffles them with everything else.
   shuffle_orbs:
-    'true': 1
-    'false': 0
+    'false': 1
+    'true': 0
 
   # Extra "Level Up" items on top of the one per spirit, 0 to 99. Nothing is
   # added to the game world for these - they arrive like any other item and
@@ -1106,15 +1366,94 @@ $game:
     bosses: 0
     with_mammon: 0
 
+  # What finishes the run.
+  #
+  # mammon      beat King Mammon
+  # page_hunt   find pages_required Torn Pages of the Eletale's Book (set
+  #             pages_required below, anywhere from 5 to 100). The moment the
+  #             last one is in your bag, the game fades into the credits and
+  #             the goal is done
   goal:
     mammon: 1
+    page_hunt: 0
 
-  # DeathLink: when Brian dies, everyone else in the room with DeathLink on
-  # dies too, and when any of them dies, Brian collapses and is sent back to
-  # his last save point the same way a lost battle does.
-  death_link:
-    'false': 1
-    'true': 0
+  # Page Hunt: how many Torn Pages finish the run (5 to 100). They take the
+  # place of filler, then wings, then Level Ups; if there is still not room
+  # for them all the seed will not generate and says why, so switch on more
+  # of the *sanity options for a big hunt.
+  pages_required: 20
+
+  # Page Hunt: where the Torn Pages can be.
+  #
+  # quest64_only       only in Quest 64's own locations
+  # all_games          anywhere in the multiworld
+  # other_games_only   only in the other games' locations; needs at least one
+  #                    other game in the seed with room for them all
+  page_placement:
+    quest64_only: 0
+    all_games: 1
+    other_games_only: 0
+
+  # Traps take the place of filler (herbs, potions and the like) in your
+  # pool, as Ocarina of Time's Ice Traps do. The pool does not grow, and a
+  # trap never replaces a gem, the Book, the key, a Soul, wings or a Level Up.
+  #
+  # no_traps            none
+  # normal              about 1 filler item in 10
+  # extra               about 1 in 4
+  # mayhem              about half
+  # onslaught           every filler item
+  # custom_count        exactly trap_count traps (as many as there is filler for)
+  # custom_percentage   trap_percentage percent of the filler
+  traps:
+    no_traps: 1
+    normal: 0
+    extra: 0
+    mayhem: 0
+    onslaught: 0
+    custom_count: 0
+    custom_percentage: 0
+
+  # With traps: custom_count, how many (0 to 300).
+  trap_count: 10
+
+  # With traps: custom_percentage, the share of the filler (0 to 100).
+  trap_percentage: 20
+
+  # Which kinds of trap can turn up. With all four off there are no traps.
+  #
+  # Death Trap   Brian falls and is sent back to his last save point, as a
+  #              DeathLink death does. Held until a won battle's rewards are
+  #              in hand. The most brutal, so it has its own amount:
+  #                off      none
+  #                rare     a quarter as likely as each other kind (about 1
+  #                         trap in 13 with all four on)
+  #                normal   as likely as the others
+  #                custom   exactly death_trap_count of them
+  # HP Trap      HP drops by half of max HP; it stops at 1, never kills.
+  # MP Trap      MP drops by half of max MP.
+  # Ice Trap     Brian is frozen in ice for five seconds, in the field or in
+  #              battle: no moving, attacking, casting, talking or opening.
+  death_traps:
+    off: 0
+    rare: 1
+    normal: 0
+    custom: 0
+
+  # With death_traps: custom, exactly this many of the traps are Death Traps
+  # (0 to 50), the rest drawn from the other kinds switched on.
+  death_trap_count: 1
+
+  hp_traps:
+    'true': 1
+    'false': 0
+  mp_traps:
+    'true': 1
+    'false': 0
+  ice_traps:
+    'true': 1
+    'false': 0
+
 $seed_yaml  progression_balancing: 50
   accessibility: full
 YAML
@@ -1131,7 +1470,7 @@ my %files = (
     "$out/quest64/__init__.py"  => $init_py,
     # The apworld manifest. Rule Builder (rule_builder) is what sets the
     # floor at 0.6.7.
-    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.6.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
+    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.7.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
     "$out/quest64/docs/en_quest64.md" => "# Quest 64 Recompiled\n\nEvery chest, gift, boss and spirit can hold an item from any world in the\nmultiworld. Turn the Archipelago Connector on in the port's menu and give it\nthe server address and your slot name.\n",
     "$out/quest64/docs/guide_en.md"   => "# Quest 64 Recompiled Setup Guide\n\n1. Put `quest64.apworld` in `Archipelago/custom_worlds`.\n2. Put your filled-in `Quest64Recompiled.yaml` in `Archipelago/Players`.\n3. Generate and host as usual.\n4. In Quest 64 Recompiled, open the config menu, turn on the Archipelago\n   Connector and enter the server address, your slot name and the password\n   if the room has one.\n",
     "$out/Quest64Recompiled.yaml" => $yaml,
