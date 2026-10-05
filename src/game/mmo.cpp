@@ -75,6 +75,11 @@ namespace {
     constexpr int cooldown = 90;
     constexpr int cooldown_max = 135;
     constexpr int cooldown_jitter = 15;
+    // A boss (gBattleState 0x100) fights alone, so it goes every three and a
+    // half seconds, counted from the start of one action to the start of the
+    // next (its clock runs while it acts); an action that runs longer than
+    // that is followed straight away by the next.
+    constexpr int boss_cooldown = 105;
     std::array<int, 6> rest{};
     constexpr int first_wait_min = 5;
     constexpr int jitter = 10;
@@ -218,15 +223,19 @@ void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
         }
         const int32_t e = enemies + slot * enemy_size;
         const bool idle = MEM_HU(0, e) == 0 && (MEM_HU(0x8, e) & 0x1) == 0;
+        const bool boss = (state & 0x100) != 0;
+        if (boss && wait[slot] > 0) {
+            wait[slot]--;
+        }
         if (!idle) {
             continue;
         }
-        if (wait[slot] > 0) {
+        if (!boss && wait[slot] > 0) {
             wait[slot]--;
         }
         if (wait[slot] == 0) {
             MEM_H(0x8, e) = static_cast<int16_t>(MEM_HU(0x8, e) | 0x1);
-            wait[slot] = rest[slot] + roll(0, cooldown_jitter);
+            wait[slot] = boss ? boss_cooldown : rest[slot] + roll(0, cooldown_jitter);
         }
     }
 }

@@ -68,6 +68,22 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Minimap size</div><div class="config-tip-text">How big the minimap is (Enhancements, Quality of Life). Drag the Map box above to move it; Minimap default puts it back at the top right of the picture.</div></div>
+                                        <select data-value="enh_minimap_size" id="enh_minimap_size_select">
+                                            <option value="48">Small</option>
+                                            <option value="72">Medium</option>
+                                            <option value="96">Large</option>
+                                            <option value="128">Extra large</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Checks Guide</div><div class="config-tip-text">A door that leads to a chest not yet opened, a spirit not yet taken, or (while playing an Archipelago seed with giftsanity) a gift NPC not yet checked - in the room behind it or anywhere further into that building or area - is marked with an white question mark, and if the door is in a building's wall, the building's outline is drawn in heavier white. A gift NPC still to check gets a white ring. Follows the randomizer when it has moved chests or spirits. Applies straight away.</div></div>
+                                        <select data-value="enh_minimap_checks_guide" id="enh_minimap_checks_guide_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide spirits</div><div class="config-tip-text">Leaves the spirits (cyan) off the minimap. Applies straight away.</div></div>
                                         <select data-value="enh_minimap_hide_spirits" id="enh_minimap_hide_spirits_select">
                                             <option value="0">Off</option>
@@ -86,22 +102,6 @@
                                         <select data-value="enh_minimap_hide_givers" id="enh_minimap_hide_givers_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Checks Guide</div><div class="config-tip-text">A door that leads to a chest not yet opened, a spirit not yet taken, or (while playing an Archipelago seed with giftsanity) a gift NPC not yet checked - in the room behind it or anywhere further into that building or area - is marked with an white question mark, and if the door is in a building's wall, the building's outline is drawn in heavier white. A gift NPC still to check gets a white ring. Follows the randomizer when it has moved chests or spirits. Applies straight away.</div></div>
-                                        <select data-value="enh_minimap_checks_guide" id="enh_minimap_checks_guide_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Minimap size</div><div class="config-tip-text">How big the minimap is (Enhancements, Quality of Life). Drag the Map box above to move it; Minimap default puts it back at the top right of the picture.</div></div>
-                                        <select data-value="enh_minimap_size" id="enh_minimap_size_select">
-                                            <option value="48">Small</option>
-                                            <option value="72">Medium</option>
-                                            <option value="96">Large</option>
-                                            <option value="128">Extra large</option>
                                         </select>
                                     </div>
                                 </div>

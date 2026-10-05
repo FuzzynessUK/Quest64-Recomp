@@ -20,7 +20,7 @@
 				width: 270dp;
 				padding: 8dp 10dp;
 				border-width: 2dp;
-				border-color: #00000000;
+				border-color: #8a93a8a0;
 				border-radius: 8dp;
 				background-color: #0c1018d0;
 				font-family: "latolatin";
@@ -33,8 +33,14 @@
 			.trk-window--unlocked { border-color: #ffd24a; }
 			/* Hide Borders: no outline, locked or not. */
 			.trk-window--borderless { border-color: #00000000; }
-			/* Hide Titles, while locked. */
+			/* Hide Titles, locked or not. Unlocked with no title, the window
+			   itself (its edge, round the list or note) is dragged instead. */
 			.trk-window--notitle .trk-title { display: none; }
+			.trk-window--unlocked.trk-window--notitle
+			{
+				drag: drag;
+				cursor: move;
+			}
 			/* The Notes window: sized from ui_tracker.cpp, resized from its corner. */
 			.trk-notes-text
 			{
@@ -48,6 +54,8 @@
 				padding: 4dp;
 				border-radius: 4dp;
 				cursor: text;
+				/* Selecting text never drags the window. */
+				drag: block;
 				/* Out of the tab order: the controller's navigation never lands here;
 				   only a mouse click focuses it. */
 				tab-index: none;

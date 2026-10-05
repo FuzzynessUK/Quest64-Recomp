@@ -43,8 +43,8 @@ namespace zelda64::tracker {
         bool hide_done_areas = false;
         // No outline on the windows, locked or not.
         bool hide_borders = false;
-        // Locked windows lose their title bars ("Tracker", "Checks", "Notes").
-        // Unlocked they come back, to have something to drag by.
+        // The windows lose their title bars ("Tracker", "Checks", "Notes"),
+        // locked or not; unlocked, a window is dragged by its edge instead.
         bool hide_titles = false;
         // The item tracker's Wings section.
         bool show_wings = true;
@@ -77,6 +77,11 @@ namespace zelda64::tracker {
     // Game thread.
     void on_frame(uint8_t* rdram);
     void monster_killed(int id);
+    // Gift NPC i (Archipelago's giver order) has been talked to in this save,
+    // check or not; kept per save like the kills, since the game keeps no
+    // "given" state. Bit i of givers_talked().
+    void giver_talked(int i);
+    uint32_t givers_talked();
     // The Controller Pak hooks: kills are filed against the save's contents.
     void save_progress(const std::string& save_key);
     void load_progress(const std::string& save_key);

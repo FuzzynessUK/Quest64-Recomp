@@ -1754,9 +1754,8 @@ void zelda64::archipelago::apply_at_boot(uint8_t* rdram) {
     (void)rdram;
     ap_enabled.store(load_options().enabled);
     rom_ready = true;
-    if (ap_enabled.load()) {
-        locate_once();
-    }
+    // The givers are needed unconnected too (the minimap drops one talked to).
+    locate_once();
 }
 
 namespace {
@@ -2209,15 +2208,21 @@ namespace {
 }
 
 extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* ctx) {
-    if (!playing_seed()) {
-        return;
-    }
     int32_t npc = static_cast<int32_t>(ctx->r16);
     int32_t record = npc != 0 ? static_cast<int32_t>(MEM_W(0x80, npc)) : 0;
     if (record == 0) {
         return;
     }
     int map = static_cast<int32_t>(MEM_W(0, gCurrentMap));
+    // Seed or not, the minimap and tracker drop a gift NPC once talked to.
+    for (int i = 0; i < giver_count; i++) {
+        if (givers[i].map == map && givers[i].item_ram != 0 && givers[i].item_ram - 7 == record) {
+            zelda64::tracker::giver_talked(i);
+        }
+    }
+    if (!playing_seed()) {
+        return;
+    }
     for (int i = 0; i < giver_count; i++) {
         const Giver& giver = givers[i];
         if (giver.map != map || giver.item_ram == 0 || giver.item_ram - 7 != record) {

@@ -55,14 +55,14 @@
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide Borders</div><div class="config-tip-text">The windows have no outline, the gold one they get while unlocked included.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide Borders</div><div class="config-tip-text">The windows have no outline, locked or unlocked.</div></div>
                                         <select data-value="trk_hide_borders" id="trk_hide_borders_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide Titles</div><div class="config-tip-text">While the windows are locked, their titles ("Tracker", "Checks", "Notes") are left out. Unlocking them brings the titles back, to drag the windows by.</div></div>
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide Titles</div><div class="config-tip-text">The windows' titles ("Tracker", "Checks", "Notes") are left out, locked or not. Unlocked, drag a window by its edge instead.</div></div>
                                         <select data-value="trk_hide_titles" id="trk_hide_titles_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>

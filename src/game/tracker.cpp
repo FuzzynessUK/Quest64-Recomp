@@ -111,6 +111,36 @@ namespace {
         }
     }
 
+    // ---- gift NPCs talked to, kept the same way (tracker_givers.json, a
+    // bitmask per save).
+    std::atomic<uint32_t> talked{ 0 };
+    std::map<std::string, uint32_t> talked_by_save;
+    bool talked_file_loaded = false;
+
+    std::filesystem::path talked_path() {
+        return zelda64::get_app_folder_path() / "tracker_givers.json";
+    }
+
+    void load_talked_file() {
+        if (talked_file_loaded) {
+            return;
+        }
+        talked_file_loaded = true;
+        std::ifstream in(talked_path());
+        if (!in.is_open()) {
+            return;
+        }
+        json j = json::parse(in, nullptr, false);
+        if (!j.is_object()) {
+            return;
+        }
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            if (it->is_number_unsigned() || it->is_number_integer()) {
+                talked_by_save[it.key()] = it->get<uint32_t>();
+            }
+        }
+    }
+
     // ---- the snapshot
     std::mutex snapshot_mutex;
     zelda64::tracker::Snapshot latest;
@@ -185,7 +215,29 @@ void zelda64::tracker::monster_killed(int id) {
     }
 }
 
+void zelda64::tracker::giver_talked(int i) {
+    if (i >= 0 && i < 32) {
+        talked.fetch_or(1u << i);
+    }
+}
+
+uint32_t zelda64::tracker::givers_talked() {
+    return talked.load();
+}
+
 void zelda64::tracker::save_progress(const std::string& save_key) {
+    load_talked_file();
+    talked_by_save[save_key] = talked.load();
+    {
+        json t = json::object();
+        for (const auto& [key, bits] : talked_by_save) {
+            t[key] = bits;
+        }
+        std::ofstream tout(talked_path());
+        if (tout.is_open()) {
+            tout << t.dump();
+        }
+    }
     load_kills_file();
     kills_by_save[save_key] = std::vector<int>(kills.begin(), kills.end());
     json j = json::object();
@@ -205,6 +257,9 @@ void zelda64::tracker::load_progress(const std::string& save_key) {
     if (it != kills_by_save.end()) {
         kills.insert(it->second.begin(), it->second.end());
     }
+    load_talked_file();
+    auto t = talked_by_save.find(save_key);
+    talked.store(t == talked_by_save.end() ? 0u : t->second);
 }
 
 void zelda64::tracker::on_frame(uint8_t* rdram) {
@@ -213,6 +268,7 @@ void zelda64::tracker::on_frame(uint8_t* rdram) {
     bool on_title = zelda64::speedrun::title_showing();
     if (on_title && !was_on_title) {
         kills.clear();
+        talked.store(0);
     }
     was_on_title = on_title;
 

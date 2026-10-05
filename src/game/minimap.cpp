@@ -9,6 +9,7 @@
 #include "minimap.h"
 #include "archipelago.h"
 #include "hardmode.h"
+#include "tracker.h"
 #include "randomizer.h"
 #include "randomizer/chest_data.h"
 #include "randomizer/spirit_data.h"
@@ -49,6 +50,8 @@ namespace {
     std::atomic<bool> any_frame{ false };
 
     int last_map = -1, last_submap = -1;
+    // The submap the outline in `state` belongs to; not cleared by a battle.
+    int shown_map = -1, shown_submap = -1;
     uint32_t last_nav = 0;
     uint32_t last_entry[4] = {};
     // The outline that is the submap's outer edge (the largest), and per exit
@@ -143,6 +146,8 @@ namespace {
     // no "given" state, so there is nothing to look for.
     bool giver_ap = false;
     std::vector<uint8_t> giver_in_seed, giver_checked;
+    // Gift NPCs talked to in this save (tracker.cpp keeps it), seed or not.
+    uint32_t giver_talked = 0;
 
     void read_givers() {
         static const std::vector<int64_t> locations = [] {
@@ -153,10 +158,16 @@ namespace {
             return out;
         }();
         giver_ap = zelda64::archipelago::tracker_view(locations, giver_in_seed, giver_checked);
+        giver_talked = zelda64::tracker::givers_talked();
+    }
+
+    // Talked to, or checked as far as Archipelago knows.
+    bool giver_done(int i) {
+        return (giver_talked & (1u << i)) != 0 || (giver_ap && giver_checked[i]);
     }
 
     bool giver_open(int i) {
-        return giver_ap && giver_in_seed[i] && !giver_checked[i];
+        return giver_ap && giver_in_seed[i] && !giver_done(i);
     }
 
     // Checks by submap: kind 0 a chest, 1 a spirit, with its save flag's bit,
@@ -237,8 +248,7 @@ namespace {
         return (MEM_BU(0, base + (id >> 3)) & (1u << (id & 7))) != 0;
     }
 
-    // A gift NPC anywhere through the door, unless Archipelago says it has
-    // been checked already.
+    // A gift NPC anywhere through the door not yet talked to (or checked).
     bool region_has_giver(const std::vector<std::pair<int, int>>& region) {
         for (const auto& at : region) {
             auto found = checks_by_submap.find(at);
@@ -246,7 +256,7 @@ namespace {
                 continue;
             }
             for (const Check& c : found->second) {
-                if (c.kind == 2 && !(giver_ap && giver_checked[c.id])) {
+                if (c.kind == 2 && !giver_done(c.id)) {
                     return true;
                 }
             }
@@ -334,12 +344,25 @@ void zelda64::minimap::on_frame(uint8_t* rdram) {
         entry[i] = static_cast<uint32_t>(MEM_W(i * 4, static_cast<int32_t>(nav + 0x10u * static_cast<uint32_t>(submap))));
     }
     if (map != last_map || submap != last_submap || nav != last_nav || std::memcmp(entry, last_entry, sizeof entry) != 0) {
+        // Back from a battle (last_map was cleared) the same submap is read
+        // again: only a different submap or outline counts as new, so the
+        // UI keeps its zoom.
+        auto outline = read_outline(rdram, nav, submap);
+        bool same = map == shown_map && submap == shown_submap && outline.size() == state.outline.size();
+        for (size_t g = 0; same && g < outline.size(); g++) {
+            same = outline[g].size() == state.outline[g].size() &&
+                   std::memcmp(outline[g].data(), state.outline[g].data(), outline[g].size() * sizeof(Point)) == 0;
+        }
         last_map = map;
         last_submap = submap;
         last_nav = nav;
         std::memcpy(last_entry, entry, sizeof entry);
-        state.outline = read_outline(rdram, nav, submap);
-        state.mesh_version++;
+        shown_map = map;
+        shown_submap = submap;
+        state.outline = std::move(outline);
+        if (!same) {
+            state.mesh_version++;
+        }
         regions.clear();
         exit_groups_dirty = true;
         float min_x = 1e9f, min_z = 1e9f, max_x = -1e9f, max_z = -1e9f;
@@ -383,17 +406,20 @@ void zelda64::minimap::on_frame(uint8_t* rdram) {
             continue;
         }
         int id = MEM_HU(0x62, c);
-        bool opened = id < 88 && flag_set(rdram, chest_flags, id);
-        state.chests.push_back({ x, z, opened });
+        // Opened chests leave the map.
+        if (id < 88 && flag_set(rdram, chest_flags, id)) {
+            continue;
+        }
+        state.chests.push_back({ x, z, false });
     }
 
-    // Givers: grey once Archipelago has the check, lit the same as a door
+    // Givers: gone once talked to (or checked), lit the same as a door
     // while it is a check still to get.
     read_givers();
     state.givers.clear();
     for (int i = 0; i < giver_count; i++) {
-        if (givers[i].map == map && givers[i].submap == submap) {
-            Marker m{ givers[i].x, givers[i].z, giver_ap && giver_checked[i] != 0 };
+        if (givers[i].map == map && givers[i].submap == submap && !giver_done(i)) {
+            Marker m{ givers[i].x, givers[i].z, false };
             m.checks = giver_open(i);
             state.givers.push_back(m);
         }
@@ -404,7 +430,10 @@ void zelda64::minimap::on_frame(uint8_t* rdram) {
     for (uint32_t i = 0; i < std::min<uint32_t>(spirits, 32); i++) {
         int32_t s = spirit_table + 8 + static_cast<int32_t>(i) * spirit_stride;
         float x = read_f32(rdram, s), z = read_f32(rdram, s + 8);
-        if (sane(x) && sane(z)) {
+        // The spirit's id is the byte at +0x14 (func_80012220); a taken one
+        // stays in the table, so its save flag says whether to draw it.
+        int id = MEM_BU(0x14, s);
+        if (sane(x) && sane(z) && !flag_set(rdram, spirit_flags, id)) {
             state.spirits.push_back({ x, z, false });
         }
     }

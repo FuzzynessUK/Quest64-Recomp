@@ -2248,13 +2248,13 @@ void recompui::update_minimap() {
     box->SetProperty(Rml::PropertyId::Height, Rml::Property(size, Rml::Unit::PX));
 
     // Buildings to light: the outline each door is on, with checks behind it
-    // (Checks Guide) or a gift NPC (while they are shown).
+    // or a gift NPC not yet talked to (Checks Guide only).
     std::vector<int> lit(mm_state.outline.size(), 0);
     for (const auto& m : mm_state.exits) {
         if (m.group < 0 || m.group >= static_cast<int>(lit.size())) {
             continue;
         }
-        int how = e.minimap_checks_guide && m.checks ? 2 : !e.minimap_hide_givers && m.giver ? 1 : 0;
+        int how = !e.minimap_checks_guide ? 0 : m.checks ? 2 : !e.minimap_hide_givers && m.giver ? 1 : 0;
         lit[m.group] = std::max(lit[m.group], how);
     }
 
@@ -2319,11 +2319,11 @@ void recompui::update_minimap() {
         }
     };
     float marker = std::max(4.0f, size * 0.045f);
-    // Plain doors are not drawn. A door to checks (Checks Guide) or to a gift
-    // NPC (while they are shown) is a white question mark.
+    // Plain doors are not drawn. With the Checks Guide on, a door to checks or to a gift
+    // NPC not yet talked to is a white question mark.
     for (const auto& m : mm_state.exits) {
         bool lead = e.minimap_checks_guide && m.checks;
-        bool giver = !lead && !e.minimap_hide_givers && m.giver;
+        bool giver = e.minimap_checks_guide && !lead && !e.minimap_hide_givers && m.giver;
         if (lead || giver) {
             dot(m.x, m.z, "mm-exit", lead ? " mm-exit--checks" : giver ? " mm-exit--giver" : "",
                 lead || giver ? marker * 2.0f : marker, lead || giver ? "?" : "");
@@ -2335,7 +2335,7 @@ void recompui::update_minimap() {
     if (!e.minimap_hide_chests) {
         for (const auto& m : mm_state.chests) dot(m.x, m.z, "mm-chest", m.done ? " mm-chest--open" : "", marker);
     }
-    // Gift NPCs: grey once given (Archipelago), ringed white while a check.
+    // Gift NPCs (gone once talked to), ringed white while a check.
     if (!e.minimap_hide_givers) {
         for (const auto& m : mm_state.givers) {
             bool lead = e.minimap_checks_guide && m.checks;

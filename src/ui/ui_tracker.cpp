@@ -201,8 +201,13 @@ namespace {
 
     class DragListener : public Rml::EventListener {
         void ProcessEvent(Rml::Event& event) override {
-            Rml::Element* window = event.GetCurrentElement()->GetParentNode();
-            if (window == nullptr || zelda64::tracker::options().locked) {
+            // On the window: dragged by its title, or by the window itself
+            // when titles are hidden. Drags of anything else inside it (the
+            // check list, a resize corner) bubble up here too and are not ours.
+            Rml::Element* window = event.GetCurrentElement();
+            Rml::Element* target = event.GetTargetElement();
+            if (zelda64::tracker::options().locked ||
+                (target != window && !(target != nullptr && target->IsClassSet("trk-title")))) {
                 return;
             }
             float mx = event.GetParameter("mouse_x", 0.0f);
@@ -405,14 +410,10 @@ namespace {
         if (auto* field = dynamic_cast<Rml::ElementFormControl*>(notes_text)) {
             field->SetValue(zelda64::tracker::load_notes());
         }
-        for (const char* id : { "trk_item_title", "trk_check_title", "trk_notes_title" }) {
-            Rml::Element* title = document->GetElementById(id);
-            if (title == nullptr) {
-                continue;
-            }
-            title->AddEventListener(Rml::EventId::Dragstart, &drag_listener);
-            title->AddEventListener(Rml::EventId::Drag, &drag_listener);
-            title->AddEventListener(Rml::EventId::Dragend, &drag_listener);
+        for (Rml::Element* window : { item_window, check_window, notes_window }) {
+            window->AddEventListener(Rml::EventId::Dragstart, &drag_listener);
+            window->AddEventListener(Rml::EventId::Drag, &drag_listener);
+            window->AddEventListener(Rml::EventId::Dragend, &drag_listener);
         }
         auto add_chips = [&](Rml::Element* grid, size_t n) {
             for (size_t i = 0; i < n; i++) {
@@ -461,7 +462,7 @@ namespace {
             w->SetClass("trk-window--solid", background == 0);
             w->SetClass("trk-window--clear", background == 2);
             w->SetClass("trk-window--borderless", o.hide_borders);
-            w->SetClass("trk-window--notitle", o.locked && o.hide_titles);
+            w->SetClass("trk-window--notitle", o.hide_titles);
         }
         // Windows are only resized while unlocked; locked, the note's text
         // is the one thing that still takes a click.
@@ -605,7 +606,7 @@ void recompui::update_tracker() {
     // less its title; never taller than the screen.
     {
         float h = check_resize_listener.active ? check_resize_listener.h : o.check_h;
-        bool titled = !(o.locked && o.hide_titles);
+        bool titled = !o.hide_titles;
         float dp = document->GetContext()->GetDensityIndependentPixelRatio();
         float list = std::max(h - 20.0f - (titled ? 25.0f : 0.0f), 40.0f) * dp;
         areas_scroll->SetProperty(Rml::PropertyId::Height, Rml::Property(std::min(list, size.y * 0.9f), Rml::Unit::PX));
@@ -621,7 +622,7 @@ void recompui::update_tracker() {
         // (8dp 10dp) and outline (2dp) are taken off.
         float w = resize_listener.active ? resize_listener.w : o.notes_w;
         float h = resize_listener.active ? resize_listener.h : o.notes_h;
-        bool titled = !(o.locked && o.hide_titles);
+        bool titled = !o.hide_titles;
         notes_window->SetProperty(Rml::PropertyId::Width, Rml::Property(w, Rml::Unit::DP));
         notes_text->SetProperty(Rml::PropertyId::Width, Rml::Property(w - 24.0f - 8.0f, Rml::Unit::DP));
         notes_text->SetProperty(Rml::PropertyId::Height,
