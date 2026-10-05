@@ -116,6 +116,13 @@ Building is not required to play this project, as prebuilt binaries (which do no
 * [Quest 64 Decompilation](https://github.com/Rainchus/Quest64-Decomp) for headers and some function definitions, used for making patches or some enhancements
 * [Ares emulator](https://github.com/ares-emulator/ares) for RSP vector instruction reference implementations, used in RSP recompilation
 
+# Credits
+
+This fork ([FuzzynessUK/Quest64-Recomp](https://github.com/FuzzynessUK/Quest64-Recomp)) adds the Archipelago Edition's features on top of the recompilation by [Rainchus](https://github.com/Rainchus).
+
+* [Fuzzyness](https://github.com/FuzzynessUK): design, direction and play-testing of every feature in this fork.
+* [Claude](https://claude.com/claude-code) (Anthropic): wrote the code for this fork's features with Fuzzyness, through Claude Code - including the Archipelago connector and apworld, the randomizer and enemy randomizer, Hard Mode, the enhancements, Real Time Combat, the tracker and minimap, custom music and the music converter, custom character models and their converter, and the reverse engineering of the game they rely on.
+
 # Special Thanks:
 
 * [ZeldaRET](https://github.com/zeldaret) : for teaching me the fundamental knowledge of N64 decompilation.
