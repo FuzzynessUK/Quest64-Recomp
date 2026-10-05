@@ -497,6 +497,14 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
     collision size); `quest64_randomizer_chests` rebuilds all of it in the
     heap. Map data ROM addresses come from the map table at RAM 0x80054F10
     (+4 ROM start, +0xC RAM destination).
+- `src/game/gfxbuffer.cpp` — the frame display list is built in 512 KB
+  buffers at 0x80500000 / 0x80580000 (hooks in `func_800011DC` at 0x80001208
+  and 0x800017EC) instead of the 2560-command area at frame block +0x8148,
+  which Rock Shower in Blue Cave overran (vanilla crash); matrices (+0x118,
+  0x40 each, count 0x8007B2F8) gain the freed area, 832 in all. Peaks above
+  the vanilla limits go to `gfx.txt`. Also the crash handler: `crash.txt`
+  (stack as module+offset, last frame's list/matrix counts) and `crash.dmp`
+  in the app folder.
 - `src/game/map_table.cpp` — map/submap/entrance tables extracted from the ROM.
 - `src/game/widescreen.cpp` — display-list post-processor hooked in
   `nnScExecuteGraphics` before `osSpTaskLoad`; F3DEX 1.23 opcodes.

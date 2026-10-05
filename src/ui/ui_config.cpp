@@ -3075,6 +3075,22 @@ public:
             [](const std::string& param, Rml::Event& event) {
                 zelda64::give_hard_mode_item(cheats_context.hm_item_index);
             });
+        // A strong Brian for testing, in one press: written on the game's next
+        // frame like the sliders (and, like them, only with the tab's master
+        // switch on). Wind is left as it is.
+        recompui::register_event(listener, "cheat_test_mode",
+            [](const std::string& param, Rml::Event& event) {
+                using zelda64::PlayerStat;
+                constexpr std::pair<PlayerStat, int> test_stats[] = {
+                    { PlayerStat::MaxHP, 999 }, { PlayerStat::HP, 999 },
+                    { PlayerStat::MaxMP, 999 }, { PlayerStat::MP, 999 },
+                    { PlayerStat::Defense, 50 }, { PlayerStat::Agility, 100 },
+                    { PlayerStat::Fire, 40 }, { PlayerStat::Earth, 50 }, { PlayerStat::Water, 50 },
+                };
+                for (const auto& [stat, value] : test_stats) {
+                    zelda64::set_player_stat(stat, value);
+                }
+            });
 
         recompui::register_event(listener, "reset_game",
             [](const std::string& param, Rml::Event& event) {

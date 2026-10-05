@@ -253,6 +253,21 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="config-debug-option" data-if="cheat_stats_available">
+                            <label class="config-debug-option__label">
+                                <div>Test mode</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" style="font-size: 14dp; width: 100%; white-space: normal;"><div>HP and MP 999, max HP and MP 999, Defense 50, Agility 100, Fire 40, Earth 50, Water 50.</div></div>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="cheat_test_mode">Test mode</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="config-debug-option" data-if="!cheat_stats_available">
                             <label class="config-debug-option__label">
                                 <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Start or load a game to edit Brian's stats.</div>

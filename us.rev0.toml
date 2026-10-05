@@ -641,3 +641,16 @@ before_vram = 0x8001C5F4
 func = "func_80004040"
 text = "quest64_archipelago_death(rdram);"
 before_vram = 0x800040C0
+
+# Display list room (src/game/gfxbuffer.cpp): the frame's list is built in a
+# 512 KB buffer of its own instead of the 2560-command area in the frame block
+# (Rock Shower in Blue Cave overran it). Just after gMasterGfxPos is pointed
+# at the block's list area, and before the epilogue, once the task has it.
+[[patches.hook]]
+func = "func_800011DC"
+text = "quest64_gfx_list_start(rdram, ctx);"
+before_vram = 0x80001208
+[[patches.hook]]
+func = "func_800011DC"
+text = "quest64_gfx_list_end(rdram, ctx);"
+before_vram = 0x800017EC

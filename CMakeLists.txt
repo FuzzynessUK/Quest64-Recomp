@@ -223,6 +223,7 @@ set (SOURCES
     ${CMAKE_SOURCE_DIR}/src/game/repel.cpp
     ${CMAKE_SOURCE_DIR}/src/game/leonardo.cpp
     ${CMAKE_SOURCE_DIR}/src/game/mmo.cpp
+    ${CMAKE_SOURCE_DIR}/src/game/gfxbuffer.cpp
     ${CMAKE_SOURCE_DIR}/src/game/repel_icon_data.cpp
     ${CMAKE_SOURCE_DIR}/src/game/itemnotice.cpp
     ${CMAKE_SOURCE_DIR}/src/game/speedrun.cpp

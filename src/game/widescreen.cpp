@@ -156,6 +156,17 @@ namespace {
     // time anyone noticed.
     bool log_rects = false;
 
+    // Whether [addr, addr + bytes) lies in the 8MB the game can address. A
+    // display list overrun used to write commands over the other frame
+    // block's task, so its list pointer could be anything; the RDP masks
+    // what it is given, but reading outside the recomp's RDRAM faults, and
+    // that was a crash (1.7.1, a busy Real Time Combat battle). Nothing
+    // outside this range is walked.
+    bool in_rdram(int32_t addr, uint32_t bytes) {
+        uint32_t a = static_cast<uint32_t>(addr);
+        return a >= 0x80000000u && a <= 0x80800000u - bytes;
+    }
+
     uint32_t read_w(uint8_t* rdram, int32_t addr) {
         return static_cast<uint32_t>(MEM_W(0, addr));
     }
@@ -450,6 +461,10 @@ namespace {
             return;
         }
         while (budget-- > 0) {
+            // 24: a texture rectangle looks two commands ahead.
+            if (!in_rdram(addr, 24)) {
+                return;
+            }
             uint32_t w0 = read_w(rdram, addr);
             uint32_t w1 = read_w(rdram, addr + 4);
             uint8_t op = w0 >> 24;
@@ -498,6 +513,9 @@ namespace {
                 case op_vtx: {
                     // F3DEX 1.x gSPVertex: w0 = 04 | v0*2 << 16 | n << 10 | (16n-1).
                     int n = (w0 >> 10) & 0x3F;
+                    if (!in_rdram(static_cast<int32_t>(resolve(w1) | 0x80000000u), n * 16)) {
+                        break;
+                    }
                     if (dump_file) {
                         int32_t v = static_cast<int32_t>(resolve(w1) | 0x80000000u);
                         for (int i = 0; i < n; i++) {
@@ -612,6 +630,9 @@ extern "C" void quest64_widescreen_task(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
     int32_t task = static_cast<int32_t>(ctx->r4) + 0x10;
+    if (!in_rdram(task + 0x30, 4)) {
+        return;
+    }
     uint32_t data_ptr = read_w(rdram, task + 0x30);
     if (data_ptr == 0) {
         return;

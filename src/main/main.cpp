@@ -38,6 +38,7 @@
 #include "audio.h"
 #include "archipelago.h"
 #include "pageitem.h"
+#include "gfxbuffer.h"
 #include "repel.h"
 #include "leonardo.h"
 #include "easierquest.h"
@@ -655,6 +656,7 @@ int main(int argc, char** argv) {
 #ifdef _WIN32
     // Set up high resolution timing period.
     timeBeginPeriod(1);
+    zelda64::gfxbuffer::install_crash_handler();
 
     // Process arguments.
     
