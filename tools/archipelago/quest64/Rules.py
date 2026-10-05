@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Dict
 
 from rule_builder.options import OptionFilter
-from rule_builder.rules import CanReachLocation, CanReachRegion, Has, Rule
+from rule_builder.rules import CanReachLocation, CanReachRegion, Has, Rule, True_
 
 from .Options import BossSouls, MammonPortal
 
@@ -19,7 +19,7 @@ WATER_JEWEL_GATE: Rule = Has("Water Jewel") | OptionFilter(BossSouls, 1, operato
 FIRE_RUBY_GATE: Rule = Has("Fire Ruby") | OptionFilter(BossSouls, 1, operator="ge")
 ALL_BOSSES_BEATEN: Rule = CanReachLocation("Boss - Solvaring") & CanReachLocation("Boss - Zelse") & CanReachLocation("Boss - Nepty") & CanReachLocation("Boss - Shilf") & CanReachLocation("Boss - Fargo") & CanReachLocation("Boss - Guilty") & CanReachLocation("Boss - Beigis")
 ALL_MONSTER_AREAS: Rule = CanReachRegion("Overworld") & CanReachRegion("Early") & CanReachRegion("Mid") & CanReachRegion("Late")
-ENDGAME_DOOR: Rule = (OptionFilter(MammonPortal, 0) & Has("Eletale's Book")) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)
+ENDGAME_DOOR: Rule = (OptionFilter(MammonPortal, 0) & Has("Eletale's Book")) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)
 
 # The Entrances sheet. An entrance with no rule is always open.
 entrance_rules: Dict[str, Rule] = {

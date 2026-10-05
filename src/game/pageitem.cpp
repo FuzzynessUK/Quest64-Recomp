@@ -78,6 +78,7 @@ namespace {
     constexpr int32_t gNextMap = 0x80084EE4;     // -1 until a save is loaded
 
     std::atomic<int> seed_target{ 0 };
+    std::atomic<bool> target_ends_run{ false };
     int baseline = -1;                            // pages in the bag as this save came in
     int last_count = -1;
     int shown_count = -2;
@@ -113,7 +114,12 @@ namespace {
     }
 }
 
-void zelda64::page_item::set_hunt(int required) {
+std::vector<uint8_t> zelda64::page_item::encode_text(const std::string& text) {
+    return encode(text);
+}
+
+void zelda64::page_item::set_hunt(int required, bool ends_run) {
+    target_ends_run.store(ends_run);
     seed_target.store(required > 0 ? required : 0);
 }
 
@@ -172,9 +178,13 @@ void zelda64::page_item::on_frame(uint8_t* rdram) {
     }
     if (count >= goal && last_count < goal) {
         zelda64::notify::post("All " + std::to_string(goal) + " pages found!");
-        zelda64::request_ending();
-        if (seed_target.load() > 0) {
-            zelda64::archipelago::goal_reached();
+        // The portal's pages only open the door (archipelago.cpp), and the
+        // run goes on to Mammon.
+        if (target_ends_run.load()) {
+            zelda64::request_ending();
+            if (seed_target.load() > 0) {
+                zelda64::archipelago::goal_reached();
+            }
         }
     }
     last_count = count;

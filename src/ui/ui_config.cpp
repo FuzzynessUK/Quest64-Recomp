@@ -871,6 +871,13 @@ void make_enhancements_bindings(Rml::Context* context) {
     // the rest of a launch that booted connected), so the tab is hidden.
     constructor.BindFunc("ap_locked", [](Rml::Variant& out) { out = zelda64::archipelago::settings_locked() ? 1 : 0; });
     bind_tooltip_events(constructor);
+    constructor.BindFunc("enh_real_time_combat",
+        [](Rml::Variant& out) { out = enhancements_context.edited.real_time_combat ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.real_time_combat = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
     constructor.BindFunc("enh_one_hit_ko",
         [](Rml::Variant& out) { out = enhancements_context.edited.one_hit_ko ? 1 : 0; },
         [](const Rml::Variant& in) {
@@ -1081,6 +1088,20 @@ void make_enhancements_bindings(Rml::Context* context) {
         [](Rml::Variant& out) { out = enhancements_context.edited.fast_mp_recovery ? 1 : 0; },
         [](const Rml::Variant& in) {
             enhancements_context.edited.fast_mp_recovery = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_play_as_leonardo",
+        [](Rml::Variant& out) { out = enhancements_context.edited.play_as_leonardo ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.play_as_leonardo = in.Get<int>() != 0;
+            enhancements_option_changed();
+        }
+    );
+    constructor.BindFunc("enh_repel",
+        [](Rml::Variant& out) { out = enhancements_context.edited.repel ? 1 : 0; },
+        [](const Rml::Variant& in) {
+            enhancements_context.edited.repel = in.Get<int>() != 0;
             enhancements_option_changed();
         }
     );

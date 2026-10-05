@@ -12,7 +12,7 @@ from .Locations import (Q64Location, Q64LocationData, location_data_table, locat
                         code_to_location_table, vanilla_locations)
 from .Options import DeathTraps, Goal, PagePlacement, Q64Options, Traps
 from .Regions import regions, connections
-from .Rules import set_all_rules
+from .Rules import entrance_rules, set_all_rules
 
 
 class Q64WebWorld(WebWorld):
@@ -47,8 +47,14 @@ class Q64World(World):
         # or a spirit does. So the monster checks have to exist.
         if self.options.mammon_portal.value & 2:
             self.options.enemysanity.value = 1
-        # Page Hunt: where the pages may go.
-        if self.options.goal.value == Goal.option_page_hunt:
+        # The pages portal opens the way to Mammon, so it means nothing when
+        # the run ends with the pages instead.
+        if self.options.mammon_portal.value & 4 and self.options.goal.value != Goal.option_mammon:
+            raise OptionError(
+                f"Quest 64: player {self.player_name} has a Mammon's World Portal that wants Torn Pages, "
+                f"which needs goal mammon. Choose goal mammon or a portal without pages.")
+        # Page Hunt, or the pages portal: where the pages may go.
+        if self.uses_pages():
             placement = self.options.page_placement.value
             if placement == PagePlacement.option_quest64_only:
                 self.options.local_items.value.add("Torn Page")
@@ -242,11 +248,18 @@ class Q64World(World):
             return 1
         return 3
 
+    def uses_pages(self) -> bool:
+        """Torn Pages are in the pool: a Page Hunt, or a Mammon's World
+        Portal that asks for them."""
+        return (self.options.goal.value == Goal.option_page_hunt
+                or bool(self.options.mammon_portal.value & 4))
+
     def add_pages(self, pool: List[Q64Item]) -> None:
-        """Page Hunt: put pages_required Torn Pages in the pool, in place of
-        filler first, then wings, then Level Ups. A seed with no room for
-        them all cannot be finished, so it is stopped here with the reason."""
-        if self.options.goal.value != Goal.option_page_hunt:
+        """Page Hunt or pages portal: put pages_required Torn Pages in the
+        pool, in place of filler first, then wings, then Level Ups. A seed
+        with no room for them all cannot be finished, so it is stopped here
+        with the reason."""
+        if not self.uses_pages():
             return
         wanted = self.options.pages_required.value
         order = sorted((i for i in range(len(pool)) if self.expendable(pool[i]) < 3),
@@ -322,6 +335,12 @@ class Q64World(World):
         set_all_rules(self)
         if self.options.goal.value == Goal.option_page_hunt:
             self.set_completion_rule(Has("Torn Page", self.options.pages_required.value))
+        # The pages portal: the workbook's ENDGAME_DOOR has the bosses and
+        # monsters halves; the page count is an option, so it is added here.
+        if self.options.mammon_portal.value & 4:
+            door = self.multiworld.get_entrance("Boss 7 to Endgame", self.player)
+            self.set_rule(door, entrance_rules["Boss 7 to Endgame"]
+                          & Has("Torn Page", self.options.pages_required.value))
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
@@ -366,6 +385,9 @@ class Q64World(World):
                 "jp_magic_barrier": self.options.jp_magic_barrier.value,
                 "jp_boss_mp_rewards": self.options.jp_boss_mp_rewards.value,
                 "fast_mp_recovery": self.options.fast_mp_recovery.value,
+                "real_time_combat": self.options.real_time_combat.value,
+                "character": self.options.character.value,
+                "repel": self.options.repel.value,
                 "jp_stat_up_effect": self.options.jp_stat_up_effect.value,
                 "exit_from_anywhere": self.options.exit_from_anywhere.value,
                 "fast_walking": self.options.fast_walking.value,

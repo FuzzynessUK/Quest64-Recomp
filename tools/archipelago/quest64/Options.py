@@ -103,12 +103,25 @@ class MammonPortal(Choice):
                   by the server: a monster leaves nothing behind in the save
                   to read back after a reload. Turning this on turns
                   enemysanity on with it.
-    both          all of the above."""
+    both          all_bosses and all_monsters.
+
+    all_pages               pages_required Torn Pages of the Eletale's Book
+                            have to be in your bag. The pages go into the
+                            pool as they do for a Page Hunt (pages_required
+                            and page_placement say how many and where), but
+                            the run still ends with Mammon. Needs goal
+                            mammon.
+    bosses_and_pages        all_bosses and all_pages.
+    bosses_monsters_pages   all_bosses, all_monsters and all_pages."""
     display_name = "Mammon's World Portal"
+    # A bitmask: 1 bosses, 2 monsters, 4 pages. The game reads it that way.
     option_vanilla = 0
     option_all_bosses = 1
     option_all_monsters = 2
     option_both = 3
+    option_all_pages = 4
+    option_bosses_and_pages = 5
+    option_bosses_monsters_pages = 7
     default = 0
 
 
@@ -299,6 +312,30 @@ class FastMPRecovery(DefaultOnToggle):
     display_name = "Fast MP Recovery"
 
 
+class RealTimeCombat(Toggle):
+    """Enhancements. Real time battles instead of turn based: Brian moves,
+    attacks and casts whenever he likes, and the monsters act on timers of
+    their own."""
+    display_name = "Real Time Combat"
+
+
+class Character(Choice):
+    """Enhancements. Who you play as. leonardo: the blond knight of Normoon
+    and Brannoch Castle, with his own cape, moving with all of Brian's
+    animations; the Leonardo you meet becomes Brian."""
+    display_name = "Character"
+    option_brian = 0
+    option_leonardo = 1
+    default = 0
+
+
+class Repel(Toggle):
+    """Enhancements. Start with a Repel: use it in the field to switch
+    random battles off, use it again to switch them back on. Its icon shows
+    over Brian while it is on."""
+    display_name = "Repel"
+
+
 class JPStatUpEffect(DefaultOnToggle):
     """Enhancements. A colour burst over Brian when a stat rises, as in the
     Japanese release."""
@@ -393,7 +430,8 @@ class Goal(Choice):
 
 
 class PagesRequired(Range):
-    """How many Torn Pages finish a Page Hunt."""
+    """How many Torn Pages finish a Page Hunt, or open Mammon's World when
+    Mammon's World Portal asks for pages."""
     display_name = "Pages Required"
     range_start = 5
     range_end = 100
@@ -450,6 +488,9 @@ class Q64Options(PerGameCommonOptions):
     jp_magic_barrier: JPMagicBarrier
     jp_boss_mp_rewards: JPBossMPRewards
     fast_mp_recovery: FastMPRecovery
+    real_time_combat: RealTimeCombat
+    character: Character
+    repel: Repel
     jp_stat_up_effect: JPStatUpEffect
     exit_from_anywhere: ExitFromAnywhere
     fast_walking: FastWalking

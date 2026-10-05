@@ -1,0 +1,280 @@
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <random>
+#include <string>
+
+#include "mmo.h"
+#include "enhancements.h"
+#include "hardmode.h"
+#include "zelda_config.h"
+#include "recomp.h"
+
+extern "C" void func_8001817C(uint8_t* rdram, recomp_context* ctx);
+extern "C" void func_80019CA4(uint8_t* rdram, recomp_context* ctx);
+
+// Real Time Combat (Enhancements, Fun): real time battles instead of turn based.
+//
+// How a vanilla battle takes turns. gBattleState (0x8008C592) bit 0x1 is
+// "in battle", 0x2 "an enemy's turn", 0x4 "the turn is changing", 0x10
+// escaped, 0x100 a boss, 0x200 the opening camera sweep, 0x400 every enemy
+// down. func_8001D358 ends a turn - every action Brian or an enemy finishes
+// calls it: it runs the actor's status countdown (func_8001817C), removes
+// the turn's ring, on Brian's turn picks the next living enemy from the order
+// list (0x8007D0B0, index 0x8008C598) and sets a 20-frame pause (0x8008C594,
+// which also holds Brian's stick), toggles 0x2 and sets 0x4. The battle
+// manager, func_8001CFE8, then waits out the pause, ends the battle on 0x400
+// or an escape, gives the enemy whose turn it is its "act" bit (+0x8 bit 1
+// of its 0x128-byte slot, set by func_8000932C), and draws the new ring
+// round whoever acts (func_80019A98) - the circle Brian can walk in, which
+// func_80005748 holds him to (centre 0x8008C5A4 / 0x8008C430). The camera
+// follows whoever's turn it is.
+//
+// Every enemy's action handler runs every frame (func_80008C20, table
+// 0x8004C290 by the slot's action id); the idle one, action 0, does nothing
+// until its "act" bit is set, then approaches, strikes or casts and, when
+// that is over, ends the turn.
+//
+// So, in Real Time Combat, in battle:
+//   - ending a turn runs the status countdown and nothing else: it is always
+//     Brian's turn, his stick is never held, the camera stays on him;
+//   - each idle enemy gets its "act" bit on a timer of its own, so they all
+//     come at him at once, each going back to idle and waiting again;
+//   - the ring's centre follows Brian, so he is never held to it, and the
+//     ring itself is taken away; the edge of the arena still lets him run;
+//   - every enemy down, or Brian off the edge of the arena, raises 0x4 so the
+//     battle manager ends the battle the way it would have at a turn change.
+namespace {
+    constexpr int32_t gBattleState = 0x8008C592;
+    constexpr int32_t turn_pause = 0x8008C594;
+    constexpr int32_t ring_handle = 0x8008C55E;
+    constexpr int32_t ring_centre_x = 0x8008C5A4;
+    constexpr int32_t ring_centre_z = 0x8008C430;
+    constexpr int32_t brian = 0x8007BACC;
+    constexpr int32_t brian_flags = 0x8007BAC0;      // bit 0x20: off the edge of the arena
+    constexpr int32_t enemy_count = 0x8007C990;
+    constexpr int32_t enemies = 0x8007C998;
+    constexpr int enemy_size = 0x128;
+    constexpr int max_enemies = 6;
+
+    // Game frames (the game runs at 30). Each enemy keeps a clock of its own:
+    // after each of its actions it rests before the next - a rest of its own,
+    // drawn once a battle between three and four and a half seconds, and up to
+    // half a second more each time (never under three). An action itself takes about three
+    // seconds, so with one rest for everybody two enemies settled into "you
+    // act while I rest" and it looked like turns; rests of their own drift
+    // apart. Their first actions are spread over the opening three seconds.
+    constexpr int cooldown = 90;
+    constexpr int cooldown_max = 135;
+    constexpr int cooldown_jitter = 15;
+    std::array<int, 6> rest{};
+    constexpr int first_wait_min = 5;
+    constexpr int jitter = 10;
+
+    std::array<int, max_enemies> wait{};
+    // No pacing: every monster acts the moment its own timer runs out, however
+    // many are at it already and whatever Brian is doing. Unfair on purpose.
+    constexpr int32_t brian_state = 0x8007BAB8;    // u16, for the log
+    int note_frames = 0;
+    bool was_in_battle = false;
+    bool ring_gone = false;
+    std::mt19937 rng{ std::random_device{}() };
+
+    int roll(int lo, int hi) {
+        return std::uniform_int_distribution<int>(lo, hi)(rng);
+    }
+
+    void log_line(const std::string& line) {
+        std::ofstream out(zelda64::get_app_folder_path() / "mmo.txt", std::ios::app);
+        out << line << "\n";
+    }
+
+    bool on() {
+        // Hard Mode too: it changes nothing the turns run on (end turn, the
+        // battle manager, the enemy update and actions, the close-up, the
+        // movement routines), and its hook inside the status countdown still
+        // runs, since the countdown is called as it is.
+        return zelda64::enhancements::active_options().real_time_combat;
+    }
+
+    float mem_f(uint8_t* rdram, int32_t addr) {
+        uint32_t bits = static_cast<uint32_t>(MEM_W(0, addr));
+        float f;
+        std::memcpy(&f, &bits, sizeof f);
+        return f;
+    }
+    void set_f(uint8_t* rdram, int32_t addr, float f) {
+        uint32_t bits;
+        std::memcpy(&bits, &f, sizeof bits);
+        MEM_W(0, addr) = static_cast<int32_t>(bits);
+    }
+
+    bool enemy_alive(uint8_t* rdram, int slot) {
+        const int32_t e = enemies + slot * enemy_size;
+        return MEM_H(0x74, e) != -1 && MEM_HU(0xA, e) != 0;
+    }
+}
+
+bool zelda64::mmo::active() {
+    return on();
+}
+
+void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
+    if (!on()) {
+        return;
+    }
+    uint16_t state = MEM_HU(0, gBattleState);
+    const bool in_battle = (state & 0x1) != 0;
+    if (!in_battle) {
+        was_in_battle = false;
+        return;
+    }
+    if (!was_in_battle) {
+        was_in_battle = true;
+        ring_gone = false;
+        int present = MEM_W(0, enemy_count);
+        present = present < 1 ? 1 : (present > max_enemies ? max_enemies : present);
+        for (int slot = 0; slot < max_enemies; slot++) {
+            wait[slot] = first_wait_min + (cooldown * (slot % present)) / present + roll(0, jitter);
+            rest[slot] = roll(cooldown, cooldown_max);
+        }
+        log_line("battle: real time");
+    }
+    // The opening sweep, or the manager acting on a turn change or the end.
+    if ((state & 0x200) != 0 || (state & 0x4) != 0) {
+        return;
+    }
+
+    // It is always Brian's turn. A battle the enemies open (they get the
+    // first move) starts with 0x2 set, and with no turn ever ending it would
+    // stay set: Brian's stick is held while it is (func_80003B60) and the
+    // camera follows that enemy.
+    if ((state & 0x2) != 0) {
+        MEM_H(0, gBattleState) = static_cast<int16_t>(state & ~0x2);
+        state = static_cast<uint16_t>(state & ~0x2);
+        log_line("the enemies had the first move: it is Brian's turn");
+    }
+
+    // The ring is not drawn (nobody is held to it: see the movement hooks
+    // below).
+    if (!ring_gone) {
+        ring_gone = true;
+        recomp_context c = *ctx;
+        c.r29 = ADD32(ctx->r29, -0x40);
+        c.r4 = MEM_HU(0, ring_handle);
+        func_80019CA4(rdram, &c);
+    }
+
+    // The end of the battle, as a turn change would have found it.
+    int count = MEM_W(0, enemy_count);
+    count = count < 0 ? 0 : (count > max_enemies ? max_enemies : count);
+    int alive = 0;
+    for (int slot = 0; slot < count; slot++) {
+        alive += enemy_alive(rdram, slot) ? 1 : 0;
+    }
+    if (alive == 0) {
+        MEM_H(0, gBattleState) = static_cast<int16_t>(state | 0x400 | 0x4);
+        MEM_H(0, turn_pause) = 0x14;
+        log_line("every enemy down: the battle ends");
+        return;
+    }
+    if ((state & 0x10) != 0 || ((state & 0x100) == 0 && (MEM_HU(0, brian_flags) & 0x20) != 0)) {
+        MEM_H(0, gBattleState) = static_cast<int16_t>(state | 0x4);
+        log_line("off the edge: escaping");
+        return;
+    }
+
+    // Every two seconds, what is going on, for when it is not what it should
+    // be: Brian's state and its timer, the battle bits, the things that hold
+    // his stick (the turn pause, two flags at 0x8008C638/C, the menu mask),
+    // and each enemy's action and flags.
+    if (--note_frames <= 0) {
+        note_frames = 60;
+        char line[256];
+        int n = std::snprintf(line, sizeof line, "brian state %d timer %d | battle %04X pause %d locks %d %d menu %08X | enemies",
+                              MEM_HU(0, brian_state), MEM_HU(4, brian_state), state, MEM_HU(0, turn_pause),
+                              MEM_W(0, 0x8008C638), MEM_W(0, 0x8008C63C), static_cast<uint32_t>(MEM_W(0, 0x8007B2E4)));
+        for (int slot = 0; slot < count && n > 0 && n < static_cast<int>(sizeof line) - 24; slot++) {
+            const int32_t e = enemies + slot * enemy_size;
+            n += std::snprintf(line + n, sizeof line - n, " [%d hp %d act %d fl %X]", slot, MEM_HU(0xA, e), MEM_HU(0, e), MEM_HU(0x8, e));
+        }
+        log_line(line);
+    }
+
+    // Each idle enemy counts down on its own timer and goes when it is ready.
+    for (int slot = 0; slot < count; slot++) {
+        if (!enemy_alive(rdram, slot)) {
+            continue;
+        }
+        const int32_t e = enemies + slot * enemy_size;
+        const bool idle = MEM_HU(0, e) == 0 && (MEM_HU(0x8, e) & 0x1) == 0;
+        if (!idle) {
+            continue;
+        }
+        if (wait[slot] > 0) {
+            wait[slot]--;
+        }
+        if (wait[slot] == 0) {
+            MEM_H(0x8, e) = static_cast<int16_t>(MEM_HU(0x8, e) | 0x1);
+            wait[slot] = rest[slot] + roll(0, cooldown_jitter);
+        }
+    }
+}
+
+// func_8001D358 at its first instruction, a0 the actor whose action has
+// finished. In battle, only the status countdown: the turn stays Brian's.
+extern "C" int quest64_mmo_end_turn(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0) {
+        return 0;
+    }
+    func_8001817C(rdram, ctx);
+    return 1;
+}
+
+// func_800140EC(?, actor) at its first instruction: in battle it saves the
+// camera (to 0x80086B00, setting camera flag 0x40) and swings it round to
+// the actor for a close-up; an enemy's attack or spell calls it
+// (func_8000A284), and so do two of the world update's routines. The camera
+// puts itself back only when that flag is set, so refusing the close-up
+// leaves nothing to undo. In Real Time Combat the camera never leaves Brian: only
+// his own close-ups go ahead.
+extern "C" int quest64_mmo_camera_focus(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0) {
+        return 0;
+    }
+    return static_cast<int32_t>(ctx->r5) != brian ? 1 : 0;
+}
+
+// The turn ring holds whoever is moving inside it: Brian through
+// func_80005748, an enemy through func_8000A508 (which sets bit 0x2 of the
+// enemy's flags when it reaches the edge, and the approach, func_80009588,
+// gives up there). In a vanilla battle it is centred on whoever's turn it
+// is. With everyone acting at once there is no such actor, so each movement
+// routine is handed a ring centred on the one moving, at its entry: a step
+// is always far shorter than the ring is wide, so nobody is held back, and
+// an enemy walks all the way to Brian. The arena's edge, tested next in
+// both, still holds.
+namespace {
+    void centre_ring_on(uint8_t* rdram, int32_t actor) {
+        set_f(rdram, ring_centre_x, mem_f(rdram, actor + 0x0));
+        set_f(rdram, ring_centre_z, mem_f(rdram, actor + 0x8));
+    }
+}
+
+// func_80005748 at its entry, a1 = Brian.
+extern "C" void quest64_mmo_brian_ring(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0) {
+        return;
+    }
+    centre_ring_on(rdram, static_cast<int32_t>(ctx->r5));
+}
+
+// func_8000A508(moving, x, z, actor) at its entry, a3 = the enemy.
+extern "C" void quest64_mmo_enemy_ring(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0) {
+        return;
+    }
+    centre_ring_on(rdram, static_cast<int32_t>(ctx->r7));
+}

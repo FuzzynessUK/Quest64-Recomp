@@ -329,8 +329,8 @@ my @named = (
     [ 'ALL_BOSSES_BEATEN', $all_bosses, "mammon_portal all_bosses: the seven bosses before Mammon. Each boss's own rule already asks for his Soul." ],
     [ 'ALL_MONSTER_AREAS', $all_monsters, 'mammon_portal all_monsters: every region a monster lives in.' ],
     [ 'ENDGAME_DOOR',
-      '(OptionFilter(MammonPortal, 0) & Has("Eletale\'s Book")) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)',
-      "The way into Mammon's World: the Book in the vanilla game, the portal condition otherwise (the Book is then not in the pool at all)." ],
+      '(OptionFilter(MammonPortal, 0) & Has("Eletale\'s Book")) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)',
+      "The way into Mammon's World: the Book in the vanilla game, the portal condition otherwise (the Book is then not in the pool at all). Portals 4, 5 and 7 also want pages_required Torn Pages, which the generator adds in set_rules: a count from an option cannot be written here." ],
 );
 my @named_rows = (
     [ T('Named Rules') ],
@@ -367,7 +367,7 @@ for my $r (@item_rows) {
 
 # ---------------------------------------------------------------- Options
 my @options = (
-    [ 'mammon_portal', 'MammonPortal', 'vanilla 0, all_bosses 1, all_monsters 2, both 3', "What opens Mammon's World: ENDGAME_DOOR. Also makes the Book's Shannon a check and takes the Book out of the pool." ],
+    [ 'mammon_portal', 'MammonPortal', 'vanilla 0, all_bosses 1, all_monsters 2, both 3, all_pages 4, bosses_and_pages 5, bosses_monsters_pages 7', "What opens Mammon's World: ENDGAME_DOOR (a bitmask: 1 bosses, 2 monsters, 4 pages; pages need goal mammon). Also makes the Book's Shannon a check and takes the Book out of the pool." ],
     [ 'boss_souls', 'BossSouls', 'off 0, bosses 1, with_mammon 2', "Each boss's check needs his Soul; the gem gates open (the *_GATE rules)." ],
     [ 'shuffle_orbs', 'ShuffleOrbs', 'off / on', 'Off: the six gate items stay at their vanilla checks (locked in pre_fill). No rule changes.' ],
     [ 'chestsanity', 'Chestsanity', 'off / on', 'Whether chests are locations.' ],

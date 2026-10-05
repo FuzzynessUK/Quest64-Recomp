@@ -118,6 +118,9 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
         }
     };
     get("one_hit_ko", o.one_hit_ko);
+    get("mmo_mode", o.real_time_combat);
+    get("mmorpg_mode", o.real_time_combat);
+    get("real_time_combat", o.real_time_combat);
     get("n64_mode", o.n64_mode);
     get("saved_resolution", o.saved_resolution);
     get("saved_aspect", o.saved_aspect);
@@ -132,6 +135,8 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
     get("boss_max_mp", o.boss_max_mp);
     get("double_exp", o.double_exp);
     get("fast_mp_recovery", o.fast_mp_recovery);
+    get("repel", o.repel);
+    get("play_as_leonardo", o.play_as_leonardo);
     get("faster_walk", o.faster_walk);
     get("stack_items", o.stack_items);
     get("remove_borders", o.remove_borders);
@@ -173,6 +178,7 @@ zelda64::enhancements::Options zelda64::enhancements::load_options() {
 void zelda64::enhancements::save_options(const Options& o) {
     nlohmann::json j;
     j["one_hit_ko"] = o.one_hit_ko;
+    j["real_time_combat"] = o.real_time_combat;
     j["n64_mode"] = o.n64_mode;
     j["saved_resolution"] = o.saved_resolution;
     j["saved_aspect"] = o.saved_aspect;
@@ -186,6 +192,8 @@ void zelda64::enhancements::save_options(const Options& o) {
     j["boss_max_mp"] = o.boss_max_mp;
     j["double_exp"] = o.double_exp;
     j["fast_mp_recovery"] = o.fast_mp_recovery;
+    j["repel"] = o.repel;
+    j["play_as_leonardo"] = o.play_as_leonardo;
     j["faster_walk"] = o.faster_walk;
     j["stack_items"] = o.stack_items;
     j["remove_borders"] = o.remove_borders;

@@ -10,6 +10,7 @@
 
 #include "itemnotice.h"
 #include "pageitem.h"
+#include "repel.h"
 #include "enhancements.h"
 #include "notify.h"
 #include "randomizer/merrow_data.h"
@@ -34,6 +35,9 @@ namespace {
     std::string item_name(int id) {
         if (id == zelda64::page_item::item_id && zelda64::page_item::available()) {
             return zelda64::page_item::name;
+        }
+        if (id == zelda64::repel::item_id && zelda64::repel::available()) {
+            return zelda64::repel::name;
         }
         size_t index = static_cast<size_t>(id) * 3;
         if (index >= data::items.size()) {

@@ -215,6 +215,14 @@ namespace {
     bool pending_all = false;
     int pending_preview = -2;                     // -2 nothing, -1 stop, else a track
     int preview_return = -2;                      // the track to go back to, -2 none
+    // What the previews last asked for (-1 a stop), and whether a battle was
+    // on at the first Play. If the request byte stops matching, or a battle
+    // starts or ends, the game has moved the music on itself - a battle, a
+    // door - and Stop forgets preview_return rather than bringing back a
+    // track that no longer belongs (the battle theme in the field).
+    int preview_last_request = -2;
+    bool preview_in_battle = false;
+    constexpr int32_t gBattleState = 0x8008C592;
     // A preview's request is watched: if the player is still stopped with
     // nothing pending a while after it, the request is made again (rapid
     // previews can hit a window in the game's own start-up sequence -
@@ -933,6 +941,26 @@ bool have_saved = false;
 // be playing instead.
 bool restore_waiting = false;
 int restore_settle = 0;
+// The saved track's sequence table entry (ROM address, length) when its
+// position was saved. The Audio tab can give that track a different song
+// in the middle of the battle; the saved read pointers then name places in
+// the old file, and putting them back on the new one sets the player
+// reading the middle of a different sequence as commands - the crash on
+// changing music mid-battle. A restore only happens onto the same file.
+uint32_t saved_entry_rom = 0;
+uint32_t saved_entry_len = 0;
+
+namespace {
+    bool track_entry(uint8_t* rdram, int track, uint32_t& rom, uint32_t& len) {
+        int32_t table = static_cast<int32_t>(MEM_W(0, seq_table_pointer));
+        if (table == 0 || track < 0 || track >= zelda64::audio::game_track_count) {
+            return false;
+        }
+        rom = static_cast<uint32_t>(MEM_W(0, table + 4 + track * 8));
+        len = static_cast<uint32_t>(MEM_W(0, table + 8 + track * 8));
+        return true;
+    }
+}
 
 namespace {
     // The heap block the marker sat in is gone after a relaunch, and none of
@@ -1047,7 +1075,7 @@ void tick_resume(uint8_t* rdram) {
                     sane = at >= buffer && at < buffer + seq_buffer_size;
                 }
                 saved_track = previous;
-                have_saved = sane;
+                have_saved = sane && track_entry(rdram, saved_track, saved_entry_rom, saved_entry_len);
                 char note[192];
                 std::snprintf(note, sizeof note,
                               "battle started: track %d, validTracks 0x%04X, buffer 0x%08X %s",
@@ -1075,6 +1103,29 @@ void tick_resume(uint8_t* rdram) {
         return;
     }
     if (++restore_settle < 2) {
+        return;
+    }
+    // Only onto the file the position was read from, and only if every read
+    // pointer is inside the sequence now loaded.
+    uint32_t rom_now = 0, len_now = 0;
+    bool same_file = track_entry(rdram, saved_track, rom_now, len_now) &&
+                     rom_now == saved_entry_rom && len_now == saved_entry_len;
+    uint32_t valid = static_cast<uint32_t>(MEM_W(0, marker_block)) & 0xFFFF;
+    uint32_t buffer = static_cast<uint32_t>(seq_buffers[0]);
+    bool inside = buffer != 0;
+    for (int track = 0; track < 16 && inside; track++) {
+        if ((valid & (1u << track)) == 0) {
+            continue;
+        }
+        uint32_t at = static_cast<uint32_t>(MEM_W(0, marker_block + 0xC + track * 4));
+        inside = at >= buffer && at < buffer + len_now;
+    }
+    if (!same_file || !inside) {
+        restore_waiting = false;
+        resume_note(std::string("not restored: track ") + std::to_string(saved_track) +
+                    (same_file ? " - a read pointer is past the end of the song"
+                               : " was given a different song during the battle") +
+                    "; it starts from the top");
         return;
     }
     seek_call(rdram, func_80038630, marker_block);
@@ -1210,18 +1261,31 @@ void zelda64::audio::on_frame(uint8_t* rdram, recomp_context* ctx) {
             write_live_entry(rdram, track, name);
         }
         int requested = static_cast<int8_t>(MEM_B(0, bgm_request_track));
+        bool in_battle = (MEM_HU(0, gBattleState) & 1) != 0;
+        if (preview_return != -2 && (requested != preview_last_request || in_battle != preview_in_battle)) {
+            live_log << "  previews: the game changed the music (track " << requested
+                     << (in_battle != preview_in_battle ? ", battle " : ", ") << (in_battle ? "on" : "off")
+                     << "); Stop will not go back to track " << preview_return << "\n";
+            live_log.flush();
+            preview_return = -2;
+            preview_last_request = -2;
+            watch_track = -1;
+        }
         if (preview >= 0) {
             if (preview_return == -2) {
                 preview_return = static_cast<int8_t>(MEM_B(0, bgm_current_track));
+                preview_in_battle = in_battle;
             }
             if (requested == preview) {
                 // The track already requested: stop this frame, start next.
                 request_track(rdram, -1);
+                preview_last_request = -1;
                 std::lock_guard lock(live_mutex);
                 pending_preview = preview;
             }
             else {
                 request_track(rdram, preview);
+                preview_last_request = preview;
                 watch_track = preview;
                 watch_frames = 0;
             }
@@ -1229,6 +1293,7 @@ void zelda64::audio::on_frame(uint8_t* rdram, recomp_context* ctx) {
         else if (preview == -1 && preview_return != -2) {
             request_track(rdram, preview_return);
             preview_return = -2;
+            preview_last_request = -2;
             watch_track = -1;
         }
         if (watch_track >= 0) {
@@ -1248,6 +1313,7 @@ void zelda64::audio::on_frame(uint8_t* rdram, recomp_context* ctx) {
                     watch_retries++;
                     watch_frames = 0;
                     request_track(rdram, -1);
+                    preview_last_request = -1;
                     std::lock_guard lock(live_mutex);
                     pending_preview = watch_track;
                 }

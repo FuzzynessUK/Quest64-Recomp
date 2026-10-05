@@ -27,7 +27,7 @@ item_data_table: Dict[str, Q64ItemData] = {
     "Guilty's Soul": Q64ItemData(code=0x51640E06, type=ItemClassification.progression, num_exist=1, can_create=lambda options: options.boss_souls.value >= 1),
     "Beigis's Soul": Q64ItemData(code=0x51640E07, type=ItemClassification.progression, num_exist=1, can_create=lambda options: options.boss_souls.value >= 1),
     "Mammon's Soul": Q64ItemData(code=0x51640E08, type=ItemClassification.progression, num_exist=1, can_create=lambda options: options.boss_souls.value >= 2),
-    "Torn Page": Q64ItemData(code=0x5164001A, type=ItemClassification.progression, num_exist=0, can_create=lambda options: options.goal.value == 1),
+    "Torn Page": Q64ItemData(code=0x5164001A, type=ItemClassification.progression, num_exist=0, can_create=lambda options: options.goal.value == 1 or bool(options.mammon_portal.value & 4)),
     "Death Trap": Q64ItemData(code=0x51640D00, type=ItemClassification.trap, num_exist=0, can_create=lambda options: True),
     "HP Trap": Q64ItemData(code=0x51640D01, type=ItemClassification.trap, num_exist=0, can_create=lambda options: True),
     "MP Trap": Q64ItemData(code=0x51640D02, type=ItemClassification.trap, num_exist=0, can_create=lambda options: True),

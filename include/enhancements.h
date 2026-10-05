@@ -14,6 +14,9 @@ namespace zelda64::enhancements {
         // set to 1 in the ROM, and Brian's max HP is held at 1 each frame so
         // it applies to a save that is already in progress.
         bool one_hit_ko = false;
+        // Real Time Combat (src/game/mmo.cpp): real time battles instead of turn
+        // based. Works under Hard Mode too. Saved as real_time_combat (mmo_mode, then mmorpg_mode, before).
+        bool real_time_combat = false;
 
         // Renders the way the console did: native resolution, 4:3, no
         // antialiasing and the original HUD ratio. The graphics settings in
@@ -66,6 +69,14 @@ namespace zelda64::enhancements {
         // Mode has it (the byte at 0x80070F39, ROM 0x071B39; Merrow's tier
         // 12). Not under Hard Mode.
         bool fast_mp_recovery = false;
+        // Repel (include/repel.h): a key item that switches random
+        // encounters off and on. On, one is put in the bag whenever a game
+        // is being played without one. Not under Hard Mode.
+        bool repel = false;
+        // Play as Leonardo (src/game/leonardo.cpp): Brian is drawn as
+        // Leonardo, the knight of Normoon and Brannoch Castle, with his own
+        // cape, moving with Brian's animations.
+        bool play_as_leonardo = false;
 
         // Brian moves 50% faster. The per-frame velocity every movement state
         // hands to func_80005748 is scaled on the way in and restored on the

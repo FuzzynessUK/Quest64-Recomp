@@ -88,10 +88,11 @@ namespace zelda64::archipelago {
     // For the tracker. False unless a seed is being played; otherwise, per
     // location id asked about, whether this slot has it and whether the
     // server says it is checked.
-    // The seed's mammon_portal (0 vanilla, 1 bosses, 2 monsters, 3 both), or
-    // -1 when no seed is being played; `monsters` is how many kinds the
-    // monster condition counts.
-    int portal_requirement(int& monsters);
+    // The seed's mammon_portal (0 vanilla, else a bitmask: 1 bosses, 2
+    // monsters, 4 pages), or -1 when no seed is being played; `monsters` is
+    // how many kinds the monster condition counts, `pages` how many Torn
+    // Pages the page condition wants.
+    int portal_requirement(int& monsters, int& pages);
     // Page Hunt: the pages the seed wants, 0 when the goal is not a Page Hunt
     // (or no seed is being played).
     int page_hunt_pages();

@@ -10,6 +10,7 @@
 #include "speedrun.h"
 #include "archipelago.h"
 #include "tracker.h"
+#include "repel.h"
 #include "zelda_config.h"
 #include "json/json.hpp"
 #include "recomp.h"
@@ -264,6 +265,7 @@ extern "C" void quest64_speedrun_pak_write(uint8_t* rdram, recomp_context* ctx) 
     // place that sees a save going past, so it does the asking.
     zelda64::archipelago::save_progress(key);
     zelda64::tracker::save_progress(key);
+    zelda64::repel::save_progress(key);
 }
 
 // func_800319E0, at its first instruction: note what is being read.
@@ -294,6 +296,7 @@ extern "C" void quest64_speedrun_pak_read_end(uint8_t* rdram, recomp_context* ct
     // save whether or not the timer has a time for it.
     zelda64::archipelago::load_progress(key);
     zelda64::tracker::load_progress(key);
+    zelda64::repel::load_progress(key);
     auto it = run_times.find(key);
     if (it == run_times.end()) {
         pak_note("read  " + key + " - no time stored for it");

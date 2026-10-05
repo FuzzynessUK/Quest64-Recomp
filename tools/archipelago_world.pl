@@ -125,12 +125,12 @@ for my $b (@{ $checks->{bosses} }) {
                        note => "Until this arrives, $b->{name} is not in the game" };
 }
 
-# The Torn Page, for the Page Hunt goal: the game's own item 0x1A (pageitem.h),
-# so it needs no translation on arrival. create_items puts in as many as the
-# yaml asks for.
+# The Torn Page, for the Page Hunt goal or a mammon_portal with pages (bit 4):
+# the game's own item 0x1A (pageitem.h), so it needs no translation on
+# arrival. create_items puts in as many as the yaml asks for.
 push @item_rows, { name => 'Torn Page', id => $BASE + $GROUP{item} + 0x1A, type => 'progression', count => 0,
-                   create => 'lambda options: options.goal.value == 1',
-                   note => 'A page of the Eletale\x27s Book; enough of them finish a Page Hunt' };
+                   create => 'lambda options: options.goal.value == 1 or bool(options.mammon_portal.value & 4)',
+                   note => 'A page of the Eletale\x27s Book; enough of them finish a Page Hunt or open Mammon\x27s World' };
 
 # Traps, Archipelago's own as well (the game springs them through traps.h):
 # 0xD00 + 0 Death, 1 HP, 2 MP, 3 Ice. None is counted here; create_items
@@ -429,6 +429,12 @@ my @seed_settings = (
       'Beating a boss raises max MP as well as max HP and refills both, by the amounts the Japanese release uses (5, 5, 5, 10, 10, 15, 15).', 'toggle_on' ],
     [ 'fast_mp_recovery', 'FastMPRecovery', 'Enhancements', 'Fast MP Recovery',
       'MP comes back as you walk at the fastest rate, as in Easy Mode.', 'toggle_on' ],
+    [ 'real_time_combat', 'RealTimeCombat', 'Enhancements', 'Real Time Combat',
+      'Real time battles instead of turn based: Brian moves, attacks and casts whenever he likes, and the monsters act on timers of their own.', 'toggle' ],
+    [ 'character', 'Character', 'Enhancements', 'Character',
+      'Who you play as. leonardo: the blond knight of Normoon and Brannoch Castle, with his own cape, moving with all of Brian\'s animations; the Leonardo you meet becomes Brian.', 'choice:brian,leonardo' ],
+    [ 'repel', 'Repel', 'Enhancements', 'Repel',
+      'Start with a Repel: use it in the field to switch random battles off, use it again to switch them back on. Its icon shows over Brian while it is on.', 'toggle' ],
     [ 'jp_stat_up_effect', 'JPStatUpEffect', 'Enhancements', 'JP Stat Up Effect',
       'A colour burst over Brian when a stat rises, as in the Japanese release.', 'toggle_on' ],
     [ 'exit_from_anywhere', 'ExitFromAnywhere', 'Enhancements', 'Exit from Anywhere',
@@ -625,12 +631,25 @@ class MammonPortal(Choice):
                   by the server: a monster leaves nothing behind in the save
                   to read back after a reload. Turning this on turns
                   enemysanity on with it.
-    both          all of the above."""
+    both          all_bosses and all_monsters.
+
+    all_pages               pages_required Torn Pages of the Eletale's Book
+                            have to be in your bag. The pages go into the
+                            pool as they do for a Page Hunt (pages_required
+                            and page_placement say how many and where), but
+                            the run still ends with Mammon. Needs goal
+                            mammon.
+    bosses_and_pages        all_bosses and all_pages.
+    bosses_monsters_pages   all_bosses, all_monsters and all_pages."""
     display_name = "Mammon's World Portal"
+    # A bitmask: 1 bosses, 2 monsters, 4 pages. The game reads it that way.
     option_vanilla = 0
     option_all_bosses = 1
     option_all_monsters = 2
     option_both = 3
+    option_all_pages = 4
+    option_bosses_and_pages = 5
+    option_bosses_monsters_pages = 7
     default = 0
 
 
@@ -765,7 +784,8 @@ class Goal(Choice):
 
 
 class PagesRequired(Range):
-    """How many Torn Pages finish a Page Hunt."""
+    """How many Torn Pages finish a Page Hunt, or open Mammon's World when
+    Mammon's World Portal asks for pages."""
     display_name = "Pages Required"
     range_start = 5
     range_end = 100
@@ -898,7 +918,7 @@ from .Locations import (Q64Location, Q64LocationData, location_data_table, locat
                         code_to_location_table, vanilla_locations)
 from .Options import DeathTraps, Goal, PagePlacement, Q64Options, Traps
 from .Regions import regions, connections
-from .Rules import set_all_rules
+from .Rules import entrance_rules, set_all_rules
 
 
 class Q64WebWorld(WebWorld):
@@ -933,8 +953,14 @@ class Q64World(World):
         # or a spirit does. So the monster checks have to exist.
         if self.options.mammon_portal.value & 2:
             self.options.enemysanity.value = 1
-        # Page Hunt: where the pages may go.
-        if self.options.goal.value == Goal.option_page_hunt:
+        # The pages portal opens the way to Mammon, so it means nothing when
+        # the run ends with the pages instead.
+        if self.options.mammon_portal.value & 4 and self.options.goal.value != Goal.option_mammon:
+            raise OptionError(
+                f"Quest 64: player {self.player_name} has a Mammon's World Portal that wants Torn Pages, "
+                f"which needs goal mammon. Choose goal mammon or a portal without pages.")
+        # Page Hunt, or the pages portal: where the pages may go.
+        if self.uses_pages():
             placement = self.options.page_placement.value
             if placement == PagePlacement.option_quest64_only:
                 self.options.local_items.value.add("Torn Page")
@@ -1128,11 +1154,18 @@ class Q64World(World):
             return 1
         return 3
 
+    def uses_pages(self) -> bool:
+        """Torn Pages are in the pool: a Page Hunt, or a Mammon's World
+        Portal that asks for them."""
+        return (self.options.goal.value == Goal.option_page_hunt
+                or bool(self.options.mammon_portal.value & 4))
+
     def add_pages(self, pool: List[Q64Item]) -> None:
-        """Page Hunt: put pages_required Torn Pages in the pool, in place of
-        filler first, then wings, then Level Ups. A seed with no room for
-        them all cannot be finished, so it is stopped here with the reason."""
-        if self.options.goal.value != Goal.option_page_hunt:
+        """Page Hunt or pages portal: put pages_required Torn Pages in the
+        pool, in place of filler first, then wings, then Level Ups. A seed
+        with no room for them all cannot be finished, so it is stopped here
+        with the reason."""
+        if not self.uses_pages():
             return
         wanted = self.options.pages_required.value
         order = sorted((i for i in range(len(pool)) if self.expendable(pool[i]) < 3),
@@ -1208,6 +1241,12 @@ class Q64World(World):
         set_all_rules(self)
         if self.options.goal.value == Goal.option_page_hunt:
             self.set_completion_rule(Has("Torn Page", self.options.pages_required.value))
+        # The pages portal: the workbook's ENDGAME_DOOR has the bosses and
+        # monsters halves; the page count is an option, so it is added here.
+        if self.options.mammon_portal.value & 4:
+            door = self.multiworld.get_entrance("Boss 7 to Endgame", self.player)
+            self.set_rule(door, entrance_rules["Boss 7 to Endgame"]
+                          & Has("Torn Page", self.options.pages_required.value))
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
@@ -1341,12 +1380,20 @@ $game:
   # all_monsters  one of each of the @{[ $by_group{enemy} // 0 ]} kinds of regular monster.
   #               Turns enemysanity on, because the server is what keeps the
   #               count - a monster leaves nothing in the save to read back
-  # both          all of it
+  # both          all_bosses and all_monsters
+  # all_pages     pages_required Torn Pages in your bag (set below; where
+  #               they can be is page_placement, as for a Page Hunt). Needs
+  #               goal mammon: the run still ends with him
+  # bosses_and_pages        all_bosses and all_pages
+  # bosses_monsters_pages   all_bosses, all_monsters and all_pages
   mammon_portal:
     vanilla: 1
     all_bosses: 0
     all_monsters: 0
     both: 0
+    all_pages: 0
+    bosses_and_pages: 0
+    bosses_monsters_pages: 0
 
   # Bosses are not in the game until their Soul turns up: an empty arena you
   # walk straight through, the same state the game uses for a boss already
@@ -1377,13 +1424,14 @@ $game:
     mammon: 1
     page_hunt: 0
 
-  # Page Hunt: how many Torn Pages finish the run (5 to 100). They take the
+  # Page Hunt: how many Torn Pages finish the run (5 to 100); with a pages
+  # mammon_portal, how many open Mammon's World. They take the
   # place of filler, then wings, then Level Ups; if there is still not room
   # for them all the seed will not generate and says why, so switch on more
   # of the *sanity options for a big hunt.
   pages_required: 20
 
-  # Page Hunt: where the Torn Pages can be.
+  # Page Hunt or a pages mammon_portal: where the Torn Pages can be.
   #
   # quest64_only       only in Quest 64's own locations
   # all_games          anywhere in the multiworld
@@ -1470,7 +1518,7 @@ my %files = (
     "$out/quest64/__init__.py"  => $init_py,
     # The apworld manifest. Rule Builder (rule_builder) is what sets the
     # floor at 0.6.7.
-    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.7.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
+    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.8.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
     "$out/quest64/docs/en_quest64.md" => "# Quest 64 Recompiled\n\nEvery chest, gift, boss and spirit can hold an item from any world in the\nmultiworld. Turn the Archipelago Connector on in the port's menu and give it\nthe server address and your slot name.\n",
     "$out/quest64/docs/guide_en.md"   => "# Quest 64 Recompiled Setup Guide\n\n1. Put `quest64.apworld` in `Archipelago/custom_worlds`.\n2. Put your filled-in `Quest64Recompiled.yaml` in `Archipelago/Players`.\n3. Generate and host as usual.\n4. In Quest 64 Recompiled, open the config menu, turn on the Archipelago\n   Connector and enter the server address, your slot name and the password\n   if the room has one.\n",
     "$out/Quest64Recompiled.yaml" => $yaml,

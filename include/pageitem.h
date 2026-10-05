@@ -2,6 +2,8 @@
 #define __PAGEITEM_H__
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 // The Torn Page, item 0x1A: a page ripped out of the Eletale's Book, for the
 // Page Hunt. The game keeps room for 32 items and uses 26; the spare slots
@@ -35,9 +37,15 @@ namespace zelda64::page_item {
     // the moment it was found.
     void on_frame(uint8_t* rdram);
 
-    // The Page Hunt target from the seed (slot_data pages_required with goal
-    // page_hunt), 0 for none.
-    void set_hunt(int required);
+    // The pages the seed wants (slot_data pages_required), 0 for none.
+    // ends_run: the Page Hunt goal, whose last page rolls the credits;
+    // otherwise the pages open Mammon's World (mammon_portal bit 4), which
+    // archipelago.cpp checks, and reaching them is only announced.
+    void set_hunt(int required, bool ends_run);
+
+    // Text in the game's encoding for an item name or description (A0 C0
+    // header, FF end); '\n' is a new line. Also used by repel.cpp.
+    std::vector<uint8_t> encode_text(const std::string& text);
 }
 
 #endif

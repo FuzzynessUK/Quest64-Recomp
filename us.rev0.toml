@@ -48,7 +48,7 @@ before_vram = 0x80026554
 # the routine's single `jr $ra`, so the handlers never see the scaled value.
 [[patches.hook]]
 func = "func_80005748"
-text = "quest64_enh_walk_scale(rdram, ctx);"
+text = "quest64_mmo_brian_ring(rdram, ctx); quest64_enh_walk_scale(rdram, ctx);"
 before_vram = 0x80005748
 [[patches.hook]]
 func = "func_80005748"
@@ -87,11 +87,65 @@ text = "quest64_audio_seq_buffer_1(rdram, ctx);"
 before_vram = 0x800251B8
 
 # The Torn Page (pageitem.h): the usable check answers no for item 0x1A,
-# whose properties slot would otherwise read a name string.
+# whose properties slot would otherwise read a name string. Repel (repel.h),
+# item 0x1B, is answered the same way: usable in the field.
 [[patches.hook]]
 func = "func_800212E4"
-text = "if (quest64_page_item_unusable(rdram, ctx)) return;"
+text = "if (quest64_page_item_unusable(rdram, ctx)) return; if (quest64_repel_use(rdram, ctx)) return;"
 before_vram = 0x800212E4
+
+# Repel: the menu has just taken the used Repel out of the bag; it goes
+# straight back in the same slot.
+[[patches.hook]]
+func = "func_80021524"
+text = "quest64_repel_keep(rdram, ctx);"
+before_vram = 0x80022178
+
+# Repel: the use taking effect as Brian's item pose ends - on or off, and
+# the cast.
+[[patches.hook]]
+func = "func_800213D8"
+text = "if (quest64_repel_apply(rdram, ctx)) return;"
+before_vram = 0x800213D8
+
+# Real Time Combat (src/game/mmo.cpp): ending a turn, at its entry. In battle only
+# the actor's status countdown runs; the turn never passes.
+[[patches.hook]]
+func = "func_8001D358"
+text = "if (quest64_mmo_end_turn(rdram, ctx)) return;"
+before_vram = 0x8001D358
+# Real Time Combat: an enemy's movement, at its entry - the turn ring is centred
+# on the enemy moving, so it is never held back (Brian's is centred on him in
+# the entry hook of func_80005748 above).
+[[patches.hook]]
+func = "func_8000A508"
+text = "quest64_mmo_enemy_ring(rdram, ctx);"
+before_vram = 0x8000A508
+# Real Time Combat: the battle camera's close-up on whoever acts, at its entry;
+# refused for anyone but Brian, so the camera stays on him.
+[[patches.hook]]
+func = "func_800140EC"
+text = "if (quest64_mmo_camera_focus(rdram, ctx)) return;"
+before_vram = 0x800140EC
+
+# Play as Leonardo (src/game/leonardo.cpp): the skinned-model draw, at its
+# entry; for Brian the animation record in a2 is swapped for Leonardo's.
+[[patches.hook]]
+func = "func_8001DB38"
+text = "quest64_leonardo_draw(rdram, ctx);"
+before_vram = 0x8001DB38
+
+# Repel: its icon over Brian's head, after the game's own status icons and
+# before the routine returns. That routine only runs in battle, so the field
+# draws it from the HUD's field branch (func_8001E25C, 0x8001E758) instead.
+[[patches.hook]]
+func = "func_8001FEEC"
+text = "quest64_repel_head_icon(rdram, ctx);"
+before_vram = 0x800202B4
+[[patches.hook]]
+func = "func_8001E25C"
+text = "quest64_repel_field_icon(rdram, ctx);"
+before_vram = 0x8001E758
 
 # Randomizer "Wings never expire" (also part of Easier Quest). func_80021524
 # removes a used item when its handler (func_800212E4) returned non-zero;
@@ -561,9 +615,10 @@ before_vram = 0x80011B70
 # Cheats tab, Disable Encounters. func_8001C5F4 is the field encounter check
 # and nothing else, so skipping it stops battles starting without leaving the
 # distance walked piling up behind the cheat. Live, like the rest of the tab.
+# The Repel item (repel.h) does the same while it is switched on.
 [[patches.hook]]
 func = "func_8001C5F4"
-text = "if (quest64_cheat_no_encounters()) return;"
+text = "if (quest64_cheat_no_encounters() || quest64_repel_active()) return;"
 before_vram = 0x8001C5F4
 
 # DeathLink. func_80004040 is player state 5 (hit stun); at 0x800040C0 it

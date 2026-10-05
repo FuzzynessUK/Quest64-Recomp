@@ -2978,7 +2978,8 @@ const zelda64::randomizer::NativeState& zelda64::randomizer::native_state() {
 // four lines ($ turns the page); the game's font has no "+", so "&".
 std::vector<uint8_t> zelda64::randomizer::abbott_message() {
     int monsters = 0;
-    int portal = zelda64::archipelago::portal_requirement(monsters);
+    int portal_pages = 0;
+    int portal = zelda64::archipelago::portal_requirement(monsters, portal_pages);
     if (portal < 0 && !native.boss_order_shuffled) {
         return {};   // not connected and nothing moved: his own line
     }
@@ -3008,6 +3009,23 @@ std::vector<uint8_t> zelda64::randomizer::abbott_message() {
             break;
         case 3:
             text += "All Enemies & All Bosses#(" + std::to_string(monsters) + " kinds of enemy)";
+            break;
+        case 4:
+            text += "Find " + std::to_string(portal_pages) + " Torn Pages";
+            list_bosses = false;
+            break;
+        case 5:
+            text += "All Bosses & " + std::to_string(portal_pages) + " Torn Pages";
+            break;
+        case 6:
+            text += "All Enemies (" + std::to_string(monsters) + " kinds)#& " +
+                    std::to_string(portal_pages) + " Torn Pages";
+            list_bosses = false;
+            break;
+        case 7:
+            // The heading and the first two lines fill the page.
+            text += "All Enemies & All Bosses#(" + std::to_string(monsters) + " kinds of enemy)$& " +
+                    std::to_string(portal_pages) + " Torn Pages";
             break;
         default:
             // Not connected, boss order shuffled: just who is where.

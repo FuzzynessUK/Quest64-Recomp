@@ -38,6 +38,8 @@
 #include "audio.h"
 #include "archipelago.h"
 #include "pageitem.h"
+#include "repel.h"
+#include "leonardo.h"
 #include "easierquest.h"
 #include "hardmode.h"
 #include "randomizer.h"
@@ -374,6 +376,8 @@ void quest64_on_init(uint8_t* rdram, recomp_context* ctx) {
     zelda64::archipelago::apply_at_boot(rdram);
     // After every other ROM patch, so a later copy of the ROM cannot undo it.
     zelda64::page_item::apply_at_boot();
+    zelda64::repel::apply_at_boot();
+    zelda64::leonardo::apply_at_boot();
 }
 
 // array of supported GameEntry objects

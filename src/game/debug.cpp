@@ -20,6 +20,8 @@
 #include "archipelago.h"
 #include "traps.h"
 #include "pageitem.h"
+#include "repel.h"
+#include "mmo.h"
 #include "librecomp/helpers.hpp"
 
 namespace {
@@ -312,6 +314,8 @@ extern "C" void quest64_cheats_frame(uint8_t* rdram, recomp_context* ctx) {
     // Before the hand-over below, so the Page Hunt counts a page that arrives
     // as a save loads as found then (pageitem.h).
     zelda64::page_item::on_frame(rdram);
+    zelda64::repel::on_frame(rdram);
+    zelda64::mmo::on_frame(rdram, ctx);
     // Before the item notice: in Archipelago mode a gift NPC's item is
     // taken straight back, and doing it first means it is never announced.
     // Items the server sends are placed here too, so those still are.
@@ -403,10 +407,12 @@ extern "C" int quest64_cheat_no_encounters() {
 }
 
 const std::vector<std::string>& zelda64::item_names() {
-    // The game's 26, then the Torn Page (item 0x1A, pageitem.h).
+    // The game's 26, then the Torn Page (item 0x1A, pageitem.h) and Repel
+    // (0x1B, repel.h).
     static const std::vector<std::string> names = [] {
         std::vector<std::string> list = merrow::data::itemcapitalcase;
         list.push_back(zelda64::page_item::name);
+        list.push_back(zelda64::repel::name);
         return list;
     }();
     return names;
@@ -414,7 +420,8 @@ const std::vector<std::string>& zelda64::item_names() {
 
 void zelda64::give_item(int item_id) {
     if (item_id < 0 || static_cast<size_t>(item_id) >= item_names().size() ||
-        (item_id == zelda64::page_item::item_id && !zelda64::page_item::available())) {
+        (item_id == zelda64::page_item::item_id && !zelda64::page_item::available()) ||
+        (item_id == zelda64::repel::item_id && !zelda64::repel::available())) {
         return;
     }
     std::lock_guard lock{ pending_mutex };

@@ -360,6 +360,53 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   |= 0x4080, countdown 0x31 - the field loop then sets gGameMode 5, the
   credits, as the game itself does) and `goal_reached()`. Mammon only sends
   the goal when the seed's goal is mammon.
+- **Repel** (2026-10-04, awaiting play-test): item 0x1B, `include/repel.h`
+  explains it all; Enhancements QoL `repel` + yaml `repel` give one when
+  missing. Item use: the menu (func_80021524) calls func_800212E4 (record at
+  0x803A91F0 + id*12: flags 1 field / 2 battle, handler; "can use"
+  handlers at 0x8004D480, then func_8000669C puts Brian in state 0xC), takes
+  the item out of the bag (shift down from the slot, 0xFF at 149), and when
+  the pose ends func_80004AB8 calls func_800213D8 = apply handler at
+  0x8004D490 + h*4 (h 3 = func_80014A98 spell cast). Status icons over an
+  actor: func_8001FEEC, called by the HUD func_8001E25C **only in battle**
+  (gBattleState bit 0 test at 0x8001E65C; the field branch is 0x8001E758,
+  where Repel draws its own: project with func_8002413C, load the palette,
+  G_TT_RGBA16, draw), icon table 0x803A8D70 (s,t,w,h), CI8 atlas desc 0x803A6F70,
+  palette 0x803A2960, drawn by func_800210FC. Data block ROM 0xD77380 ->
+  RAM 0x80399AB0. Icons from `tools/repel/repel_icon.pl`. Log: repel.txt.
+- **Play as Leonardo** (2026-10-04, awaiting play-test): Enhancements QoL
+  `play_as_leonardo`, `src/game/leonardo.cpp` (its header comment has the
+  skinned-model format: 12-byte animation records, 0x20-byte bones, 0x34-byte
+  keyframes, mesh tables). Brian's records 0x80206064 (resident block ROM
+  0x86B830 -> 0x80206000), his bones streamed per animation to 0x80200000
+  (func_80006720, ROM table 0x80053F58). NPC models come from per-region NPC
+  files (table 0x800547F0, ROM start/end pairs, 7 files) loaded to
+  0x8020E6F0; global NPCs ROM 0xA725D0 -> 0x802A0000; NPC definition +0x10
+  = its record table. Leonardo = model 0x8021DFB4 in file 3 (Normoon, ROM
+  0x95F730), copied to 0x80700000 with its 0x04/0xFD addresses moved; hook
+  at func_8001DB38's entry swaps Brian's record for a 19-bone hybrid,
+  and a Leonardo NPC's (19 bones + his mesh table, checked against the
+  ROM) for Brian's 23-bone skeleton driven by the NPC's keyframes, Brian's
+  idle animation (ROM 0xF14A10, copied) filling hair, cape, staff and face.
+- **Real Time Combat** (2026-10-04, awaiting play-test): Enhancements Fun
+  `mmo_mode`, `src/game/mmo.cpp` (header comment documents the turn
+  system). gBattleState bits: 1 battle, 2 enemy's turn, 4 turn changing, 8
+  ending, 0x10 escaped, 0x100 boss, 0x200 intro sweep, 0x400 all enemies
+  down. End turn = func_8001D358 (status tick func_8001817C, next enemy from
+  order list 0x8007D0B0 idx 0x8008C598, pause 0x8008C594, toggles 2, sets
+  4). Battle manager func_8001CFE8 acts on 4 (victory/escape, enemy "act"
+  bit = slot +0x8 bit 1 via func_8000932C, ring func_80019A98 handle
+  0x8008C55E). Enemy slots 6 x 0x128 at 0x8007C998, count 0x8007C990,
+  actions via table 0x8004C290 (func_80008C20 every frame). Brian's ring
+  clamp in func_80005748 (centre 0x8008C5A4/0x8008C430).
+- **mammon_portal is a bitmask** (2026-10-04, apworld 1.8.0): 1 bosses, 2
+  monsters, 4 pages; choices 0-5 and 7 (all_pages 4, bosses_and_pages 5,
+  bosses_monsters_pages 7). Pages reuse pages_required/page_placement and
+  need goal mammon (OptionError otherwise). The page count cannot be
+  written in the workbook (an option-valued count), so `set_rules` ANDs
+  `Has("Torn Page", n)` onto the "Boss 7 to Endgame" entrance; the game
+  counts pages in the bag in `portal_progress`, and
+  `page_item::set_hunt(n, ends_run=false)` only shows the count.
 - Gift NPCs: talk routine `func_800086E4`, hooks at 0x80008814 (the "held?"
   answer) and `func_800212A0` entry (skip the add).
 - A save read counts as a load only when the Pak menu was opened from the

@@ -139,13 +139,22 @@ namespace {
     std::set<int64_t> slot_locations;
     bool slot_locations_known = false;
     bool chestsanity = true, giftsanity = true, enemysanity = true, spiritsanity = true;
-    int mammon_portal = 0;   // 0 vanilla, 1 bosses, 2 monsters, 3 both
+    // A bitmask: 1 bosses, 2 monsters, 4 pages (pages_required Torn Pages in
+    // the bag); 0 is the vanilla Book.
+    int mammon_portal = 0;
     // The yaml's goal: 0 Mammon, 1 Page Hunt with pages_required pages. Read
     // by boss_beaten on the game thread, hence atomic.
     std::atomic<int> seed_goal{ 0 };
     int seed_pages_required = 0;
+    // The pages count towards the Page Hunt, which ends the run, or towards
+    // the portal, which only opens the door; the apworld never sends both.
     void apply_page_hunt() {
-        zelda64::page_item::set_hunt(seed_goal.load() == 1 ? seed_pages_required : 0);
+        if (seed_goal.load() == 1) {
+            zelda64::page_item::set_hunt(seed_pages_required, true);
+        }
+        else {
+            zelda64::page_item::set_hunt((mammon_portal & 4) ? seed_pages_required : 0, false);
+        }
     }
     // With the Enemy Randomizer, the kinds of monster the apworld placed
     // (from slot_data "enemy_plan"): the only enemy locations the slot has.
@@ -255,6 +264,7 @@ namespace {
         }
         else if (key == "mammon_portal" && v.is_number_integer()) {
             mammon_portal = v.get<int>();
+            apply_page_hunt();
         }
         else if (key == "boss_souls" && v.is_number_integer()) {
             boss_souls.store(v.get<int>());
@@ -897,7 +907,7 @@ void zelda64::archipelago::apply_seed_settings(zelda64::randomizer::Options& o) 
     o.wing_unlock_indoors = true;
 }
 
-// The enhancements: the seven the yaml decides, and the three that would
+// The enhancements: the ten the yaml decides, and the three that would
 // change the game underneath the seed (One Hit KO, Hard Mode, Easy Mode) off.
 // Everything else - the timer, the notices, N64 mode, the HUD layout - is
 // the player's own and stays as the menus have it.
@@ -908,6 +918,9 @@ void zelda64::archipelago::apply_seed_settings(zelda64::enhancements::Options& o
     o.boss_max_mp = setting("jp_boss_mp_rewards") != 0 || setting("boss_max_mp") != 0;
     o.double_exp = std::clamp(setting("double_exp"), 0, 3);
     o.fast_mp_recovery = setting("fast_mp_recovery") != 0;
+    o.real_time_combat = setting("real_time_combat") != 0 || setting("mmorpg_mode") != 0;
+    o.play_as_leonardo = setting("character") == 1;
+    o.repel = setting("repel") != 0;
     o.stat_up_effect = setting("jp_stat_up_effect") != 0;
     o.exit_from_anywhere = setting("exit_from_anywhere") != 0;
     o.faster_walk = setting("fast_walking") != 0;
@@ -1113,15 +1126,24 @@ namespace {
     // How much of what the portal is waiting for is done. Counted from the
     // server's list rather than from anything in the save, because a boss or
     // a monster leaves no flag behind; see checked_locations.
+    // Pages are the exception: they are items, counted in the bag, which the
+    // save keeps.
     struct PortalProgress {
         int bosses = 0, bosses_needed = 0;
         int monsters = 0, monsters_needed = 0;
-        bool open() const { return bosses >= bosses_needed && monsters >= monsters_needed; }
+        int pages = 0, pages_needed = 0;
+        bool open() const {
+            return bosses >= bosses_needed && monsters >= monsters_needed && pages >= pages_needed;
+        }
     };
 
-    PortalProgress portal_progress() {
+    PortalProgress portal_progress(uint8_t* rdram) {
         PortalProgress p;
         std::lock_guard lock{ server_mutex };
+        if (mammon_portal & 4) {
+            p.pages_needed = seed_pages_required;
+            p.pages = zelda64::enhancements::bag_count(rdram, zelda64::page_item::item_id);
+        }
         if (mammon_portal & 1) {
             p.bosses_needed = bosses_before_mammon;
             for (int order = 1; order <= bosses_before_mammon; order++) {
@@ -1193,7 +1215,7 @@ namespace {
             }
             return;
         }
-        PortalProgress progress = portal_progress();
+        PortalProgress progress = portal_progress(rdram);
         if (progress.open()) {
             MEM_B(0, portal_ram + 0x15) = static_cast<int8_t>(portal_open_flags);
             MEM_H(0, portal_ram + 0x16) = 0;
@@ -1207,7 +1229,7 @@ namespace {
         // so the reason the door will not open is never a mystery. The notice
         // stack is the port's own, top-left.
         static int last_said = -1;
-        int state = progress.open() ? -2 : progress.bosses * 100 + progress.monsters;
+        int state = progress.open() ? -2 : progress.bosses * 100000 + progress.monsters * 1000 + progress.pages;
         if (state == last_said && portal_visit) {
             return;
         }
@@ -1228,6 +1250,13 @@ namespace {
             }
             what += std::to_string(progress.monsters) + "/" +
                     std::to_string(progress.monsters_needed) + " monsters";
+        }
+        if (progress.pages_needed) {
+            if (!what.empty()) {
+                what += ", ";
+            }
+            what += std::to_string(std::min(progress.pages, progress.pages_needed)) + "/" +
+                    std::to_string(progress.pages_needed) + " pages";
         }
         zelda64::notify::post("Mammon's World is sealed: " + what);
     }
@@ -1669,12 +1698,13 @@ int zelda64::archipelago::pending_level_ups() {
     return level_ups_waiting.load();
 }
 
-int zelda64::archipelago::portal_requirement(int& monsters) {
+int zelda64::archipelago::portal_requirement(int& monsters, int& pages) {
     if (!playing_seed()) {
         return -1;
     }
     std::lock_guard lock{ server_mutex };
     monsters = portal_monsters.empty() ? monster_kinds : static_cast<int>(portal_monsters.size());
+    pages = seed_pages_required;
     return mammon_portal;
 }
 
