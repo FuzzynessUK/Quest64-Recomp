@@ -23,6 +23,7 @@
 #include "tracker.h"
 #include "traps.h"
 #include "pageitem.h"
+#include "speedrun.h"
 #include "randomizer/chest_data.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
@@ -212,6 +213,56 @@ namespace {
     // The yaml's wingsmith_wings: a wingsmith hands over its wings as well
     // as sending its check.
     std::atomic<bool> wingsmith_wings{ false };
+    // The yaml's open_world: the gem locks are opened (open_boss_locks).
+    // -1 until slot_data says: an apworld before 1.9.0 has no such option
+    // and opened them with Boss Souls, so its seeds still get that.
+    std::atomic<int> open_world{ -1 };
+    bool open_world_on() {
+        int ow = open_world.load();
+        return ow >= 0 ? ow != 0 : boss_souls.load() != 0;
+    }
+    // Wingsmiths: gift NPCs 10-15, Melrode to Brannoch, each with his own
+    // town's wings (0x0E White .. 0x13 Black). In a seed a wingsmith only
+    // ever hands over his own town's pair - whatever the gift shuffle put on
+    // him - so a pair arrives no sooner than the town it belongs to, and only
+    // once a save: unconnected, the game gives them again whenever the bag
+    // lacks them, which made them free warps on demand. With Wings shuffled
+    // or progressive the item pool is the only source of wings, so no gift
+    // NPC hands any over, check or not.
+    constexpr int first_wingsmith = 10;
+    constexpr int wingsmith_count = 6;
+    std::atomic<uint32_t> wingsmiths_given{ 0 };   // bit n: wingsmith n has given, this save
+    std::map<std::string, uint32_t> wingsmiths_by_save;
+    bool wingsmiths_file_loaded = false;
+    bool was_on_title_screen = false;
+
+    std::filesystem::path wingsmiths_path() {
+        return zelda64::get_app_folder_path() / "ap_wingsmiths.json";
+    }
+
+    void load_wingsmiths_file() {
+        if (wingsmiths_file_loaded) {
+            return;
+        }
+        wingsmiths_file_loaded = true;
+        std::ifstream in(wingsmiths_path());
+        if (!in.is_open()) {
+            return;
+        }
+        nlohmann::json j = nlohmann::json::parse(in, nullptr, false);
+        if (!j.is_object()) {
+            return;
+        }
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            if (it->is_number_unsigned() || it->is_number_integer()) {
+                wingsmiths_by_save[it.key()] = it->get<uint32_t>();
+            }
+        }
+    }
+
+    bool is_wings(int item) {
+        return item >= 0x0E && item <= 0x13;
+    }
     // Bit n (1-8) set once that boss's Soul has arrived. Read from the boss
     // spawn hook, which runs on the game thread, so it is an atomic rather
     // than something the mutex guards. The server sends every item again on
@@ -234,6 +285,7 @@ namespace {
     const std::vector<std::string> slot_data_keys = {
         "goal", "mammon_portal", "boss_souls", "chestsanity", "giftsanity",
         "wingsmith_wings", "enemysanity", "spiritsanity", "shuffle_orbs",
+        "boss_items", "wings", "open_world",
         "rando_seed", "settings", "locations", "enemy_plan", "portal_monsters",
         "pages_required",
     };
@@ -273,6 +325,11 @@ namespace {
             bool on = false;
             flag(on);
             wingsmith_wings.store(on);
+        }
+        else if (key == "open_world") {
+            bool on = false;
+            flag(on);
+            open_world.store(on ? 1 : 0);
         }
         else if (key == "chestsanity") {
             flag(chestsanity);
@@ -354,6 +411,7 @@ namespace {
                     slot_locations.clear();
                     slot_locations_known = false;
                     wingsmith_wings.store(false);
+                    open_world.store(-1);
                     enemy_plan_live = json();
                     planned_monsters.clear();
                     monsters_planned = false;
@@ -1535,6 +1593,16 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
     if (!ap_enabled.load()) {
         return;
     }
+    // Back on the title screen: what comes next is a new game, with every
+    // wingsmith still to visit, or a file, which load_progress gives its own
+    // record back.
+    {
+        const bool on_title = zelda64::speedrun::title_showing();
+        if (on_title && !was_on_title_screen) {
+            wingsmiths_given.store(0);
+        }
+        was_on_title_screen = on_title;
+    }
     scan_flags(rdram, chest_flags, chest_count, chest_sent, group_chest, "chest");
     scan_flags(rdram, spirit_flags, spirit_count, spirit_sent, group_spirit, "spirit");
     // Only with a save loaded: before that the byte is whatever the boot
@@ -1559,13 +1627,43 @@ void zelda64::archipelago::on_frame(uint8_t* rdram) {
     if (MEM_W(0, gNextMap) != -1 && !zelda64::enhancements::item_menu_open(rdram)) {
         for (;;) {
             int64_t item = 0;
+            // For a progressive item: how many of the same came before it in
+            // the server's list, and whether the Book is in the game. The
+            // list is the same on every connect, so the n-th one is always
+            // the same thing, whichever save or session hands it over.
+            int rank = 0;
+            int portal = 0;
             {
                 std::lock_guard lock{ server_mutex };
                 if (items_applied >= static_cast<int>(server_items.size())) {
                     break;
                 }
                 item = server_items[static_cast<size_t>(items_applied)];
+                if (item == zelda64::archipelago::item_progressive_boss ||
+                    item == zelda64::archipelago::item_progressive_wings) {
+                    for (int i = 0; i < items_applied; i++) {
+                        rank += server_items[static_cast<size_t>(i)] == item ? 1 : 0;
+                    }
+                }
+                portal = mammon_portal;
                 items_applied++;
+            }
+            if (item == zelda64::archipelago::item_progressive_boss) {
+                // Earth Orb, Wind Jade, Water Jewel, Fire Ruby, the Book (only
+                // when no portal condition has taken it out), Dark Gaol Key.
+                static constexpr int with_book[] = { 0x14, 0x15, 0x16, 0x17, 0x18, 0x19 };
+                static constexpr int without_book[] = { 0x14, 0x15, 0x16, 0x17, 0x19 };
+                const int* order = portal == 0 ? with_book : without_book;
+                const int last = portal == 0 ? 5 : 4;
+                const int which = order[rank < last ? rank : last];
+                log_line("Progressive Boss Item #" + std::to_string(rank + 1) + " is item " + std::to_string(which));
+                item = id_base + group_item + which;
+            }
+            else if (item == zelda64::archipelago::item_progressive_wings) {
+                // White, Yellow, Blue, Green, Red, Black Wings, and round again.
+                const int which = 0x0E + rank % 6;
+                log_line("Progressive Wings #" + std::to_string(rank + 1) + " is item " + std::to_string(which));
+                item = id_base + group_item + which;
             }
             if (item == item_level_up) {
                 int waiting = level_ups_waiting.fetch_add(1) + 1;
@@ -1981,9 +2079,10 @@ namespace {
 
     // ---- the boss-item locks
     //
-    // With Boss Souls a boss may not be there to beat, so the four items the
-    // bosses drop - Earth Orb 0x14, Wind Jewel 0x15, Water Jewel 0x16, Fire
-    // Ruby 0x17 - can no longer be what the way forward waits on. Each lock
+    // Open World (yaml open_world; before apworld 1.9.0, Boss Souls): the
+    // four items the bosses drop - Earth Orb 0x14, Wind Jewel 0x15, Water
+    // Jewel 0x16, Fire Ruby 0x17 - are no longer what the way forward waits
+    // on. Each lock
     // is an exit record in a map file (the door, boat or teleporter), and
     // its word at +0x14 is { u8 kind, u8 flags, u16 item }: flag 0x10 is
     // "needs the item", 0x20 "blocked once you have it" (Epona's teleporter
@@ -1996,11 +2095,11 @@ namespace {
     // its two overlapping teleporters both go to Colleen's side.
     //
     // Merrow writes these into the ROM at boot; here they have to wait for
-    // the server to say Boss Souls is on, so they are written into the map
+    // the server to say Open World is on, so they are written into the map
     // as it sits in RAM instead, like the portal door. A map file is DMA'd
     // afresh on every load, so this is done on every frame the map is
     // current and undoes itself the moment it stops: disconnect, or play
-    // without Boss Souls, and the next load is the game's own again.
+    // without Open World, and the next load is the game's own again.
     struct BossLock {
         int map = -1;
         int32_t ram = 0;
@@ -2058,11 +2157,11 @@ namespace {
             }
             boss_locks.push_back(std::move(lock));
         }
-        log_line("boss-item locks: " + std::to_string(boss_locks.size()) + " to open when Boss Souls is on");
+        log_line("boss-item locks: " + std::to_string(boss_locks.size()) + " to open when Open World is on");
     }
 
     void open_boss_locks(uint8_t* rdram) {
-        if (boss_souls.load() == 0) {
+        if (!open_world_on()) {
             return;
         }
         int map = static_cast<int32_t>(MEM_W(0, gCurrentMap));
@@ -2104,6 +2203,9 @@ namespace {
 // server's list arrives with every connection.
 namespace {
     bool skip_next_add = false;
+    // The item the next bag add is made into (a wingsmith's own wings), or -1.
+    int force_next_add = -1;
+
 }
 
 extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* ctx) {
@@ -2122,13 +2224,41 @@ extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* c
             continue;
         }
         int64_t location = zelda64::archipelago::id_base + zelda64::archipelago::group_giver + i;
+        const bool wingsmith = i >= first_wingsmith && i < first_wingsmith + wingsmith_count;
+        const int town_wings = 0x0E + (i - first_wingsmith);
+        const int record_item = MEM_BU(7, record);
         bool done = giver_sent[i];
+        bool slot = false;
         {
             std::lock_guard lock{ server_mutex };
-            if (!in_slot(location)) {
-                return;   // not a check in this seed: the NPC gives as usual
+            slot = in_slot(location);
+            done = done || (slot && checked_locations.count(location) != 0);
+        }
+        if (!slot) {
+            // Not a check in this seed (giftsanity off): the NPC gives as
+            // usual, except for wings.
+            if (!wingsmith && !is_wings(record_item)) {
+                return;
             }
-            done = done || checked_locations.count(location) != 0;
+            if (!wingsmith || !wingsmith_wings.load()) {
+                // Wings shuffled or progressive: they come from the pool only.
+                ctx->r2 = 1;
+                log_line("giver " + std::to_string(i) + " keeps his wings: the seed's wings come from the item pool");
+                return;
+            }
+            const uint32_t bit = 1u << (i - first_wingsmith);
+            if (wingsmiths_given.load() & bit) {
+                ctx->r2 = 1;
+                log_line("wingsmith " + std::to_string(i) + " has already given his wings this save");
+                return;
+            }
+            wingsmiths_given.fetch_or(bit);
+            ctx->r2 = 0;
+            skip_next_add = false;
+            force_next_add = town_wings;
+            log_line("wingsmith " + std::to_string(i) + " hands over his own wings (item " +
+                     std::to_string(town_wings) + "), once this save");
+            return;
         }
         if (done) {
             giver_sent[i] = true;
@@ -2139,9 +2269,14 @@ extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* c
         ctx->r2 = 0;
         // A wingsmith (its item one of the six wings, 0x0E-0x13) keeps its
         // wings when the yaml says so; every other gift stays out of the bag.
-        int item = MEM_BU(7, record);
-        bool keep = wingsmith_wings.load() && item >= 0x0E && item <= 0x13;
+        int item = record_item;
+        bool keep = wingsmith && wingsmith_wings.load();
         skip_next_add = !keep;
+        if (keep) {
+            force_next_add = town_wings;
+            item = town_wings;
+            wingsmiths_given.fetch_or(1u << (i - first_wingsmith));
+        }
         zelda64::archipelago::send_check(location);
         log_line("giver " + std::to_string(i) + " checked on map " + std::to_string(map) +
                  " (item " + std::to_string(item) + (keep ? " handed over too)" : " kept out of the bag)"));
@@ -2155,7 +2290,12 @@ extern "C" void quest64_archipelago_giver_talk(uint8_t* rdram, recomp_context* c
 // 0x80008814 and the add is at 0x80008850, on the same path.
 extern "C" int quest64_archipelago_skip_gift_item(uint8_t* rdram, recomp_context* ctx) {
     (void)rdram;
-    (void)ctx;
+    if (force_next_add >= 0) {
+        // A wingsmith's own wings, whatever his record says.
+        ctx->r4 = force_next_add;
+        force_next_add = -1;
+        return 0;
+    }
     if (!skip_next_add) {
         return 0;
     }
@@ -2249,6 +2389,18 @@ void zelda64::archipelago::save_progress(const std::string& save_key) {
         applied = items_applied;
     }
     save_progress_by_key[save_key] = applied;
+    load_wingsmiths_file();
+    wingsmiths_by_save[save_key] = wingsmiths_given.load();
+    {
+        nlohmann::json w = nlohmann::json::object();
+        for (const auto& [key, bits] : wingsmiths_by_save) {
+            w[key] = bits;
+        }
+        std::ofstream wout(wingsmiths_path());
+        if (wout.is_open()) {
+            wout << w.dump(2);
+        }
+    }
     nlohmann::json j = nlohmann::json::object();
     for (const auto& [key, count] : save_progress_by_key) {
         j[key] = count;
@@ -2270,6 +2422,11 @@ void zelda64::archipelago::load_progress(const std::string& save_key) {
     {
         std::lock_guard lock{ server_mutex };
         items_applied = applied;
+    }
+    load_wingsmiths_file();
+    {
+        auto w = wingsmiths_by_save.find(save_key);
+        wingsmiths_given.store(w == wingsmiths_by_save.end() ? 0u : w->second);
     }
     // A Level Up the file was saved without spending is not owed twice
     // either: what this save is due is the mark, and nothing else.

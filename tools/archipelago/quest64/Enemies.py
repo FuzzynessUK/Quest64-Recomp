@@ -5,24 +5,24 @@ from typing import Dict, List, Tuple
 
 # The regions a monster can be in, earliest first. Each needs everything
 # the one before it does.
-REGION_ORDER: List[str] = ["Overworld", "Early", "Mid", "Late", "Endgame"]
+REGION_ORDER: List[str] = ["Overworld", "Early", "Boss 2", "Mid", "Boss 4", "Late", "Endgame"]
 
 # The game's sixteen progression areas, in its order: name, logic region, and
 # how many monsters its packs can hold.
 ENEMY_AREAS: List[Tuple[str, str, int]] = [
     ("Holy Plains", "Overworld", 12),
     ("Connor Forest", "Overworld", 14),
-    ("Dondoran Flats", "Early", 14),
-    ("Glencoe Forest", "Early", 8),
-    ("West Carmaugh", "Early", 20),
-    ("Cull Hazard", "Early", 12),
-    ("East Limelin", "Early", 17),
-    ("Windward Forest", "Mid", 17),
+    ("Dondoran Flats", "Boss 2", 14),
+    ("Glencoe Forest", "Boss 2", 8),
+    ("West Carmaugh", "Mid", 20),
+    ("Cull Hazard", "Boss 2", 12),
+    ("East Limelin", "Boss 4", 17),
+    ("Windward Forest", "Boss 2", 17),
     ("Blue Cave", "Mid", 13),
     ("Isle of Skye", "Mid", 10),
-    ("Baragoon Tunnel", "Mid", 12),
-    ("Dindom Dries", "Mid", 16),
-    ("Boil Hole", "Mid", 13),
+    ("Baragoon Tunnel", "Boss 4", 12),
+    ("Dindom Dries", "Boss 4", 16),
+    ("Boil Hole", "Boss 4", 13),
     ("Baragoon Moor", "Late", 14),
     ("Brannoch Castle", "Late", 4),
     ("Mammon's World", "Endgame", 6),

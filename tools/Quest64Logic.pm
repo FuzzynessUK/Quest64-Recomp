@@ -115,6 +115,11 @@ sub tokens {
 # Checks one rule and notes what it uses. Returns the rule as Python source.
 sub check_rule {
     my ($src, $where, $ctx, $uses) = @_;
+    # Rule Builder has no OptionFilter & OptionFilter: a filter can only be
+    # joined to a rule (Archipelago then cannot even load the world). Put the
+    # rule first: Rule & OptionFilter(...) & OptionFilter(...).
+    die "$where: OptionFilter(...) & OptionFilter(...) does not work in Rule Builder; put a rule before them: $src\n"
+        if $src =~ /(?:^|[(|])\s*OptionFilter\([^()]*\)\s*&\s*OptionFilter\b/;
     my @t = tokens($src, $where);
     my @stack;          # enclosing calls
     my $depth = 0;

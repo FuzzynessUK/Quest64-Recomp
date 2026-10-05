@@ -36,14 +36,24 @@ Quest 64 Recompiled:
     'true': 1
     'false': 0
 
-  # With giftsanity on, the six wingsmiths still hand over their wings as
-  # well as sending their check (once each).
-  wingsmith_wings:
-    'true': 1
-    'false': 0
+  # Where the six pairs of wings come from. No rule needs wings.
+  # normal        the wingsmiths hand over their wings, as in the game
+  # shuffled      one of each pair in the item pool; the wingsmiths give
+  #               only their check
+  # progressive   six "Progressive Wings" in the pool, each the next pair in
+  #               town order (White, Yellow, Blue, Green, Red, Black); the
+  #               wingsmiths give only their check
+  # With giftsanity off the wingsmiths are not checks and give their wings
+  # whatever this says.
+  wings:
+    normal: 1
+    shuffled: 0
+    progressive: 0
 
-  # How many of each pair of wings go in the item pool: none (the default),
-  # one, or two. No rule needs wings; the room left goes to filler.
+  # Extra copies of each pair of wings in the pool, on top of what wings
+  # puts there: none (the default), one or two. With wings progressive they
+  # are more Progressive Wings, going round the six again. They replace
+  # filler.
   wings_in_pool:
     none: 1
     one: 0
@@ -65,10 +75,25 @@ Quest 64 Recompiled:
     'true': 1
     'false': 0
 
-  # false keeps the boss rewards on their bosses (the Earth Orb, Wind Jade,
-  # Water Jewel and Fire Ruby), and the Eletale's Book and Dark Gaol Key
-  # with the Shannons who give them. true shuffles them with everything else.
-  shuffle_orbs:
+  # The six items the way on waits for: the Earth Orb, Wind Jade, Water
+  # Jewel and Fire Ruby the bosses drop, and the Eletale's Book and Dark Gaol
+  # Key the Shannons hand over.
+  # normal        each stays on its boss or Shannon, as in the game
+  # shuffled      shuffled with everything else
+  # progressive   a "Progressive Boss Item" for each in the pool, each the
+  #               next of Earth Orb, Wind Jade, Water Jewel, Fire Ruby,
+  #               Eletale's Book, Dark Gaol Key (five, without the Book, when
+  #               mammon_portal replaces it)
+  boss_items:
+    normal: 1
+    shuffled: 0
+    progressive: 0
+
+  # The doors, boats and teleporters the four gems lock are open from the
+  # start, so the world can be explored in any order. The Dark Gaol Key still
+  # locks the endgame, and so does the Eletale's Book unless mammon_portal
+  # replaces it.
+  open_world:
     'false': 1
     'true': 0
 
@@ -111,10 +136,9 @@ Quest 64 Recompiled:
   # beaten. The Soul is an Archipelago item, not one the game knows about, so
   # it can be anywhere in the multiworld. Whether a boss is there is settled
   # as his arena loads, so a Soul that arrives while you are standing in one
-  # takes effect the next time you walk in. With Souls on, everything the
-  # four gems lock (doors, boats, teleporters) is open from the start;
-  # the Dark Gaol Key still locks the endgame, and so does the Eletale's
-  # Book unless mammon_portal replaces it.
+  # takes effect the next time you walk in. Souls open nothing else: the
+  # gem locks stay locked unless open_world is on, and with boss_items normal
+  # a gem waits on its boss's Soul.
   #
   # off           every boss is where the game puts him
   # bosses        the seven before Mammon need Souls
@@ -309,8 +333,8 @@ Quest 64 Recompiled:
   # off, use it again to switch them back on. Its icon shows over Brian while
   # it is on.
   repel:
-    'false': 1
-    'true': 0
+    'true': 1
+    'false': 0
 
   # JP Stat Up Effect: A colour burst over Brian when a stat rises, as in the
   # Japanese release.

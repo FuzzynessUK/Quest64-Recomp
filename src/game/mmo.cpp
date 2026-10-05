@@ -200,7 +200,7 @@ void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
         char line[256];
         int n = std::snprintf(line, sizeof line, "brian state %d timer %d | battle %04X pause %d locks %d %d menu %08X | enemies",
                               MEM_HU(0, brian_state), MEM_HU(4, brian_state), state, MEM_HU(0, turn_pause),
-                              MEM_W(0, 0x8008C638), MEM_W(0, 0x8008C63C), static_cast<uint32_t>(MEM_W(0, 0x8007B2E4)));
+                              MEM_W(0, static_cast<int32_t>(0x8008C638)), MEM_W(0, static_cast<int32_t>(0x8008C63C)), static_cast<uint32_t>(MEM_W(0, static_cast<int32_t>(0x8007B2E4))));
         for (int slot = 0; slot < count && n > 0 && n < static_cast<int>(sizeof line) - 24; slot++) {
             const int32_t e = enemies + slot * enemy_size;
             if (MEM_H(0x74, e) == -1) {

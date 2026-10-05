@@ -10,7 +10,7 @@ from .Enemies import ENEMY_AREAS, ENEMY_IDS, ENEMY_LOCATIONS, FILE_MONSTERS, REG
 from .Items import Q64Item, item_data_table, item_table, code_to_item_table, filler_items
 from .Locations import (Q64Location, Q64LocationData, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
-from .Options import DeathTraps, Goal, PagePlacement, Q64Options, Traps
+from .Options import BossItems, DeathTraps, Goal, PagePlacement, Q64Options, Traps, Wings
 from .Regions import regions, connections
 from .Rules import entrance_rules, set_all_rules
 
@@ -158,11 +158,11 @@ class Q64World(World):
     def locked_items(self) -> Dict[str, str]:
         """Item name -> location name for anything held out of the pool.
 
-        With shuffle_orbs off the six gate items stay where the game puts
+        With boss_items normal the six gate items stay where the game puts
         them. If the group that location belongs to is switched off it is not
         a location at all, so the item goes back in the pool instead.
         """
-        if self.options.shuffle_orbs:
+        if self.options.boss_items.value != BossItems.option_normal:
             return {}
         return {
             item: location
@@ -196,8 +196,17 @@ class Q64World(World):
                 level_ups = data.num_exist
                 continue
             count = data.num_exist
-            if data.type == ItemClassification.useful:   # the wings
-                count = min(count, self.options.wings_in_pool.value)
+            extra_wings = self.options.wings_in_pool.value
+            if name == "Progressive Boss Item":
+                # One per gate item: the Book only when it opens something.
+                count = 6 if self.options.mammon_portal.value == 0 else 5
+            elif name == "Progressive Wings":
+                # Six, and six more for each extra copy (they go round again).
+                count = 6 * (1 + extra_wings)
+            elif data.type == ItemClassification.useful:   # the wings
+                # Normal: only the extra copies (the wingsmiths have theirs).
+                # Shuffled: one of each, plus the extra copies.
+                count = extra_wings + (1 if self.options.wings.value == Wings.option_shuffled else 0)
             for _ in range(count):
                 pool.append(self.create_item(name))
 
@@ -352,10 +361,16 @@ class Q64World(World):
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
             "giftsanity": bool(self.options.giftsanity),
-            "wingsmith_wings": bool(self.options.wingsmith_wings),
+            # The wingsmiths still give wings only with wings normal.
+            "wingsmith_wings": self.options.wings.value == Wings.option_normal,
+            "wings": self.options.wings.value,
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
-            "shuffle_orbs": bool(self.options.shuffle_orbs),
+            "boss_items": self.options.boss_items.value,
+            # The game opens the gem locks only when this is true; before
+            # apworld 1.9.0 Boss Souls did it, and a slot without the key is
+            # still treated that way.
+            "open_world": bool(self.options.open_world),
             # Read by APCpp itself (the game declares DeathLink support and
             # APCpp tags the connection when this is true).
             "death_link": bool(self.options.death_link),

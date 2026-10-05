@@ -407,6 +407,37 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   `Has("Torn Page", n)` onto the "Boss 7 to Endgame" entrance; the game
   counts pages in the bag in `portal_progress`, and
   `page_item::set_hunt(n, ends_run=false)` only shows the count.
+- **Boss items, wings, open world** (2026-10-05, apworld 1.9.0): yaml
+  `boss_items` normal/shuffled/progressive (replaces `shuffle_orbs`),
+  `wings` normal/shuffled/progressive (replaces `wingsmith_wings`; slot_data
+  still sends `wingsmith_wings` = wings normal), `wings_in_pool` is now
+  extra copies on top, `open_world` on its own. Boss Souls no longer opens
+  the gem locks: `open_boss_locks` follows slot_data `open_world`, falling
+  back to boss_souls only when the key is missing (pre-1.9.0 seeds).
+  Progressive items are 0xC00 boss (Earth, Wind, Water, Fire, Book only with
+  mammon_portal 0, Key) and 0xC01 wings (White..Black, cycling); the game
+  resolves the n-th copy by counting earlier copies in `server_items`. The
+  gates are named rules in the workbook (`*_GATE`, `ELETALE_BOOK`,
+  `DARK_GAOL_KEY`); `archipelago_logic_sheet.pl --force` now reproduces the
+  workbook exactly (it carries the Mammon's World monsters' Endgame region).
+- **Regions follow the story** (2026-10-05): every check's region comes
+  from its story stage (`region_for_stage` in `archipelago_logic_sheet.pl`:
+  0 Overworld, 1 Boss 2 = behind the Earth Orb, 2 Mid = + Wind Jade, 3-4
+  Boss 4 = + Water Jewel, 5+ Late = + Fire Ruby). Chests use Merrow's stage;
+  spirits and monsters `%stage_of_map`, gift NPCs `%stage_of_giver`. Before
+  this, spirits and gift NPCs were all Overworld and Brannoch Castle was
+  sphere 1 (reported from a multiworld). With open_world the gem gates
+  also accept "the boss who drops the gem can be beaten" only when Boss
+  Souls is on; without Souls they still want the gem. Rule Builder cannot
+  `&` two OptionFilters: put a rule first (Quest64Logic.pm now refuses it).
+- **Wingsmiths in a seed** (2026-10-05): gift NPCs 10-15 (Melrode..Brannoch,
+  own wings 0x0E+n). Connected, a wingsmith only ever hands over his own
+  town's pair (the bag add `func_800212A0` is redirected, whatever the gift
+  shuffle put on him), and only once a save, check or not: bitmask
+  `wingsmiths_given`, kept per save in `ap_wingsmiths.json` through
+  save/load_progress, cleared on the title. With wings shuffled or
+  progressive (slot_data wingsmith_wings false) no gift NPC hands over
+  wings at all, giftsanity off included: the pool is the only source.
 - Gift NPCs: talk routine `func_800086E4`, hooks at 0x80008814 (the "held?"
   answer) and `func_800212A0` entry (skip the add).
 - A save read counts as a load only when the Pak menu was opened from the
@@ -439,7 +470,10 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
 - Settings and logs: `%LOCALAPPDATA%\Quest64Recompiled\` (`randomizer.json`,
   `enhancements.json`, `randomizer_spoiler.txt`, `randomizer_hooks.txt`).
 - Game-side C++ that touches RDRAM uses the `MEM_W/MEM_H/MEM_B` macros from
-  `recomp.h` and needs a parameter named `rdram` in scope.
+  `recomp.h` and needs a parameter named `rdram` in scope. Pass addresses as
+  `int32_t` (a `constexpr int32_t`, or `static_cast<int32_t>(0x8008FCC1)`): a
+  bare 0x8xxxxxxx literal is unsigned and the macro then lands 4 GB past
+  RDRAM (a write there crashed the game, 2026-10-05).
 - No Python on this machine; perl is. The xlsx is written as a raw XML zip by
   perl (`IO::Compress::Zip`, `fullCalcOnLoad`), no spreadsheet library.
 

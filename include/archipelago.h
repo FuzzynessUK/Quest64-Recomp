@@ -69,6 +69,12 @@ namespace zelda64::archipelago {
     // they take the place of filler and fire when they arrive.
     constexpr int64_t item_trap = id_base + group_item + 0xD00;
     constexpr int trap_kinds = 4;
+    // Progressive items (yaml boss_items / wings progressive): each one is
+    // the next of a list, so they always arrive in order. Boss: Earth Orb,
+    // Wind Jade, Water Jewel, Fire Ruby, Eletale's Book (only with
+    // mammon_portal 0), Dark Gaol Key. Wings: White to Black, round again.
+    constexpr int64_t item_progressive_boss = id_base + group_item + 0xC00;
+    constexpr int64_t item_progressive_wings = id_base + group_item + 0xC01;
 
     // --- the game side -----------------------------------------------------
     // Boot, after the randomizer: with the connector on, the chests' own

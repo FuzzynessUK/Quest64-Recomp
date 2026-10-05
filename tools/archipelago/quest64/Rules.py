@@ -7,19 +7,21 @@ from typing import TYPE_CHECKING, Dict
 from rule_builder.options import OptionFilter
 from rule_builder.rules import CanReachLocation, CanReachRegion, Has, Rule, True_
 
-from .Options import BossSouls, MammonPortal
+from .Options import BossSouls, MammonPortal, OpenWorld
 
 if TYPE_CHECKING:
     from . import Q64World
 
 # Rules used in more than one place (the Named Rules sheet).
-EARTH_ORB_GATE: Rule = Has("Earth Orb") | OptionFilter(BossSouls, 1, operator="ge")
-WIND_JADE_GATE: Rule = Has("Wind Jade") | OptionFilter(BossSouls, 1, operator="ge")
-WATER_JEWEL_GATE: Rule = Has("Water Jewel") | OptionFilter(BossSouls, 1, operator="ge")
-FIRE_RUBY_GATE: Rule = Has("Fire Ruby") | OptionFilter(BossSouls, 1, operator="ge")
+EARTH_ORB_GATE: Rule = Has("Earth Orb") | Has("Progressive Boss Item", 1) | (CanReachLocation("Boss - Solvaring") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))
+WIND_JADE_GATE: Rule = Has("Wind Jade") | Has("Progressive Boss Item", 2) | (CanReachLocation("Boss - Zelse") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))
+WATER_JEWEL_GATE: Rule = Has("Water Jewel") | Has("Progressive Boss Item", 3) | (CanReachLocation("Boss - Nepty") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))
+FIRE_RUBY_GATE: Rule = Has("Fire Ruby") | Has("Progressive Boss Item", 4) | (CanReachLocation("Boss - Fargo") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))
+ELETALE_BOOK: Rule = Has("Eletale's Book") | Has("Progressive Boss Item", 5)
+DARK_GAOL_KEY: Rule = Has("Dark Gaol Key") | (OptionFilter(MammonPortal, 0) & Has("Progressive Boss Item", 6)) | (OptionFilter(MammonPortal, 0, operator="ne") & Has("Progressive Boss Item", 5))
 ALL_BOSSES_BEATEN: Rule = CanReachLocation("Boss - Solvaring") & CanReachLocation("Boss - Zelse") & CanReachLocation("Boss - Nepty") & CanReachLocation("Boss - Shilf") & CanReachLocation("Boss - Fargo") & CanReachLocation("Boss - Guilty") & CanReachLocation("Boss - Beigis")
 ALL_MONSTER_AREAS: Rule = CanReachRegion("Overworld") & CanReachRegion("Early") & CanReachRegion("Mid") & CanReachRegion("Late")
-ENDGAME_DOOR: Rule = (OptionFilter(MammonPortal, 0) & Has("Eletale's Book")) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)
+ENDGAME_DOOR: Rule = (OptionFilter(MammonPortal, 0) & ELETALE_BOOK) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)
 
 # The Entrances sheet. An entrance with no rule is always open.
 entrance_rules: Dict[str, Rule] = {
@@ -35,7 +37,7 @@ entrance_rules: Dict[str, Rule] = {
     "Late to Boss 7": FIRE_RUBY_GATE,
     "Boss 6 to Boss 7": FIRE_RUBY_GATE,
     "Boss 7 to Endgame": ENDGAME_DOOR,
-    "Endgame to Boss 8": Has("Dark Gaol Key"),
+    "Endgame to Boss 8": DARK_GAOL_KEY,
 }
 
 # The Locations sheet, where reaching the region is not enough.

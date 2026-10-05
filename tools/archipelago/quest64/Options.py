@@ -15,23 +15,36 @@ class Giftsanity(DefaultOnToggle):
     display_name = "Giftsanity"
 
 
-class WingsmithWings(DefaultOnToggle):
-    """The six wingsmiths still hand over their wings, on top of their
-    Archipelago check. Only matters with giftsanity on; each gives its wings
-    once, the first time you talk to them."""
-    display_name = "Wingsmiths Give Wings"
+class Wings(Choice):
+    """Where the six pairs of wings come from. No rule needs wings: they are
+    for getting about.
+
+    normal        the wingsmiths hand over their wings, as in the game (with
+                  giftsanity on, on top of their check)
+    shuffled      one of each pair is in the item pool; the wingsmiths give
+                  only their check
+    progressive   six "Progressive Wings" are in the pool instead, each the
+                  next pair in town order: White, Yellow, Blue, Green, Red,
+                  Black; the wingsmiths give only their check
+
+    With giftsanity off the wingsmiths are not checks and hand over their
+    wings whatever this says."""
+    display_name = "Wings"
+    option_normal = 0
+    option_shuffled = 1
+    option_progressive = 2
+    default = 0
 
 
 class WingsInPool(Choice):
-    """How many of each pair of wings go in the item pool. The wings are
-    handy for getting about but no rule needs them, so fewer leaves room
-    for filler instead.
+    """Extra copies of each pair of wings in the item pool, on top of what
+    Wings puts there (with Wings progressive, as more Progressive Wings,
+    which go round the six again). They take the place of filler.
 
-    none          no wings at all (the default); the wingsmiths can still
-                  hand theirs over with Wingsmiths Give Wings
-    one           one of each
-    two           two of each of the six"""
-    display_name = "Wings in Pool"
+    none          no extra wings (the default)
+    one           one more of each
+    two           two more of each"""
+    display_name = "Extra Wings in Pool"
     option_none = 0
     option_one = 1
     option_two = 2
@@ -56,11 +69,31 @@ class EnsureAllEnemies(DefaultOnToggle):
     display_name = "Ensure All Enemies Appear"
 
 
-class ShuffleOrbs(Toggle):
-    """Off keeps the boss rewards on their bosses (the Earth Orb, Wind Jade,
-    Water Jewel and Fire Ruby), and the Eletale's Book and Dark Gaol Key with
-    the Shannons who give them. On shuffles them with everything else."""
-    display_name = "Shuffle Orbs"
+class BossItems(Choice):
+    """The six items the way on waits for: the Earth Orb, Wind Jade, Water
+    Jewel and Fire Ruby the bosses drop, and the Eletale's Book and Dark Gaol
+    Key the Shannons hand over.
+
+    normal        each stays where the game puts it, on its boss or Shannon
+    shuffled      they are shuffled with everything else
+    progressive   the pool has a "Progressive Boss Item" for each instead,
+                  and each one is the next of Earth Orb, Wind Jade, Water
+                  Jewel, Fire Ruby, Eletale's Book, Dark Gaol Key - so they
+                  always arrive in story order. With a Mammon's World Portal
+                  condition the Book is not in the game and there are five."""
+    display_name = "Orbs / Boss Items"
+    option_normal = 0
+    option_shuffled = 1
+    option_progressive = 2
+    default = 0
+
+
+class OpenWorld(Toggle):
+    """The doors, boats and teleporters the Earth Orb, Wind Jade, Water Jewel
+    and Fire Ruby open are open from the start, so the world can be explored
+    in any order. The Dark Gaol Key still locks what it locks, and so does the
+    Eletale's Book unless Mammon's World Portal replaces it."""
+    display_name = "Open World"
 
 
 class Spiritsanity(DefaultOnToggle):
@@ -138,11 +171,9 @@ class BossSouls(Choice):
     arrives while you are standing in the arena takes effect when you next
     walk in.
 
-    With Souls on, the doors, boats and teleporters the Earth Orb, Wind
-    Jade, Water Jewel and Fire Ruby open are open from the start, since the
-    boss who drops one may not be there yet. The Dark Gaol Key still locks
-    what it locks, and so does the Eletale's Book unless Mammon's World
-    Portal replaces it.
+    Souls open nothing else: the gem locks stay locked unless Open World
+    is on. With Orbs / Boss Items normal, a gem then waits on its boss's
+    Soul as well as the boss.
 
     bosses        the seven before Mammon get Souls
     with_mammon   Mammon as well, so the last fight waits on his Soul too"""
@@ -329,7 +360,7 @@ class Character(Choice):
     default = 0
 
 
-class Repel(Toggle):
+class Repel(DefaultOnToggle):
     """Enhancements. Start with a Repel: use it in the field to switch
     random battles off, use it again to switch them back on. Its icon shows
     over Brian while it is on."""
@@ -459,10 +490,11 @@ class Q64Options(PerGameCommonOptions):
     page_placement: PagePlacement
     mammon_portal: MammonPortal
     boss_souls: BossSouls
-    shuffle_orbs: ShuffleOrbs
+    open_world: OpenWorld
+    boss_items: BossItems
     chestsanity: Chestsanity
     giftsanity: Giftsanity
-    wingsmith_wings: WingsmithWings
+    wings: Wings
     wings_in_pool: WingsInPool
     enemysanity: Enemysanity
     ensure_all_enemies: EnsureAllEnemies

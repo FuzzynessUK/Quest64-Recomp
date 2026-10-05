@@ -145,15 +145,15 @@ sub py_str { my $s = shift; $s =~ s/\\/\\\\/g; $s =~ s/"/\\"/g; return "\"$s\"" 
 # The same regions, gates and option switches as archipelago_world.pl.
 my @regions = (
     [ 'Menu',      "Archipelago's start region. Leads straight to the Overworld." ],
-    [ 'Overworld', 'Melrode and everything open from the start: Holy Plains, Connor Forest, the spirits, the gift NPCs.' ],
+    [ 'Overworld', 'Melrode and everything open from the start: Holy Plains, Connor Forest, Dondoran.' ],
     [ 'Boss 1',    'Solvaring (Connor Forest).' ],
-    [ 'Early',     'What opens once the first gems are in: Dondoran, Glencoe, West Carmaugh.' ],
-    [ 'Boss 2',    'Zelse (Windward Forest). Behind the Earth Orb.' ],
+    [ 'Early',     'Behind nothing, like the Overworld; no check is put here now (see region_for_stage).' ],
+    [ 'Boss 2',    'Zelse (Windward Forest), and every check of story stage 1. Behind the Earth Orb.' ],
     [ 'Boss 3',    'Nepty (Blue Cave). Behind the Wind Jade.' ],
-    [ 'Mid',       'Isle of Skye, Baragoon Tunnel, Dindom Dries. Behind the Wind Jade.' ],
-    [ 'Boss 4',    'Shilf (Baragoon Tunnel). Behind the Water Jewel.' ],
+    [ 'Mid',       'Story stage 2: Larapool, Blue Cave, Isle of Skye. Behind the Wind Jade.' ],
+    [ 'Boss 4',    'Shilf (Baragoon Tunnel), and every check of story stages 3-4: Limelin, Baragoon Tunnel, Dindom Dries, Shamwood, Boil Hole. Behind the Water Jewel.' ],
     [ 'Boss 5',    'Fargo (Boil Hole). Behind the Water Jewel.' ],
-    [ 'Late',      'Baragoon Moor, Brannoch Castle. Behind the Fire Ruby.' ],
+    [ 'Late',      'Story stage 5: Baragoon Moor, Brannoch, Brannoch Castle. Behind the Fire Ruby.' ],
     [ 'Boss 6',    'Guilty (Brannoch Castle). Behind the Fire Ruby.' ],
     [ 'Boss 7',    'Beigis (Brannoch Castle roof). Behind the Fire Ruby.' ],
     [ 'Endgame',   "Mammon's World. Behind Eletale's Book, or the mammon_portal condition." ],
@@ -169,13 +169,71 @@ my %gate = (
     'Boss 2' => 'EARTH_ORB_GATE', 'Boss 3' => 'WIND_JADE_GATE', 'Mid' => 'WIND_JADE_GATE',
     'Boss 4' => 'WATER_JEWEL_GATE', 'Boss 5' => 'WATER_JEWEL_GATE', 'Boss 6' => 'FIRE_RUBY_GATE',
     'Boss 7' => 'FIRE_RUBY_GATE', 'Late' => 'FIRE_RUBY_GATE', 'Endgame' => 'ENDGAME_DOOR',
-    'Boss 8' => 'Has("Dark Gaol Key")',
+    'Boss 8' => 'DARK_GAOL_KEY',
 );
 my @arena = ('Connor Forest', 'Windward Forest', 'Blue Cave', 'Baragoon Tunnel', 'Boil Hole',
              'Brannoch Castle', 'Brannoch Castle roof', "Mammon's World");
 
-sub region_for_stage { my $r = shift; return $r >= 5 ? 'Late' : $r >= 3 ? 'Mid' : $r >= 1 ? 'Early' : 'Overworld' }
-sub region_for_tier  { my $t = shift; return '' eq ($t // '') ? 'Overworld' : $t >= 7 ? 'Late' : $t >= 4 ? 'Mid' : $t >= 2 ? 'Early' : 'Overworld' }
+# A check's region comes from its story stage: how many bosses the story has
+# had beaten by the time you can get there (Merrow's "boss region" for the
+# chests). The region is the one behind the gem that stage needs, so nothing
+# is in logic before the game's own difficulty curve gets you there:
+# 0 nothing, 1 the Earth Orb (Solvaring's), 2 the Wind Jade (Zelse's), 3-4
+# the Water Jewel (Nepty's), 5 and on the Fire Ruby (Fargo's) - Baragoon Moor,
+# Brannoch and its castle. The Boss regions are only nodes here: being in
+# "Boss 2" means "behind the Earth Orb". (Until 2026-10-05 stages 1-2 went to
+# Early, which is behind nothing, and the spirits and gift NPCs were all in
+# the Overworld: Brannoch Castle's spirits were sphere 1.)
+sub region_for_stage {
+    my $r = shift;
+    return $r >= 5 ? 'Late' : $r >= 3 ? 'Boss 4' : $r >= 2 ? 'Mid' : $r >= 1 ? 'Boss 2' : 'Overworld';
+}
+# The stage of each map, for the checks that carry a map rather than a stage
+# (spirits, monsters): from the chests in the same places, the Enemy
+# Randomizer's difficulty tiers and the story. Where a map spans more than
+# one stage it takes the latest, so a check is never in logic too early.
+my %stage_of_map = (
+    0 => 0,  # Melrode
+    1 => 0,  # Dondoran
+    2 => 0,  # Holy Plains
+    3 => 1,  # Dondoran Flats
+    4 => 2,  # Larapool
+    5 => 2,  # West Carmaugh (Greenoch)
+    6 => 1,  # Normoon
+    7 => 3,  # West / East Limelin
+    8 => 3,  # Limelin
+    9 => 4,  # Dindom Dries
+    10 => 4, # Shamwood
+    11 => 5, # Brannoch / Baragoon Moor
+    12 => 2, # Isle of Skye
+    14 => 1, # Dondoran Castle
+    16 => 0, # Dondoran buildings
+    21 => 3, # Limelin Castle
+    22 => 3, # Limelin buildings
+    23 => 5, # Dindom Dries & Brannoch buildings
+    24 => 4, # Shamwood buildings
+    25 => 5, # Hidden rooms & shrines (spread about: the latest)
+    26 => 2, # Blue Cave
+    27 => 1, # Cull Hazard
+    28 => 3, # Baragoon Tunnel
+    29 => 4, # Boil Hole
+    30 => 5, # Brannoch Castle
+    31 => 0, # Connor Forest
+    32 => 1, # Glencoe Forest
+    33 => 1, # Windward Forest
+);
+sub stage_of_map {
+    my $m = shift;
+    die "no story stage for map $m: add it to %stage_of_map\n" unless defined $stage_of_map{$m};
+    return $stage_of_map{$m};
+}
+# The gift NPCs by where they stand.
+my %stage_of_giver = (
+    'Monastery Kitchen' => 0, 'Dondoran Bar' => 0, 'Larapool Inn' => 2, 'Normoon House' => 1,
+    'Limelin Tavern' => 3, 'Brannoch House' => 5, 'Greenoch Shop' => 2,
+    'Melrode Wingsmith' => 0, 'Dondoran Wingsmith' => 0, 'Larapool Wingsmith' => 2,
+    'Normoon Wingsmith' => 1, 'Limelin Wingsmith' => 3, 'Brannoch Wingsmith' => 5,
+);
 
 # ---------------------------------------------------------------- locations
 my @bosses = @{ $checks->{bosses} };
@@ -185,7 +243,9 @@ for my $c (@{ $checks->{chests} }) {
                  'chestsanity', region_for_stage($c->{region}), '', "Vanilla: $c->{item}" ];
 }
 for my $g (@{ $checks->{givers} }) {
-    my $region = $g->{kind} ne 'Shannon (endgame)' ? 'Overworld'
+    die "no story stage for the gift NPC in $g->{where}: add it to %stage_of_giver\n"
+        if $g->{kind} ne 'Shannon (endgame)' && !defined $stage_of_giver{ $g->{where} };
+    my $region = $g->{kind} ne 'Shannon (endgame)' ? region_for_stage($stage_of_giver{ $g->{where} })
                : $g->{item} eq "Eletale's Book"    ? 'Boss 7'
                :                                     'Endgame';
     my $when = $g->{item} eq "Eletale's Book" ? 'giftsanity, or mammon_portal not vanilla' : 'giftsanity';
@@ -194,7 +254,7 @@ for my $g (@{ $checks->{givers} }) {
 }
 for my $m (@{ $checks->{monsters} }) {
     push @loc, [ Quest64Checks::enemy_name($m), $BASE + $GROUP{enemy} + $m->{id}, 'Monster', $m->{first} || '(unplaced)',
-                 'enemysanity', region_for_tier($m->{tier}), '', 'Any one kill counts; first met in this area' ];
+                 'enemysanity', ($m->{first} // '') eq "Mammon's World" ? 'Endgame' : ($m->{first_map} // '') eq '' ? 'Overworld' : region_for_stage(stage_of_map($m->{first_map})), '', 'Any one kill counts; first met in this area' ];
 }
 for my $b (@bosses) {
     my $soul = "$b->{name}'s Soul";
@@ -206,7 +266,7 @@ for my $b (@bosses) {
 }
 for my $s (@{ $checks->{spirits} }) {
     push @loc, [ Quest64Checks::spirit_name($s), $BASE + $GROUP{spirit} + $s->{id}, 'Spirit', $s->{map_name},
-                 'spiritsanity', 'Overworld', '', 'Vanilla: Level Up' ];
+                 'spiritsanity', region_for_stage(stage_of_map($s->{map})), '', 'Vanilla: Level Up' ];
 }
 
 # ---------------------------------------------------------------- items
@@ -255,7 +315,7 @@ my @guide = (
     [ W('OptionFilter(Option, value, operator=...)'), W('True when the yaml option compares true: operator eq (default), ne, gt, ge, lt, le, contains. Only means something inside & or |.'), W('OptionFilter(BossSouls, 1, operator="ge")') ],
     [ W('True_() / False_()'), W('Always / never.'), W('True_()') ],
     [ W('a & b'), W('Both.'), W('Has("Fire Ruby") & Has("Water Jewel")') ],
-    [ W('a | b'), W('Either.'), W('Has("Earth Orb") | OptionFilter(BossSouls, 1, operator="ge")') ],
+    [ W('a | b'), W('Either.'), W('Has("Earth Orb") | OptionFilter(OpenWorld, 1)') ],
     [ W('(blank)'), W('No rule of its own: reaching the region is enough.'), W('') ],
     [],
     [ S('How the sheet becomes code') ],
@@ -321,15 +381,19 @@ my $loc_end = scalar @loc_rows;
 my $all_bosses = join(' & ', map { 'CanReachLocation(' . py_str(Quest64Checks::boss_name($_)) . ')' } grep { $_->{order} < 8 } @bosses);
 my $all_monsters = join(' & ', map { "CanReachRegion(\"$_\")" } qw(Overworld Early Mid Late));
 my @named = (
-    [ 'EARTH_ORB_GATE',   'Has("Earth Orb") | OptionFilter(BossSouls, 1, operator="ge")',
-      'With Boss Souls on, a boss may not be there to drop his gem, so the game opens the gem locks and the gem stops gating anything.' ],
-    [ 'WIND_JADE_GATE',   'Has("Wind Jade") | OptionFilter(BossSouls, 1, operator="ge")', 'As EARTH_ORB_GATE.' ],
-    [ 'WATER_JEWEL_GATE', 'Has("Water Jewel") | OptionFilter(BossSouls, 1, operator="ge")', 'As EARTH_ORB_GATE.' ],
-    [ 'FIRE_RUBY_GATE',   'Has("Fire Ruby") | OptionFilter(BossSouls, 1, operator="ge")', 'As EARTH_ORB_GATE.' ],
+    [ 'EARTH_ORB_GATE',   'Has("Earth Orb") | Has("Progressive Boss Item", 1) | (CanReachLocation("Boss - Solvaring") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))',
+      'The gem, or the first Progressive Boss Item (boss_items progressive). With open_world the door is open whatever you hold, but the logic still follows the story: with Boss Souls the way on counts as open once the boss who drops the gem (Solvaring) can be beaten - his Soul is in - and without them it still asks for the gem. Otherwise Brannoch Castle was sphere 1.' ],
+    [ 'WIND_JADE_GATE',   'Has("Wind Jade") | Has("Progressive Boss Item", 2) | (CanReachLocation("Boss - Zelse") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))', 'As EARTH_ORB_GATE; the second Progressive Boss Item, Zelse.' ],
+    [ 'WATER_JEWEL_GATE', 'Has("Water Jewel") | Has("Progressive Boss Item", 3) | (CanReachLocation("Boss - Nepty") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))', 'As EARTH_ORB_GATE; the third, Nepty.' ],
+    [ 'FIRE_RUBY_GATE',   'Has("Fire Ruby") | Has("Progressive Boss Item", 4) | (CanReachLocation("Boss - Fargo") & OptionFilter(OpenWorld, 1) & OptionFilter(BossSouls, 1, operator="ge"))', 'As EARTH_ORB_GATE; the fourth, Fargo (who drops the Fire Ruby).' ],
+    [ 'ELETALE_BOOK',     'Has("Eletale\'s Book") | Has("Progressive Boss Item", 5)',
+      'The Book, or the fifth Progressive Boss Item. Only asked for with mammon_portal vanilla, when the Book is fifth in the progressive order.' ],
+    [ 'DARK_GAOL_KEY',    'Has("Dark Gaol Key") | (OptionFilter(MammonPortal, 0) & Has("Progressive Boss Item", 6)) | (OptionFilter(MammonPortal, 0, operator="ne") & Has("Progressive Boss Item", 5))',
+      'The key, or the last Progressive Boss Item: the sixth, or the fifth when a mammon_portal condition has taken the Book out of the game.' ],
     [ 'ALL_BOSSES_BEATEN', $all_bosses, "mammon_portal all_bosses: the seven bosses before Mammon. Each boss's own rule already asks for his Soul." ],
     [ 'ALL_MONSTER_AREAS', $all_monsters, 'mammon_portal all_monsters: every region a monster lives in.' ],
     [ 'ENDGAME_DOOR',
-      '(OptionFilter(MammonPortal, 0) & Has("Eletale\'s Book")) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)',
+      '(OptionFilter(MammonPortal, 0) & ELETALE_BOOK) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)',
       "The way into Mammon's World: the Book in the vanilla game, the portal condition otherwise (the Book is then not in the pool at all). Portals 4, 5 and 7 also want pages_required Torn Pages, which the generator adds in set_rules: a count from an option cannot be written here." ],
 );
 my @named_rows = (
@@ -368,14 +432,16 @@ for my $r (@item_rows) {
 # ---------------------------------------------------------------- Options
 my @options = (
     [ 'mammon_portal', 'MammonPortal', 'vanilla 0, all_bosses 1, all_monsters 2, both 3, all_pages 4, bosses_and_pages 5, bosses_monsters_pages 7', "What opens Mammon's World: ENDGAME_DOOR (a bitmask: 1 bosses, 2 monsters, 4 pages; pages need goal mammon). Also makes the Book's Shannon a check and takes the Book out of the pool." ],
-    [ 'boss_souls', 'BossSouls', 'off 0, bosses 1, with_mammon 2', "Each boss's check needs his Soul; the gem gates open (the *_GATE rules)." ],
-    [ 'shuffle_orbs', 'ShuffleOrbs', 'off / on', 'Off: the six gate items stay at their vanilla checks (locked in pre_fill). No rule changes.' ],
+    [ 'boss_souls', 'BossSouls', 'off 0, bosses 1, with_mammon 2', "Each boss's check needs his Soul. Opens nothing else: that is open_world." ],
+    [ 'open_world', 'OpenWorld', 'off / on', 'On: the game opens the doors, boats and teleporters the four gems lock. The logic still follows the story (the *_GATE rules): with boss_souls a gate is met once the boss who drops its gem can be beaten, without them it still wants the gem.' ],
+    [ 'boss_items', 'BossItems', 'normal 0, shuffled 1, progressive 2', 'Normal: the six gate items stay at their vanilla checks (locked in pre_fill). Shuffled: in the pool. Progressive: the pool has one Progressive Boss Item per gate item instead, each the next of Earth Orb, Wind Jade, Water Jewel, Fire Ruby, Eletale\'s Book (only with mammon_portal vanilla), Dark Gaol Key - which is why the gates also take a count of them.' ],
     [ 'chestsanity', 'Chestsanity', 'off / on', 'Whether chests are locations.' ],
     [ 'giftsanity', 'Giftsanity', 'off / on', 'Whether gift NPCs are locations.' ],
     [ 'enemysanity', 'Enemysanity', 'off / on', 'Whether each monster kind is a location.' ],
     [ 'spiritsanity', 'Spiritsanity', 'off / on', 'Whether spirits are locations; also makes one Level Up per spirit.' ],
     [ 'extra_level_ups', 'ExtraLevelUps', '0 - 99', 'Extra Level Ups in the pool.' ],
-    [ 'wingsmith_wings', 'WingsmithWings', 'off / on', 'A wingsmith also hands over his wings. No rule changes.' ],
+    [ 'wings', 'Wings', 'normal 0, shuffled 1, progressive 2', 'Normal: the wingsmiths hand over their wings. Shuffled: one of each in the pool, the wingsmiths give only their check. Progressive: six Progressive Wings instead, each the next wing in town order. No rule changes: no rule needs wings.' ],
+    [ 'wings_in_pool', 'WingsInPool', 'none 0, one 1, two 2', 'Extra copies of each wing in the pool, on top of what wings puts there (as more Progressive Wings when progressive). No rule changes.' ],
     [ 'shuffle_boss_order', 'ShuffleBossOrder', 'off / on', 'The game\'s own setting. Not in the logic today, although it moves which boss stands where - worth a look if bosses get their own regions.' ],
     [ 'goal', 'Goal', 'mammon 0', 'The only goal.' ],
 );

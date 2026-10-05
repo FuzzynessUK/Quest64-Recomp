@@ -166,9 +166,30 @@ for my $r (@item_rows) {
 }
 # With a mammon_portal condition the condition opens the door in the Book's
 # place, so the Book would be a key to nothing: it is left out of the pool.
-for my $r (grep { $_->{name} eq "Eletale's Book" } @item_rows) {
-    $r->{create} = 'lambda options: options.mammon_portal.value == 0';
+# With boss_items or wings progressive the progressive item stands in for
+# them all.
+for my $r (@item_rows) {
+    next if $r->{create};
+    if ($r->{name} eq "Eletale's Book") {
+        $r->{create} = 'lambda options: options.mammon_portal.value == 0 and options.boss_items.value != 2';
+    }
+    elsif ($progression{ $r->{name} }) {
+        $r->{create} = 'lambda options: options.boss_items.value != 2';
+    }
+    elsif ($useful{ $r->{name} }) {
+        $r->{create} = 'lambda options: options.wings.value != 2';
+    }
 }
+
+# The progressive items, Archipelago's own at 0xC00: the game hands out the
+# next of the list each time one arrives (archipelago.cpp, progressive_*).
+# create_items puts in as many as there are things for them to stand for.
+push @item_rows, { name => 'Progressive Boss Item', id => $BASE + $GROUP{item} + 0xC00, type => 'progression',
+                   count => 0, dynamic => 1, create => 'lambda options: options.boss_items.value == 2',
+                   note => 'The next of Earth Orb, Wind Jade, Water Jewel, Fire Ruby, Eletale\x27s Book, Dark Gaol Key' };
+push @item_rows, { name => 'Progressive Wings', id => $BASE + $GROUP{item} + 0xC01, type => 'useful',
+                   count => 0, dynamic => 1, create => 'lambda options: options.wings.value == 2',
+                   note => 'The next pair of White, Yellow, Blue, Green, Red, Black Wings' };
 
 # ---------------------------------------------------------------- logic
 # Regions, entrances, each location's region and every rule come from the
@@ -273,7 +294,10 @@ my (@enemy_areas, @file_monsters);
 # The regions monsters can be in, earliest first. Each needs everything the
 # one before it does, so a monster found in several areas is logically where
 # the earliest of them is.
-my @enemy_region_order = ('Overworld', 'Early', 'Mid', 'Late', 'Endgame');
+# (Early is behind nothing, like the Overworld; Boss 2 is behind the Earth
+# Orb, Mid the Wind Jade as well, Boss 4 the Water Jewel as well, Late the
+# Fire Ruby as well: see region_for_stage in archipelago_logic_sheet.pl.)
+my @enemy_region_order = ('Overworld', 'Early', 'Boss 2', 'Mid', 'Boss 4', 'Late', 'Endgame');
 {
     my %ok = map { $_ => 1 } @enemy_region_order;
     my @bad = grep { !$ok{ $_->{region} } } @enemy_areas;
@@ -434,7 +458,7 @@ my @seed_settings = (
     [ 'character', 'Character', 'Enhancements', 'Character',
       'Who you play as. leonardo: the blond knight of Normoon and Brannoch Castle, with his own cape, moving with all of Brian\'s animations; the Leonardo you meet becomes Brian.', 'choice:brian,leonardo' ],
     [ 'repel', 'Repel', 'Enhancements', 'Repel',
-      'Start with a Repel: use it in the field to switch random battles off, use it again to switch them back on. Its icon shows over Brian while it is on.', 'toggle' ],
+      'Start with a Repel: use it in the field to switch random battles off, use it again to switch them back on. Its icon shows over Brian while it is on.', 'toggle_on' ],
     [ 'jp_stat_up_effect', 'JPStatUpEffect', 'Enhancements', 'JP Stat Up Effect',
       'A colour burst over Brian when a stat rises, as in the Japanese release.', 'toggle_on' ],
     [ 'exit_from_anywhere', 'ExitFromAnywhere', 'Enhancements', 'Exit from Anywhere',
@@ -543,23 +567,36 @@ class Giftsanity(DefaultOnToggle):
     display_name = "Giftsanity"
 
 
-class WingsmithWings(DefaultOnToggle):
-    """The six wingsmiths still hand over their wings, on top of their
-    Archipelago check. Only matters with giftsanity on; each gives its wings
-    once, the first time you talk to them."""
-    display_name = "Wingsmiths Give Wings"
+class Wings(Choice):
+    """Where the six pairs of wings come from. No rule needs wings: they are
+    for getting about.
+
+    normal        the wingsmiths hand over their wings, as in the game (with
+                  giftsanity on, on top of their check)
+    shuffled      one of each pair is in the item pool; the wingsmiths give
+                  only their check
+    progressive   six "Progressive Wings" are in the pool instead, each the
+                  next pair in town order: White, Yellow, Blue, Green, Red,
+                  Black; the wingsmiths give only their check
+
+    With giftsanity off the wingsmiths are not checks and hand over their
+    wings whatever this says."""
+    display_name = "Wings"
+    option_normal = 0
+    option_shuffled = 1
+    option_progressive = 2
+    default = 0
 
 
 class WingsInPool(Choice):
-    """How many of each pair of wings go in the item pool. The wings are
-    handy for getting about but no rule needs them, so fewer leaves room
-    for filler instead.
+    """Extra copies of each pair of wings in the item pool, on top of what
+    Wings puts there (with Wings progressive, as more Progressive Wings,
+    which go round the six again). They take the place of filler.
 
-    none          no wings at all (the default); the wingsmiths can still
-                  hand theirs over with Wingsmiths Give Wings
-    one           one of each
-    two           two of each of the six"""
-    display_name = "Wings in Pool"
+    none          no extra wings (the default)
+    one           one more of each
+    two           two more of each"""
+    display_name = "Extra Wings in Pool"
     option_none = 0
     option_one = 1
     option_two = 2
@@ -584,11 +621,31 @@ class EnsureAllEnemies(DefaultOnToggle):
     display_name = "Ensure All Enemies Appear"
 
 
-class ShuffleOrbs(Toggle):
-    """Off keeps the boss rewards on their bosses (the Earth Orb, Wind Jade,
-    Water Jewel and Fire Ruby), and the Eletale's Book and Dark Gaol Key with
-    the Shannons who give them. On shuffles them with everything else."""
-    display_name = "Shuffle Orbs"
+class BossItems(Choice):
+    """The six items the way on waits for: the Earth Orb, Wind Jade, Water
+    Jewel and Fire Ruby the bosses drop, and the Eletale's Book and Dark Gaol
+    Key the Shannons hand over.
+
+    normal        each stays where the game puts it, on its boss or Shannon
+    shuffled      they are shuffled with everything else
+    progressive   the pool has a "Progressive Boss Item" for each instead,
+                  and each one is the next of Earth Orb, Wind Jade, Water
+                  Jewel, Fire Ruby, Eletale's Book, Dark Gaol Key - so they
+                  always arrive in story order. With a Mammon's World Portal
+                  condition the Book is not in the game and there are five."""
+    display_name = "Orbs / Boss Items"
+    option_normal = 0
+    option_shuffled = 1
+    option_progressive = 2
+    default = 0
+
+
+class OpenWorld(Toggle):
+    """The doors, boats and teleporters the Earth Orb, Wind Jade, Water Jewel
+    and Fire Ruby open are open from the start, so the world can be explored
+    in any order. The Dark Gaol Key still locks what it locks, and so does the
+    Eletale's Book unless Mammon's World Portal replaces it."""
+    display_name = "Open World"
 
 
 class Spiritsanity(DefaultOnToggle):
@@ -666,11 +723,9 @@ class BossSouls(Choice):
     arrives while you are standing in the arena takes effect when you next
     walk in.
 
-    With Souls on, the doors, boats and teleporters the Earth Orb, Wind
-    Jade, Water Jewel and Fire Ruby open are open from the start, since the
-    boss who drops one may not be there yet. The Dark Gaol Key still locks
-    what it locks, and so does the Eletale's Book unless Mammon's World
-    Portal replaces it.
+    Souls open nothing else: the gem locks stay locked unless Open World
+    is on. With Orbs / Boss Items normal, a gem then waits on its boss's
+    Soul as well as the boss.
 
     bosses        the seven before Mammon get Souls
     with_mammon   Mammon as well, so the last fight waits on his Soul too"""
@@ -813,10 +868,11 @@ class Q64Options(PerGameCommonOptions):
     page_placement: PagePlacement
     mammon_portal: MammonPortal
     boss_souls: BossSouls
-    shuffle_orbs: ShuffleOrbs
+    open_world: OpenWorld
+    boss_items: BossItems
     chestsanity: Chestsanity
     giftsanity: Giftsanity
-    wingsmith_wings: WingsmithWings
+    wings: Wings
     wings_in_pool: WingsInPool
     enemysanity: Enemysanity
     ensure_all_enemies: EnsureAllEnemies
@@ -916,7 +972,7 @@ from .Enemies import ENEMY_AREAS, ENEMY_IDS, ENEMY_LOCATIONS, FILE_MONSTERS, REG
 from .Items import Q64Item, item_data_table, item_table, code_to_item_table, filler_items
 from .Locations import (Q64Location, Q64LocationData, location_data_table, location_table,
                         code_to_location_table, vanilla_locations)
-from .Options import DeathTraps, Goal, PagePlacement, Q64Options, Traps
+from .Options import BossItems, DeathTraps, Goal, PagePlacement, Q64Options, Traps, Wings
 from .Regions import regions, connections
 from .Rules import entrance_rules, set_all_rules
 
@@ -1064,11 +1120,11 @@ class Q64World(World):
     def locked_items(self) -> Dict[str, str]:
         """Item name -> location name for anything held out of the pool.
 
-        With shuffle_orbs off the six gate items stay where the game puts
+        With boss_items normal the six gate items stay where the game puts
         them. If the group that location belongs to is switched off it is not
         a location at all, so the item goes back in the pool instead.
         """
-        if self.options.shuffle_orbs:
+        if self.options.boss_items.value != BossItems.option_normal:
             return {}
         return {
             item: location
@@ -1102,8 +1158,17 @@ class Q64World(World):
                 level_ups = data.num_exist
                 continue
             count = data.num_exist
-            if data.type == ItemClassification.useful:   # the wings
-                count = min(count, self.options.wings_in_pool.value)
+            extra_wings = self.options.wings_in_pool.value
+            if name == "Progressive Boss Item":
+                # One per gate item: the Book only when it opens something.
+                count = 6 if self.options.mammon_portal.value == 0 else 5
+            elif name == "Progressive Wings":
+                # Six, and six more for each extra copy (they go round again).
+                count = 6 * (1 + extra_wings)
+            elif data.type == ItemClassification.useful:   # the wings
+                # Normal: only the extra copies (the wingsmiths have theirs).
+                # Shuffled: one of each, plus the extra copies.
+                count = extra_wings + (1 if self.options.wings.value == Wings.option_shuffled else 0)
             for _ in range(count):
                 pool.append(self.create_item(name))
 
@@ -1258,10 +1323,16 @@ class Q64World(World):
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
             "giftsanity": bool(self.options.giftsanity),
-            "wingsmith_wings": bool(self.options.wingsmith_wings),
+            # The wingsmiths still give wings only with wings normal.
+            "wingsmith_wings": self.options.wings.value == Wings.option_normal,
+            "wings": self.options.wings.value,
             "enemysanity": bool(self.options.enemysanity),
             "spiritsanity": bool(self.options.spiritsanity),
-            "shuffle_orbs": bool(self.options.shuffle_orbs),
+            "boss_items": self.options.boss_items.value,
+            # The game opens the gem locks only when this is true; before
+            # apworld 1.9.0 Boss Souls did it, and a slot without the key is
+            # still treated that way.
+            "open_world": bool(self.options.open_world),
             # Read by APCpp itself (the game declares DeathLink support and
             # APCpp tags the connection when this is true).
             "death_link": bool(self.options.death_link),
@@ -1325,14 +1396,24 @@ $game:
     'true': 1
     'false': 0
 
-  # With giftsanity on, the six wingsmiths still hand over their wings as
-  # well as sending their check (once each).
-  wingsmith_wings:
-    'true': 1
-    'false': 0
+  # Where the six pairs of wings come from. No rule needs wings.
+  # normal        the wingsmiths hand over their wings, as in the game
+  # shuffled      one of each pair in the item pool; the wingsmiths give
+  #               only their check
+  # progressive   six "Progressive Wings" in the pool, each the next pair in
+  #               town order (White, Yellow, Blue, Green, Red, Black); the
+  #               wingsmiths give only their check
+  # With giftsanity off the wingsmiths are not checks and give their wings
+  # whatever this says.
+  wings:
+    normal: 1
+    shuffled: 0
+    progressive: 0
 
-  # How many of each pair of wings go in the item pool: none (the default),
-  # one, or two. No rule needs wings; the room left goes to filler.
+  # Extra copies of each pair of wings in the pool, on top of what wings
+  # puts there: none (the default), one or two. With wings progressive they
+  # are more Progressive Wings, going round the six again. They replace
+  # filler.
   wings_in_pool:
     none: 1
     one: 0
@@ -1354,10 +1435,25 @@ $game:
     'true': 1
     'false': 0
 
-  # false keeps the boss rewards on their bosses (the Earth Orb, Wind Jade,
-  # Water Jewel and Fire Ruby), and the Eletale's Book and Dark Gaol Key
-  # with the Shannons who give them. true shuffles them with everything else.
-  shuffle_orbs:
+  # The six items the way on waits for: the Earth Orb, Wind Jade, Water
+  # Jewel and Fire Ruby the bosses drop, and the Eletale's Book and Dark Gaol
+  # Key the Shannons hand over.
+  # normal        each stays on its boss or Shannon, as in the game
+  # shuffled      shuffled with everything else
+  # progressive   a "Progressive Boss Item" for each in the pool, each the
+  #               next of Earth Orb, Wind Jade, Water Jewel, Fire Ruby,
+  #               Eletale's Book, Dark Gaol Key (five, without the Book, when
+  #               mammon_portal replaces it)
+  boss_items:
+    normal: 1
+    shuffled: 0
+    progressive: 0
+
+  # The doors, boats and teleporters the four gems lock are open from the
+  # start, so the world can be explored in any order. The Dark Gaol Key still
+  # locks the endgame, and so does the Eletale's Book unless mammon_portal
+  # replaces it.
+  open_world:
     'false': 1
     'true': 0
 
@@ -1400,10 +1496,9 @@ $game:
   # beaten. The Soul is an Archipelago item, not one the game knows about, so
   # it can be anywhere in the multiworld. Whether a boss is there is settled
   # as his arena loads, so a Soul that arrives while you are standing in one
-  # takes effect the next time you walk in. With Souls on, everything the
-  # four gems lock (doors, boats, teleporters) is open from the start;
-  # the Dark Gaol Key still locks the endgame, and so does the Eletale's
-  # Book unless mammon_portal replaces it.
+  # takes effect the next time you walk in. Souls open nothing else: the
+  # gem locks stay locked unless open_world is on, and with boss_items normal
+  # a gem waits on its boss's Soul.
   #
   # off           every boss is where the game puts him
   # bosses        the seven before Mammon need Souls
@@ -1518,7 +1613,7 @@ my %files = (
     "$out/quest64/__init__.py"  => $init_py,
     # The apworld manifest. Rule Builder (rule_builder) is what sets the
     # floor at 0.6.7.
-    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.8.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
+    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.9.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
     "$out/quest64/docs/en_quest64.md" => "# Quest 64 Recompiled\n\nEvery chest, gift, boss and spirit can hold an item from any world in the\nmultiworld. Turn the Archipelago Connector on in the port's menu and give it\nthe server address and your slot name.\n",
     "$out/quest64/docs/guide_en.md"   => "# Quest 64 Recompiled Setup Guide\n\n1. Put `quest64.apworld` in `Archipelago/custom_worlds`.\n2. Put your filled-in `Quest64Recompiled.yaml` in `Archipelago/Players`.\n3. Generate and host as usual.\n4. In Quest 64 Recompiled, open the config menu, turn on the Archipelago\n   Connector and enter the server address, your slot name and the password\n   if the room has one.\n",
     "$out/Quest64Recompiled.yaml" => $yaml,
@@ -1549,9 +1644,10 @@ zip [ @members ] => $apworld,
     die "no filler items
 " unless grep { $_->{type} eq 'filler' } @item_rows;
     # Every item a rule waits on must actually be in the pool, or what it
-    # guards is unreachable and the seed cannot be finished.
+    # guards is unreachable and the seed cannot be finished. A dynamic item
+    # is counted out in create_items rather than here.
     my @needed = sort keys %{ $logic->{uses}{items} // {} };
-    my @unplaceable = grep { my $n = $_; !grep { $_->{name} eq $n && $_->{count} > 0 } @item_rows } @needed;
+    my @unplaceable = grep { my $n = $_; !grep { $_->{name} eq $n && ($_->{count} > 0 || $_->{dynamic}) } @item_rows } @needed;
     die "rules need items with none in the pool: @unplaceable\n" if @unplaceable;
 }
 

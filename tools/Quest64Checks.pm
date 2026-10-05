@@ -119,7 +119,7 @@ sub gather {
         my @where = sort { ($tier{$a}{order} // 99) <=> ($tier{$b}{order} // 99) } keys %{ $areas_of{$i} || {} };
         my $f = $prog_flags{ $monster_names[$i] } || {};
         push @monsters, { id => $i, name => $monster_names[$i], areas => \@where,
-                          first => $where[0] // '', tier => ($where[0] ? $tier{ $where[0] }{tier} : ''),
+                          first => $where[0] // '', first_map => ($where[0] ? $tier{ $where[0] }{map} : ''), tier => ($where[0] ? $tier{ $where[0] }{tier} : ''),
                           hp => $s[0], atk => $s[1], def => $s[2], agi => $s[3], exp => $s[4],
                           drop => item_name($drops[ $i * 2 + 1 ]), drop_id => $drops[ $i * 2 + 1 ], drop_addr => $drops[ $i * 2 ],
                           flying => ($f->{flying} // '') eq 'true' ? 'Y' : 'N', dangerous => ($f->{dangerous} // '') eq 'true' ? 'Y' : 'N' };
