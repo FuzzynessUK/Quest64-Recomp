@@ -654,3 +654,17 @@ before_vram = 0x80001208
 func = "func_800011DC"
 text = "quest64_gfx_list_end(rdram, ctx);"
 before_vram = 0x800017EC
+# Real Time Combat: "is a spell still in flight", at its entry. Only Brian's
+# own routines ask it (can he act, the attack button, the end of his cast and
+# item poses); in battle it counts only his own spells, so a monster's spell
+# no longer locks him out of the spell menu.
+[[patches.hook]]
+func = "func_80015B50"
+text = "if (quest64_mmo_spells_active(rdram, ctx)) return;"
+before_vram = 0x80015B50
+# Real Time Combat: Brian's dodge, at its entry. In battle only the "Miss" and
+# the sound; no evade freeze (state 3) to cut off what he is doing.
+[[patches.hook]]
+func = "func_80006F6C"
+text = "if (quest64_mmo_dodge(rdram, ctx)) return;"
+before_vram = 0x80006F6C

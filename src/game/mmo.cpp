@@ -16,6 +16,7 @@ extern "C" void func_8001817C(uint8_t* rdram, recomp_context* ctx);
 extern "C" void func_80019CA4(uint8_t* rdram, recomp_context* ctx);
 extern "C" void func_80013F20(uint8_t* rdram, recomp_context* ctx);
 extern "C" void func_800268D4(uint8_t* rdram, recomp_context* ctx);
+extern "C" void func_800208B8(uint8_t* rdram, recomp_context* ctx);
 
 // Real Time Combat (Enhancements, Fun): real time battles instead of turn based.
 //
@@ -346,5 +347,57 @@ extern "C" int quest64_mmo_enemy_hit(uint8_t* rdram, recomp_context* ctx) {
     const gpr damage = ctx->r16;
     hit_sound(rdram, ctx, MEM_HU(0x5E, ctx->r29));
     leave(rdram, ctx, 0x50, damage);
+    return 1;
+}
+
+// Spells in flight. A cast takes the first free one of ten 0x3C-byte slots
+// at 0x80086F18 (func_80014A98: +4 nonzero while the spell runs, +0x24 the
+// caster), and func_80015B50 says whether any slot is in use. Only Brian's
+// code asks: whether he can act (func_80007030, which the spell menu, the
+// element buttons and items sit behind), the attack button
+// (func_80002F60), and the end of his cast and item poses (func_800045F0,
+// func_80004AB8), which wait for it. Turn based, nobody else casts in his
+// turn; in Real Time Combat a monster's spell - a Wind spell lingering in
+// Blue Cave - locked him out until it was over. In battle, only his own
+// spells count.
+extern "C" int quest64_mmo_spells_active(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0) {
+        return 0;
+    }
+    constexpr int32_t spell_slots = 0x80086F18;
+    constexpr int spell_slot_size = 0x3C;
+    constexpr int spell_slot_count = 10;
+    int mine = 0;
+    for (int i = 0; i < spell_slot_count; i++) {
+        const int32_t slot = spell_slots + i * spell_slot_size;
+        if (MEM_HU(0x4, slot) != 0 && MEM_W(0x24, slot) == brian) {
+            mine++;
+        }
+    }
+    ctx->r2 = mine;
+    return 1;
+}
+
+
+// Dodge. When a monster's attack or spell misses Brian (func_80009C08's
+// strike, func_80015888's spell hit), func_80006F6C shows "Miss"
+// (func_800208B8), plays the dodge sound (0x17) and the evade animation (7),
+// and freezes him: state 3 for a time from the attacker's data, with the busy
+// bits (+0x60 bits 0/1) that func_80007030 refuses every action on until it
+// ends - the spell menu "not coming up at the exact moment of a hit", more
+// often the higher his Agility. In a Real Time Combat battle the dodge is the
+// "Miss" and the sound only, like the hits that land: nothing he is doing is
+// cut off. At 0 HP it does nothing in either case.
+extern "C" int quest64_mmo_dodge(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0 || MEM_HU(0, brian_state) == 6 ||
+        MEM_HU(0, brian_hp) == 0) {
+        return 0;
+    }
+    ctx->r4 = brian;
+    func_800208B8(rdram, ctx);
+    ctx->r4 = 0;
+    ctx->r5 = 0x17;
+    ctx->r6 = 0xFF;
+    func_800268D4(rdram, ctx);
     return 1;
 }
