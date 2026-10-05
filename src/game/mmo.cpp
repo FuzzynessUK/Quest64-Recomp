@@ -14,6 +14,8 @@
 
 extern "C" void func_8001817C(uint8_t* rdram, recomp_context* ctx);
 extern "C" void func_80019CA4(uint8_t* rdram, recomp_context* ctx);
+extern "C" void func_80013F20(uint8_t* rdram, recomp_context* ctx);
+extern "C" void func_800268D4(uint8_t* rdram, recomp_context* ctx);
 
 // Real Time Combat (Enhancements, Fun): real time battles instead of turn based.
 //
@@ -54,6 +56,9 @@ namespace {
     constexpr int32_t ring_centre_z = 0x8008C430;
     constexpr int32_t brian = 0x8007BACC;
     constexpr int32_t brian_flags = 0x8007BAC0;      // bit 0x20: off the edge of the arena
+    // Enemies still standing: the game takes one off as each dies (0x800098C4,
+    // 0x80016C58) without moving the others down, so it is not how many slots
+    // are in use - a survivor can sit in a slot past it. Walk all six slots.
     constexpr int32_t enemy_count = 0x8007C990;
     constexpr int32_t enemies = 0x8007C998;
     constexpr int enemy_size = 0x128;
@@ -168,8 +173,7 @@ void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
     }
 
     // The end of the battle, as a turn change would have found it.
-    int count = MEM_W(0, enemy_count);
-    count = count < 0 ? 0 : (count > max_enemies ? max_enemies : count);
+    const int count = max_enemies;
     int alive = 0;
     for (int slot = 0; slot < count; slot++) {
         alive += enemy_alive(rdram, slot) ? 1 : 0;
@@ -198,6 +202,9 @@ void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
                               MEM_W(0, 0x8008C638), MEM_W(0, 0x8008C63C), static_cast<uint32_t>(MEM_W(0, 0x8007B2E4)));
         for (int slot = 0; slot < count && n > 0 && n < static_cast<int>(sizeof line) - 24; slot++) {
             const int32_t e = enemies + slot * enemy_size;
+            if (MEM_H(0x74, e) == -1) {
+                continue;
+            }
             n += std::snprintf(line + n, sizeof line - n, " [%d hp %d act %d fl %X]", slot, MEM_HU(0xA, e), MEM_HU(0, e), MEM_HU(0x8, e));
         }
         log_line(line);
@@ -277,4 +284,67 @@ extern "C" void quest64_mmo_enemy_ring(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
     centre_ring_on(rdram, static_cast<int32_t>(ctx->r7));
+}
+
+// Hit stun. A hit on Brian (func_80006BEC) or an enemy (func_8000ACC0) takes
+// the HP off, shows the number, then stuns: Brian goes to state 5 for a time
+// from the attacker's data (func_80004040 waits it out, then dies at 0 HP or
+// goes back to state 0), an enemy to action 2 (func_80009818: knocked back,
+// then dies at 0 HP or goes back to idle), each with its hurt animation
+// (func_8001D8B0) and hit flags (+0x60 bits 0/1, cleared when the stun ends).
+// Whatever the one hit was doing - an attack, a spell - is lost. In Real Time
+// Combat a hit that leaves the target standing skips all of that: the hooks
+// sit where the stun begins and finish the routine themselves, doing what
+// remains after it (the shake on Brian, the hit sound), restoring s0 and sp
+// as the epilogue would. A hit that kills goes on as before, since the stun's
+// end is where the death happens.
+namespace {
+    constexpr int32_t brian_hp = 0x8007BA84;
+
+    void hit_sound(uint8_t* rdram, recomp_context* ctx, uint32_t flags) {
+        if ((flags & 0x8000) == 0) {
+            return;
+        }
+        ctx->r4 = 0;
+        ctx->r5 = 0x18;
+        ctx->r6 = 0xFF;
+        func_800268D4(rdram, ctx);
+    }
+
+    // The routine's epilogue: v0 = damage (s0), s0 and ra back, frame popped.
+    void leave(uint8_t* rdram, recomp_context* ctx, int frame, gpr damage) {
+        const gpr sp = ctx->r29;
+        ctx->r2 = damage;
+        ctx->r31 = MEM_W(0x24, sp);
+        ctx->r16 = MEM_W(0x20, sp);
+        ctx->r29 = ADD32(sp, frame);
+    }
+}
+
+// func_80006BEC at 0x80006EBC: s0 = the damage, the flags halfword at 0x4E(sp).
+extern "C" int quest64_mmo_brian_hit(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0 || MEM_HU(0, brian_hp) == 0) {
+        return 0;
+    }
+    const gpr damage = ctx->r16;
+    const uint32_t flags = MEM_HU(0x4E, ctx->r29);
+    if (damage != 0) {
+        ctx->r4 = 2;
+        func_80013F20(rdram, ctx);
+    }
+    hit_sound(rdram, ctx, flags);
+    leave(rdram, ctx, 0x48, damage);
+    return 1;
+}
+
+// func_8000ACC0 at 0x8000AFFC: v1 = the enemy's slot, s0 = the damage, the
+// flags halfword at 0x5E(sp).
+extern "C" int quest64_mmo_enemy_hit(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0 || MEM_HU(0xA, ctx->r3) == 0) {
+        return 0;
+    }
+    const gpr damage = ctx->r16;
+    hit_sound(rdram, ctx, MEM_HU(0x5E, ctx->r29));
+    leave(rdram, ctx, 0x50, damage);
+    return 1;
 }

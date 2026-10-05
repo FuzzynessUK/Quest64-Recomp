@@ -396,7 +396,7 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   order list 0x8007D0B0 idx 0x8008C598, pause 0x8008C594, toggles 2, sets
   4). Battle manager func_8001CFE8 acts on 4 (victory/escape, enemy "act"
   bit = slot +0x8 bit 1 via func_8000932C, ring func_80019A98 handle
-  0x8008C55E). Enemy slots 6 x 0x128 at 0x8007C998, count 0x8007C990,
+  0x8008C55E). Enemy slots 6 x 0x128 at 0x8007C998, count 0x8007C990 (enemies left: dec on each death, slots not compacted - scan all 6),
   actions via table 0x8004C290 (func_80008C20 every frame). Brian's ring
   clamp in func_80005748 (centre 0x8008C5A4/0x8008C430).
 - **mammon_portal is a bitmask** (2026-10-04, apworld 1.8.0): 1 bosses, 2

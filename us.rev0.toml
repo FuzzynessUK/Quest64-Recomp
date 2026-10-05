@@ -127,6 +127,19 @@ before_vram = 0x8000A508
 func = "func_800140EC"
 text = "if (quest64_mmo_camera_focus(rdram, ctx)) return;"
 before_vram = 0x800140EC
+# Real Time Combat: Brian hit, past the damage and before the stun (state 5) and
+# hurt animation; while he lives, the hook finishes the routine without them, so
+# a hit no longer cuts off his attack or spell.
+[[patches.hook]]
+func = "func_80006BEC"
+text = "if (quest64_mmo_brian_hit(rdram, ctx)) return;"
+before_vram = 0x80006EBC
+# Real Time Combat: an enemy hit, past the damage and before the stagger (action
+# 2) and hurt animation; the same for an enemy that lives.
+[[patches.hook]]
+func = "func_8000ACC0"
+text = "if (quest64_mmo_enemy_hit(rdram, ctx)) return;"
+before_vram = 0x8000AFFC
 
 # Play as Leonardo (src/game/leonardo.cpp): the skinned-model draw, at its
 # entry; for Brian the animation record in a2 is swapped for Leonardo's.
