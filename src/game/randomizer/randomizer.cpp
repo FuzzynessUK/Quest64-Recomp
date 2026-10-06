@@ -157,6 +157,17 @@ namespace {
     constexpr int nepty_bubble_shot = 4;
     constexpr int bubble_spell = 33;
 
+    // A monster's attack list (entry +0x30, 0x18-byte records) names a spell
+    // as 0x8ESS, the same table the player casts from: slot E * 15 + SS, so
+    // the shuffle changes what monsters cast too. These are the slots the ten
+    // monsters with the ROM's flying flag (entry +0) cast - Cockatrice,
+    // Wyvern, Skelebat, Winged Sunfish, Red Wyvern, Magma Fish, Will-o'-Wisp,
+    // Sprite, Temptress, Pixie. Brian's staff cannot reach a flyer, so one
+    // that casts Magic Barrier on itself can never be beaten, and with
+    // enemies as checks that check is gone for good.
+    constexpr int magic_barrier = 27;
+    constexpr int flying_monster_spells[] = { 1, 3, 5, 8, 9, 12, 14, 22, 23, 26, 42, 46 };
+
     // Merrow uses System.Random; this only needs to be reproducible with itself.
     class Rng {
     public:
@@ -1255,6 +1266,14 @@ namespace {
                     if (power_elements[1] != element) crashlock[(i * player_spells) + 27] = 27;
                     if (power_elements[2] != element) crashlock[(i * player_spells) + 34] = 34;
                     if (power_elements[3] != element) crashlock[(i * player_spells) + 51] = 51;
+                }
+            }
+
+            // No flying monster may cast Magic Barrier (unless a boss spell
+            // has taken that slot over, when there is no barrier to give).
+            if (boss_spell_slots[magic_barrier] < 0) {
+                for (int slot : flying_monster_spells) {
+                    crashlock[(slot * player_spells) + magic_barrier] = magic_barrier;
                 }
             }
 
