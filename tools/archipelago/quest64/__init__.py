@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List
 
 from BaseClasses import ItemClassification, LocationProgressType, Region, Tutorial
-from rule_builder.rules import Has
+from rule_builder.rules import Has, HasFromList
 from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 
@@ -344,12 +344,29 @@ class Q64World(World):
         set_all_rules(self)
         if self.options.goal.value == Goal.option_page_hunt:
             self.set_completion_rule(Has("Torn Page", self.options.pages_required.value))
-        # The pages portal: the workbook's ENDGAME_DOOR has the bosses and
-        # monsters halves; the page count is an option, so it is added here.
-        if self.options.mammon_portal.value & 4:
+        # The pages and orbs portals: the workbook's ENDGAME_DOOR has the
+        # bosses and monsters halves; the page and orb counts are options,
+        # so they are added here.
+        portal = self.options.mammon_portal.value
+        if portal & (4 | 8):
             door = self.multiworld.get_entrance("Boss 7 to Endgame", self.player)
-            self.set_rule(door, entrance_rules["Boss 7 to Endgame"]
-                          & Has("Torn Page", self.options.pages_required.value))
+            rule = entrance_rules["Boss 7 to Endgame"]
+            if portal & 4:
+                rule = rule & Has("Torn Page", self.options.pages_required.value)
+            if portal & 8:
+                orbs = self.orbs_required()
+                if self.options.boss_items.value == BossItems.option_progressive:
+                    # The first four Progressive Boss Items are the orbs.
+                    rule = rule & Has("Progressive Boss Item", orbs)
+                else:
+                    rule = rule & HasFromList("Earth Orb", "Wind Jade", "Water Jewel", "Fire Ruby", count=orbs)
+            self.set_rule(door, rule)
+
+    def orbs_required(self) -> int:
+        """The orbs the portal wants: all four, or orbs_required of them."""
+        if self.options.mammon_portal.value & 16:
+            return self.options.orbs_required.value
+        return 4
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
@@ -358,6 +375,7 @@ class Q64World(World):
             "goal": self.options.goal.value,
             "pages_required": self.options.pages_required.value,
             "mammon_portal": self.options.mammon_portal.value,
+            "orbs_required": self.orbs_required() if self.options.mammon_portal.value & 8 else 0,
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
             "giftsanity": bool(self.options.giftsanity),

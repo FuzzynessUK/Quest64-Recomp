@@ -1,0 +1,118 @@
+<template name="config-menu__rnd_monsters">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Randomizer (config_menu.rml), on randomizer_model; its tab only shows while the randomizer is on and no seed is connected. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div data-if="rnd_mode == 1 && ap_locked == 0">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Monsters</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Enemy Randomizer</div><div class="config-tip-text">Any of the game's six monster sets can appear in any area and the encounter packs are rerolled; then every monster's HP, ATK, DEF, AGI, EXP and Stones are rescaled from its home area to the area it is in (damage follows ATK), with a guard that keeps each area at least as hard as the one before. Replaces Shuffle enemy tables when on. The spoiler log lists each area's set and every monster's vanilla and scaled stats.</div></div>
+                                        <select data-value="rnd_enemy_randomizer" id="rnd_enemy_randomizer_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Randomize stats</div><div class="config-tip-text">Every monster in each region gets new stats, rolled between the lowest and highest vanilla values of that stat in the region. Bosses are included at half the variance. Scale stats is applied afterwards.</div></div>
+                                        <select data-value="rnd_monster_stats" id="rnd_monster_stats_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Stat variance: {{rnd_variance}}</div><div class="config-tip-text">Widens the range Randomize stats rolls from, beyond the region's vanilla lowest and highest values. 0 keeps the vanilla range.</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_variance_input"
+                                            type="range"
+                                            data-value="rnd_variance"
+                                            min="0"
+                                            max="5"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Scale stats</div><div class="config-tip-text">Multiplies every monster stat by the percentage below. Stronger than variance, and applied after Randomize stats, so high values of both give extreme results.</div></div>
+                                        <select data-value="rnd_monster_scale" id="rnd_monster_scale_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Stat scale %: {{rnd_scale_percent}}</div><div class="config-tip-text">The multiplier used by Scale stats, from 50% to 150%.</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_scale_percent_input"
+                                            type="range"
+                                            data-value="rnd_scale_percent"
+                                            min="50"
+                                            max="150"
+                                            step="10"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>EXP follows stats</div><div class="config-tip-text">Recalculates the experience a monster gives from its base stat total, so randomized, scaled or reordered monsters pay out in line with their strength. Needs one of those options on to have any effect.</div></div>
+                                        <select data-value="rnd_exp_by_bst" id="rnd_exp_by_bst_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>EXP boost (quarters): {{rnd_exp_boost}}</div><div class="config-tip-text">Scales combat experience after everything else, in quarters: 4 is vanilla, 8 is double, 0 gives no EXP at all. HP, MP, agility and defense experience are unaffected.</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_exp_boost_input"
+                                            type="range"
+                                            data-value="rnd_exp_boost"
+                                            min="0"
+                                            max="12"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle boss order</div><div class="config-tip-text">Shuffles the order of the bosses other than Beigis and Mammon. Each keeps its stat ratios but is scaled to the level of the boss it replaces, and drops that boss's progression item.</div></div>
+                                        <select data-value="rnd_boss_order" id="rnd_boss_order_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Random Guilty element</div><div class="config-tip-text">Guilty's element is rolled instead of being Dark, which resists all magic.</div></div>
+                                        <select data-value="rnd_boss_element" id="rnd_boss_element_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle enemy tables</div><div class="config-tip-text">Merrow's table shuffle: swaps which monster set each area draws from, with no regard for difficulty. The Enemy Randomizer replaces it when on.</div></div>
+                                        <select data-value="rnd_enemy_tables" id="rnd_enemy_tables_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

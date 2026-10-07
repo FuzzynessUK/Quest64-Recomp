@@ -21,7 +21,10 @@ Quest 64 Recompiled:
   # Which groups of locations are Archipelago checks.
   #
   # chestsanity   the 88 treasure chests
-  # giftsanity    the 16 NPCs who hand something over
+  # giftsanity    the 16 NPCs who hand something over, the six wingsmiths
+  #               (Melrode to Brannoch) and the two endgame Shannons among
+  #               them. Each sends its check the first time you talk to it.
+  #               What a wingsmith hands over as well is up to wings, below
   # enemysanity   defeating each of the 67 kinds of regular monster. One
   #               check a kind, sent the first time you beat one of them
   # spiritsanity  the 98 spirits. With this on a spirit sends a check
@@ -37,14 +40,16 @@ Quest 64 Recompiled:
     'false': 0
 
   # Where the six pairs of wings come from. No rule needs wings.
-  # normal        the wingsmiths hand over their wings, as in the game
-  # shuffled      one of each pair in the item pool; the wingsmiths give
-  #               only their check
+  # normal        each wingsmith hands over his own town's wings, as in the
+  #               game, once per save. With giftsanity on he also sends a
+  #               check; with it off he gives only the wings
+  # shuffled      one of each pair in the item pool. The wingsmiths give no
+  #               wings: with giftsanity on they send a check, with it off
+  #               they give nothing
   # progressive   six "Progressive Wings" in the pool, each the next pair in
-  #               town order (White, Yellow, Blue, Green, Red, Black); the
-  #               wingsmiths give only their check
-  # With giftsanity off the wingsmiths are not checks and give their wings
-  # whatever this says.
+  #               town order (White, Yellow, Blue, Green, Red, Black). The
+  #               wingsmiths give no wings: with giftsanity on they send a
+  #               check, with it off they give nothing
   wings:
     normal: 1
     shuffled: 0
@@ -122,6 +127,9 @@ Quest 64 Recompiled:
   #               goal mammon: the run still ends with him
   # bosses_and_pages        all_bosses and all_pages
   # bosses_monsters_pages   all_bosses, all_monsters and all_pages
+  # all_orbs      the four orbs in your bag: Earth Orb, Wind Jade, Water Jewel
+  #               and Fire Ruby
+  # some_orbs     orbs_required of the four orbs (set below), any of them
   mammon_portal:
     vanilla: 1
     all_bosses: 0
@@ -130,6 +138,13 @@ Quest 64 Recompiled:
     all_pages: 0
     bosses_and_pages: 0
     bosses_monsters_pages: 0
+    all_orbs: 0
+    some_orbs: 0
+
+  # With mammon_portal some_orbs: how many of the four orbs open Mammon's
+  # World, 1 to 4. With boss_items progressive it is that many Progressive
+  # Boss Items, which arrive as the orbs in story order.
+  orbs_required: 2
 
   # Bosses are not in the game until their Soul turns up: an empty arena you
   # walk straight through, the same state the game uses for a boss already

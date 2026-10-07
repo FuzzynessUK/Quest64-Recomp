@@ -10,8 +10,10 @@ class Chestsanity(DefaultOnToggle):
 
 class Giftsanity(DefaultOnToggle):
     """NPCs who hand over an item are Archipelago checks: the gift NPCs, the
-    two endgame Shannons and the wingsmiths. Each gives its check once, the
-    first time you talk to them, whatever is in your bag - and no item."""
+    two endgame Shannons and the six wingsmiths (Melrode to Brannoch). Each
+    gives its check once, the first time you talk to them, whatever is in
+    your bag - and no item, except that with Wings normal a wingsmith also
+    hands over his own town's wings."""
     display_name = "Giftsanity"
 
 
@@ -19,16 +21,16 @@ class Wings(Choice):
     """Where the six pairs of wings come from. No rule needs wings: they are
     for getting about.
 
-    normal        the wingsmiths hand over their wings, as in the game (with
-                  giftsanity on, on top of their check)
-    shuffled      one of each pair is in the item pool; the wingsmiths give
-                  only their check
+    normal        each wingsmith hands over his own town's wings, as in the
+                  game, once per save. With giftsanity on he also sends a
+                  check; with it off he gives only the wings
+    shuffled      one of each pair is in the item pool. The wingsmiths give
+                  no wings: with giftsanity on they send a check, with it
+                  off they give nothing
     progressive   six "Progressive Wings" are in the pool instead, each the
                   next pair in town order: White, Yellow, Blue, Green, Red,
-                  Black; the wingsmiths give only their check
-
-    With giftsanity off the wingsmiths are not checks and hand over their
-    wings whatever this says."""
+                  Black. The wingsmiths give no wings: with giftsanity on
+                  they send a check, with it off they give nothing"""
     display_name = "Wings"
     option_normal = 0
     option_shuffled = 1
@@ -145,9 +147,18 @@ class MammonPortal(Choice):
                             the run still ends with Mammon. Needs goal
                             mammon.
     bosses_and_pages        all_bosses and all_pages.
-    bosses_monsters_pages   all_bosses, all_monsters and all_pages."""
+    bosses_monsters_pages   all_bosses, all_monsters and all_pages.
+
+    all_orbs                the four orbs - Earth Orb, Wind Jade, Water Jewel
+                            and Fire Ruby - have to be in your bag.
+    some_orbs               orbs_required of the four orbs, any of them.
+                            With boss_items progressive the orbs are the
+                            first four Progressive Boss Items, so it is that
+                            many of those."""
     display_name = "Mammon's World Portal"
-    # A bitmask: 1 bosses, 2 monsters, 4 pages. The game reads it that way.
+    # A bitmask: 1 bosses, 2 monsters, 4 pages, 8 orbs. The game reads it that
+    # way. 16 only says "orbs_required of them" rather than all four; the
+    # apworld settles the number and sends it as slot_data orbs_required.
     option_vanilla = 0
     option_all_bosses = 1
     option_all_monsters = 2
@@ -155,6 +166,8 @@ class MammonPortal(Choice):
     option_all_pages = 4
     option_bosses_and_pages = 5
     option_bosses_monsters_pages = 7
+    option_all_orbs = 8
+    option_some_orbs = 24
     default = 0
 
 
@@ -460,6 +473,15 @@ class Goal(Choice):
     default = 0
 
 
+class OrbsRequired(Range):
+    """How many of the four orbs (Earth Orb, Wind Jade, Water Jewel, Fire
+    Ruby) open Mammon's World when Mammon's World Portal is some_orbs."""
+    display_name = "Orbs Required"
+    range_start = 1
+    range_end = 4
+    default = 2
+
+
 class PagesRequired(Range):
     """How many Torn Pages finish a Page Hunt, or open Mammon's World when
     Mammon's World Portal asks for pages."""
@@ -489,6 +511,7 @@ class Q64Options(PerGameCommonOptions):
     pages_required: PagesRequired
     page_placement: PagePlacement
     mammon_portal: MammonPortal
+    orbs_required: OrbsRequired
     boss_souls: BossSouls
     open_world: OpenWorld
     boss_items: BossItems

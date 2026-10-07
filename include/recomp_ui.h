@@ -67,6 +67,7 @@ namespace recompui {
         Mods,
         Cheats,
         Randomizer,
+        Archipelago,
         Enhancements,
         Layout,
         Audio,

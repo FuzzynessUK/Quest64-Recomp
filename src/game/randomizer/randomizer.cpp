@@ -2995,61 +2995,94 @@ const zelda64::randomizer::NativeState& zelda64::randomizer::native_state() {
 // Built each time he speaks, since in an Archipelago seed the portal's
 // condition is the server's to say. Text lines hold 27 characters and a page
 // four lines ($ turns the page); the game's font has no "+", so "&".
+namespace {
+    // His words before encoding, without the end mark; empty for his own line.
+    std::string abbott_text();
+
+    std::vector<uint8_t> encode_message(const std::string& text) {
+        std::optional<std::vector<uint8_t>> encoded = translate_string(text + "%");
+        if (!encoded) {
+            return {};
+        }
+        std::vector<uint8_t> out = { 0xA0, 0xC0 };
+        out.insert(out.end(), encoded->begin(), encoded->end());
+        return out;
+    }
+}
+
 std::vector<uint8_t> zelda64::randomizer::abbott_message() {
+    std::string text = abbott_text();
+    return text.empty() ? std::vector<uint8_t>{} : encode_message(text);
+}
+
+// The opening speech in an Archipelago seed: a welcome on its own page, then
+// what he says when spoken to in the monastery.
+std::vector<uint8_t> zelda64::randomizer::archipelago_intro_message() {
+    int monsters = 0;
+    int pages = 0;
+    if (zelda64::archipelago::portal_requirement(monsters, pages) < 0) {
+        return {};   // not playing a seed
+    }
+    std::string text = abbott_text();
+    if (text.empty()) {
+        return {};
+    }
+    return encode_message("Welcome to Quest 64#Archipelago$" + text);
+}
+
+namespace {
+std::string abbott_text() {
     int monsters = 0;
     int portal_pages = 0;
-    int portal = zelda64::archipelago::portal_requirement(monsters, portal_pages);
+    int portal_orbs = 4;
+    int portal = zelda64::archipelago::portal_requirement(monsters, portal_pages, &portal_orbs);
     if (portal < 0 && !native.boss_order_shuffled) {
         return {};   // not connected and nothing moved: his own line
     }
-    int pages = zelda64::archipelago::page_hunt_pages();
-    std::string text = "Requirement for Mammon's#World Portal:#";
+    // A page is four lines of 27 characters; lines are joined with # and a
+    // new page starts with $.
+    std::vector<std::string> lines = { "Requirement for Mammon's", "World Portal:" };
     bool list_bosses = true;
+    int pages = zelda64::archipelago::page_hunt_pages();
     if (pages > 0) {
         // Page Hunt: the run ends with the pages, not with Mammon, so that is
         // what he tells you; the bosses follow if they have moved.
-        text = "Restore the Eletale Book:#Find " + std::to_string(pages) + " Torn Pages";
+        lines = { "Restore the Eletale Book:", "Find " + std::to_string(pages) + " Torn Pages" };
         list_bosses = native.boss_order_shuffled;
-        portal = -2;
     }
-    switch (portal) {
-        case -2:
-            break;   // the Page Hunt, above
-        case 0:
-            text += "The Eletale Book";
-            list_bosses = false;
-            break;
-        case 1:
-            text += "All Bosses";
-            break;
-        case 2:
-            text += "All Enemies#(" + std::to_string(monsters) + " kinds)";
-            list_bosses = false;
-            break;
-        case 3:
-            text += "All Enemies & All Bosses#(" + std::to_string(monsters) + " kinds of enemy)";
-            break;
-        case 4:
-            text += "Find " + std::to_string(portal_pages) + " Torn Pages";
-            list_bosses = false;
-            break;
-        case 5:
-            text += "All Bosses & " + std::to_string(portal_pages) + " Torn Pages";
-            break;
-        case 6:
-            text += "All Enemies (" + std::to_string(monsters) + " kinds)#& " +
-                    std::to_string(portal_pages) + " Torn Pages";
-            list_bosses = false;
-            break;
-        case 7:
-            // The heading and the first two lines fill the page.
-            text += "All Enemies & All Bosses#(" + std::to_string(monsters) + " kinds of enemy)$& " +
-                    std::to_string(portal_pages) + " Torn Pages";
-            break;
-        default:
-            // Not connected, boss order shuffled: just who is where.
-            text = "Requirement for Mammon's#World Portal:";
-            break;
+    else if (portal == 0) {
+        lines.push_back("The Eletale Book");
+        list_bosses = false;
+    }
+    else if (portal > 0) {
+        // The portal is a bitmask (1 bosses, 2 monsters, 4 pages, 8 orbs):
+        // one line each, the later ones joined with "&" (the font has no "+").
+        std::vector<std::string> needs;
+        if (portal & 1) {
+            needs.push_back("All Bosses");
+        }
+        if (portal & 2) {
+            needs.push_back("All Enemies (" + std::to_string(monsters) + " kinds)");
+        }
+        if (portal & 4) {
+            needs.push_back(std::to_string(portal_pages) + " Torn Pages");
+        }
+        if (portal & 8) {
+            needs.push_back(portal_orbs >= 4 ? std::string("All 4 Orbs")
+                                             : "Any " + std::to_string(portal_orbs) + " of the 4 Orbs");
+        }
+        for (size_t i = 0; i < needs.size(); i++) {
+            lines.push_back(i == 0 ? needs[i] : "& " + needs[i]);
+        }
+        list_bosses = (portal & 1) != 0;
+    }
+    // portal -1: not connected, boss order shuffled - just who is where.
+    std::string text;
+    for (size_t i = 0; i < lines.size(); i++) {
+        if (i > 0) {
+            text += (i % 4 == 0) ? "$" : "#";
+        }
+        text += lines[i];
     }
     if (list_bosses && native.boss_lines.size() == 7) {
         // Four to a page, after the heading's.
@@ -3058,14 +3091,8 @@ std::vector<uint8_t> zelda64::randomizer::abbott_message() {
             text += native.boss_lines[i];
         }
     }
-    text += "%";
-    std::optional<std::vector<uint8_t>> encoded = translate_string(text);
-    if (!encoded) {
-        return {};
-    }
-    std::vector<uint8_t> out = { 0xA0, 0xC0 };
-    out.insert(out.end(), encoded->begin(), encoded->end());
-    return out;
+    return text;
+}
 }
 
 void zelda64::randomizer::apply_at_boot(uint8_t* rdram) {

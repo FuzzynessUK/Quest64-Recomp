@@ -393,8 +393,8 @@ my @named = (
     [ 'ALL_BOSSES_BEATEN', $all_bosses, "mammon_portal all_bosses: the seven bosses before Mammon. Each boss's own rule already asks for his Soul." ],
     [ 'ALL_MONSTER_AREAS', $all_monsters, 'mammon_portal all_monsters: every region a monster lives in.' ],
     [ 'ENDGAME_DOOR',
-      '(OptionFilter(MammonPortal, 0) & ELETALE_BOOK) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)',
-      "The way into Mammon's World: the Book in the vanilla game, the portal condition otherwise (the Book is then not in the pool at all). Portals 4, 5 and 7 also want pages_required Torn Pages, which the generator adds in set_rules: a count from an option cannot be written here." ],
+      '(OptionFilter(MammonPortal, 0) & ELETALE_BOOK) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 8) & True_()) | (OptionFilter(MammonPortal, 24) & True_())',
+      "The way into Mammon's World: the Book in the vanilla game, the portal condition otherwise (the Book is then not in the pool at all). Portals 4, 5 and 7 also want pages_required Torn Pages, and 8 and 24 the orbs (all four, or orbs_required of them), which the generator adds in set_rules: a count from an option cannot be written here." ],
 );
 my @named_rows = (
     [ T('Named Rules') ],
@@ -431,7 +431,7 @@ for my $r (@item_rows) {
 
 # ---------------------------------------------------------------- Options
 my @options = (
-    [ 'mammon_portal', 'MammonPortal', 'vanilla 0, all_bosses 1, all_monsters 2, both 3, all_pages 4, bosses_and_pages 5, bosses_monsters_pages 7', "What opens Mammon's World: ENDGAME_DOOR (a bitmask: 1 bosses, 2 monsters, 4 pages; pages need goal mammon). Also makes the Book's Shannon a check and takes the Book out of the pool." ],
+    [ 'mammon_portal', 'MammonPortal', 'vanilla 0, all_bosses 1, all_monsters 2, both 3, all_pages 4, bosses_and_pages 5, bosses_monsters_pages 7, all_orbs 8, some_orbs 24', "What opens Mammon's World: ENDGAME_DOOR (a bitmask: 1 bosses, 2 monsters, 4 pages, 8 orbs, 16 only orbs_required of them; pages need goal mammon). Also makes the Book's Shannon a check and takes the Book out of the pool." ],
     [ 'boss_souls', 'BossSouls', 'off 0, bosses 1, with_mammon 2', "Each boss's check needs his Soul. Opens nothing else: that is open_world." ],
     [ 'open_world', 'OpenWorld', 'off / on', 'On: the game opens the doors, boats and teleporters the four gems lock. The logic still follows the story (the *_GATE rules): with boss_souls a gate is met once the boss who drops its gem can be beaten, without them it still wants the gem.' ],
     [ 'boss_items', 'BossItems', 'normal 0, shuffled 1, progressive 2', 'Normal: the six gate items stay at their vanilla checks (locked in pre_fill). Shuffled: in the pool. Progressive: the pool has one Progressive Boss Item per gate item instead, each the next of Earth Orb, Wind Jade, Water Jewel, Fire Ruby, Eletale\'s Book (only with mammon_portal vanilla), Dark Gaol Key - which is why the gates also take a count of them.' ],

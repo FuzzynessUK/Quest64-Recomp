@@ -31,6 +31,14 @@ namespace {
         { 22, "Water Jewel", "#4a8cff" }, { 23, "Fire Ruby", "#ff4a3c" },
         { 24, "Eletale Book", "#b07cff" }, { 25, "Dark Gaol Key", "#a8aeb8" },
     };
+    // Boss Souls, by boss number (1-8, Solvaring first), not an item id: a
+    // Soul is never in the bag. Coloured by the boss's element.
+    const ItemInfo soul_items[] = {
+        { 1, "Solvaring", "#c8904c" }, { 2, "Zelse", "#5ad07a" },
+        { 3, "Nepty", "#4a8cff" }, { 4, "Shilf", "#5ad07a" },
+        { 5, "Fargo", "#ff4a3c" }, { 6, "Guilty", "#b07cff" },
+        { 7, "Beigis", "#ff4a3c" }, { 8, "Mammon", "#b07cff" },
+    };
     const ItemInfo wing_items[] = {
         { 14, "White", "#f4f4f4" }, { 15, "Yellow", "#ffe24a" },
         { 16, "Blue", "#4a8cff" }, { 17, "Green", "#5ad07a" },
@@ -165,6 +173,10 @@ namespace {
     CheckList overlay_list;
     Rml::Element* wings_heading = nullptr;
     Rml::Element* wings_grid = nullptr;
+    // Shown only while a seed with Boss Souls is being played.
+    Rml::Element* souls_heading = nullptr;
+    Rml::Element* souls_grid = nullptr;
+    std::vector<Rml::Element*> soul_chips;
     Rml::Element* notes_window = nullptr;
     Rml::Element* notes_text = nullptr;
     Rml::Element* check_resize = nullptr;   // the check list's corner, only while unlocked
@@ -390,12 +402,15 @@ namespace {
         Rml::Element* wing_grid = document->GetElementById("trk_wings");
         wings_grid = wing_grid;
         wings_heading = document->GetElementById("trk_wings_heading");
+        souls_heading = document->GetElementById("trk_souls_heading");
+        souls_grid = document->GetElementById("trk_souls");
         notes_window = document->GetElementById("notes_window");
         notes_text = document->GetElementById("trk_notes_text");
         notes_resize = document->GetElementById("trk_notes_resize");
         check_resize = document->GetElementById("trk_check_resize");
         if (!item_window || !check_window || !check_title || !areas_scroll || !boss_grid || !wing_grid ||
-            !wings_heading || !notes_window || !notes_text || !notes_resize || !check_resize) {
+            !wings_heading || !souls_heading || !souls_grid || !notes_window || !notes_text ||
+            !notes_resize || !check_resize) {
             return;
         }
         check_resize->AddEventListener(Rml::EventId::Dragstart, &check_resize_listener);
@@ -424,6 +439,11 @@ namespace {
         };
         add_chips(boss_grid, std::size(boss_items));
         add_chips(wing_grid, std::size(wing_items));
+        for (size_t i = 0; i < std::size(soul_items); i++) {
+            Rml::ElementPtr chip = document->CreateElement("div");
+            chip->SetClass("trk-item", true);
+            soul_chips.push_back(souls_grid->AppendChild(std::move(chip)));
+        }
         // Areas open and close on a click whether the windows are locked or not.
         overlay_list.clickable = nullptr;
         overlay_list.build(document, areas_scroll);
@@ -447,6 +467,20 @@ namespace {
         size_t k = 0;
         for (const ItemInfo& item : boss_items) chip(item_chips[k++], item);
         for (const ItemInfo& item : wing_items) chip(item_chips[k++], item);
+
+        // Boss Souls: lit once arrived. Mammon's only when the seed holds
+        // him back too (mode 2).
+        const bool souls = shown.souls_mode != 0 && o.show_souls;
+        set_display(souls_heading, souls);
+        set_display(souls_grid, souls);
+        for (size_t i = 0; i < soul_chips.size(); i++) {
+            const ItemInfo& soul = soul_items[i];
+            Rml::Element* e = soul_chips[i];
+            e->SetProperty("display", souls && (soul.id < 8 || shown.souls_mode == 2) ? "inline-block" : "none");
+            e->SetClass("trk-item--missing", (shown.souls & (1u << soul.id)) == 0);
+            e->SetInnerRML(std::string("<span class=\"trk-dot\" style=\"background-color: ") + soul.color +
+                           ";\"></span>" + escape(soul.name));
+        }
 
         overlay_list.refresh(shown, have_snapshot, o.hide_done_areas);
         check_title->SetInnerRML("Checks " + std::to_string(overlay_list.found_total) + " / " +
@@ -550,8 +584,9 @@ void recompui::update_tracker() {
         }
     }
 
-    // Only while a file is being played: not on the title screen.
-    bool playing = have_snapshot && shown.in_game;
+    // Only while a file is being played (not on the title screen), and only
+    // with the tracker switched on at all.
+    bool playing = o.enabled && have_snapshot && shown.in_game;
     bool show_items = playing && o.item_tracker;
     bool show_checks = playing && o.check_tracker;
     bool show_notes = playing && o.notes;
@@ -559,7 +594,7 @@ void recompui::update_tracker() {
     bool options_changed = !applied_set || o.item_tracker != applied.item_tracker ||
         o.check_tracker != applied.check_tracker || o.notes != applied.notes || o.locked != applied.locked ||
         o.hide_done_areas != applied.hide_done_areas || o.hide_borders != applied.hide_borders ||
-        o.hide_titles != applied.hide_titles || o.show_wings != applied.show_wings ||
+        o.hide_titles != applied.hide_titles || o.show_wings != applied.show_wings || o.show_souls != applied.show_souls ||
         o.item_background != applied.item_background || o.check_background != applied.check_background ||
         o.notes_background != applied.notes_background ||
         o.item_x != applied.item_x || o.item_y != applied.item_y ||

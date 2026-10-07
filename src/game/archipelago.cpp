@@ -141,12 +141,15 @@ namespace {
     bool slot_locations_known = false;
     bool chestsanity = true, giftsanity = true, enemysanity = true, spiritsanity = true;
     // A bitmask: 1 bosses, 2 monsters, 4 pages (pages_required Torn Pages in
-    // the bag); 0 is the vanilla Book.
+    // the bag), 8 orbs (seed_orbs_required of the four in the bag; 16 only
+    // told the apworld how many); 0 is the vanilla Book.
     int mammon_portal = 0;
     // The yaml's goal: 0 Mammon, 1 Page Hunt with pages_required pages. Read
     // by boss_beaten on the game thread, hence atomic.
     std::atomic<int> seed_goal{ 0 };
     int seed_pages_required = 0;
+    // slot_data orbs_required: how many of the four orbs the portal wants.
+    int seed_orbs_required = 0;
     // The pages count towards the Page Hunt, which ends the run, or towards
     // the portal, which only opens the door; the apworld never sends both.
     void apply_page_hunt() {
@@ -287,7 +290,7 @@ namespace {
         "wingsmith_wings", "enemysanity", "spiritsanity", "shuffle_orbs",
         "boss_items", "wings", "open_world",
         "rando_seed", "settings", "locations", "enemy_plan", "portal_monsters",
-        "pages_required",
+        "pages_required", "orbs_required",
     };
 
     // One slot_data value, as JSON text. It comes from the server, so
@@ -313,6 +316,9 @@ namespace {
         else if (key == "pages_required" && v.is_number_integer()) {
             seed_pages_required = v.get<int>();
             apply_page_hunt();
+        }
+        else if (key == "orbs_required" && v.is_number_integer()) {
+            seed_orbs_required = std::clamp(v.get<int>(), 0, 4);
         }
         else if (key == "mammon_portal" && v.is_number_integer()) {
             mammon_portal = v.get<int>();
@@ -418,6 +424,7 @@ namespace {
                     portal_monsters.clear();
                     seed_goal.store(0);
                     seed_pages_required = 0;
+                    seed_orbs_required = 0;
                     apply_page_hunt();
                     break;
                 case q64ap::EventType::ItemReceived: {
@@ -1190,8 +1197,10 @@ namespace {
         int bosses = 0, bosses_needed = 0;
         int monsters = 0, monsters_needed = 0;
         int pages = 0, pages_needed = 0;
+        int orbs = 0, orbs_needed = 0;
         bool open() const {
-            return bosses >= bosses_needed && monsters >= monsters_needed && pages >= pages_needed;
+            return bosses >= bosses_needed && monsters >= monsters_needed && pages >= pages_needed &&
+                   orbs >= orbs_needed;
         }
     };
 
@@ -1201,6 +1210,17 @@ namespace {
         if (mammon_portal & 4) {
             p.pages_needed = seed_pages_required;
             p.pages = zelda64::enhancements::bag_count(rdram, zelda64::page_item::item_id);
+        }
+        if (mammon_portal & 8) {
+            // The four orbs - Earth Orb 0x14, Wind Jade 0x15, Water Jewel 0x16,
+            // Fire Ruby 0x17 - each counted once, from the bag. An older
+            // apworld would not send a count: then it is all four.
+            p.orbs_needed = seed_orbs_required > 0 ? seed_orbs_required : 4;
+            for (int orb = 0x14; orb <= 0x17; orb++) {
+                if (zelda64::enhancements::bag_count(rdram, orb) > 0) {
+                    p.orbs++;
+                }
+            }
         }
         if (mammon_portal & 1) {
             p.bosses_needed = bosses_before_mammon;
@@ -1287,7 +1307,7 @@ namespace {
         // so the reason the door will not open is never a mystery. The notice
         // stack is the port's own, top-left.
         static int last_said = -1;
-        int state = progress.open() ? -2 : progress.bosses * 100000 + progress.monsters * 1000 + progress.pages;
+        int state = progress.open() ? -2 : progress.orbs * 10000000 + progress.bosses * 100000 + progress.monsters * 1000 + progress.pages;
         if (state == last_said && portal_visit) {
             return;
         }
@@ -1315,6 +1335,13 @@ namespace {
             }
             what += std::to_string(std::min(progress.pages, progress.pages_needed)) + "/" +
                     std::to_string(progress.pages_needed) + " pages";
+        }
+        if (progress.orbs_needed) {
+            if (!what.empty()) {
+                what += ", ";
+            }
+            what += std::to_string(std::min(progress.orbs, progress.orbs_needed)) + "/" +
+                    std::to_string(progress.orbs_needed) + " orbs";
         }
         zelda64::notify::post("Mammon's World is sealed: " + what);
     }
@@ -1795,13 +1822,16 @@ int zelda64::archipelago::pending_level_ups() {
     return level_ups_waiting.load();
 }
 
-int zelda64::archipelago::portal_requirement(int& monsters, int& pages) {
+int zelda64::archipelago::portal_requirement(int& monsters, int& pages, int* orbs) {
     if (!playing_seed()) {
         return -1;
     }
     std::lock_guard lock{ server_mutex };
     monsters = portal_monsters.empty() ? monster_kinds : static_cast<int>(portal_monsters.size());
     pages = seed_pages_required;
+    if (orbs != nullptr) {
+        *orbs = seed_orbs_required > 0 ? seed_orbs_required : 4;
+    }
     return mammon_portal;
 }
 
@@ -1826,6 +1856,15 @@ bool zelda64::archipelago::tracker_view(const std::vector<int64_t>& locations, s
         checked[i] = checked_locations.count(locations[i]) != 0 ? 1 : 0;
     }
     return true;
+}
+
+int zelda64::archipelago::tracker_souls(uint32_t& held) {
+    held = 0;
+    if (!playing_seed()) {
+        return 0;
+    }
+    held = souls_held.load();
+    return boss_souls.load();
 }
 
 // func_80009818 is the rewards routine, run once per monster that died, and
@@ -1922,6 +1961,34 @@ extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
         return;
     }
     boss_beaten(order, "defeated");
+}
+
+// A boss's item is his monster drop: entry +0x34 (Solvaring 0x14 Earth Orb,
+// Zelse 0x15, Nepty 0x16, Fargo 0x17; the others 0xFF). func_8001D828 is the
+// battle's drop roll - one chance in four from an ordinary battle, but in a
+// boss battle (gBattleState 0x100) always the boss's own +0x34 - and the
+// victory screen puts what it returns in the bag. In a seed the boss is a
+// check, and whatever the seed put there (his own item too, with boss_items
+// normal) comes from the server, so his drop would be a second copy: with
+// progressive boss items the Earth Orb arrived from another game and then
+// Solvaring handed over another. The hook sits at 0x8001D88C, after both
+// paths have left the answer in v0; 0xFF is "no drop".
+extern "C" void quest64_archipelago_boss_drop(uint8_t* rdram, recomp_context* ctx) {
+    if (!playing_seed() || !(MEM_HU(0, gBattleState) & 0x100)) {
+        return;
+    }
+    int order = MEM_W(0, boss_here);
+    if (order < 1 || order > boss_count ||
+        !seed_has(zelda64::archipelago::group_boss, order)) {
+        return;
+    }
+    int item = static_cast<int>(ctx->r2 & 0xFF);
+    if (item == 0xFF) {
+        return;
+    }
+    ctx->r2 = 0xFF;
+    log_line("boss " + std::to_string(order) + "'s own drop (item " + std::to_string(item) +
+             ") held back: his check gives the seed's item");
 }
 
 // Boss Souls: a boss whose Soul has not arrived is simply not there.

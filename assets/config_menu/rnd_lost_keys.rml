@@ -1,0 +1,49 @@
+<template name="config-menu__rnd_lost_keys">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Randomizer (config_menu.rml), on randomizer_model; its tab only shows while the randomizer is on and no seed is connected. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div data-if="rnd_mode == 1 && ap_locked == 0">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Lost Keys</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Mode</div><div class="config-tip-text">A ruleset in which the Elemental Gems and the Wings each appear exactly once, scattered around the world. Progressive keeps each gem in its own region (Earth: Melrode to Solvaring; Wind: Dondoran Treasury to Zelse; Water: Dondoran Treasury to Nepty; Fire: Limelin to Brannoch; Book: Limelin to the Brannoch Castle roof). Open world draws them all from one pool with no doors locked. While it is on, chests, drops and gifts are shuffled at least, wingsmiths are left alone and Ivory Wings is on.</div></div>
+                                        <select data-value="rnd_lost_keys" id="rnd_lost_keys_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Progressive</option>
+                                            <option value="2">Open world</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Fire Book</div><div class="config-tip-text">The Book region overlaps the Fire region, as Water overlaps Wind, so the Eletale Book can also turn up in any Fire location. The Fire Ruby is unchanged. Needs Lost Keys.</div></div>
+                                        <select data-value="rnd_fire_book" id="rnd_fire_book_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shannon hints</div><div class="config-tip-text">Shannon gives hints to where the local progression item went, in Dondoran, Larapool, Normoon, Limelin and Brannoch. Needs Lost Keys.</div></div>
+                                        <select data-value="rnd_shannon_hints" id="rnd_shannon_hints_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

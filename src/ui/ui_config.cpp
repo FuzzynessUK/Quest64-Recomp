@@ -51,22 +51,27 @@ int recompui::config_tab_to_index(recompui::ConfigTab tab) {
         return 2;
     case recompui::ConfigTab::Sound:
         return 3;
-    case recompui::ConfigTab::Mods:
+    case recompui::ConfigTab::Archipelago:
         return 4;
-    case recompui::ConfigTab::Cheats:
-        return 5;
     case recompui::ConfigTab::Randomizer:
-        return 6;
+        return 5;
     case recompui::ConfigTab::Enhancements:
-        return 7;
+        return 6;
     case recompui::ConfigTab::Layout:
-        return 8;
+        return 7;
+    // Audio is on the Sound tab's page, and Tracker a sub-tab of Layout
+    // (config_menu.rml).
     case recompui::ConfigTab::Audio:
-        return 9;
+        return 3;
     case recompui::ConfigTab::Tracker:
-        return 10;
+        return 7;
     case recompui::ConfigTab::Debug:
-        return 11;
+        return 8;
+    case recompui::ConfigTab::Mods:
+        return 9;
+    // Last, on the far right.
+    case recompui::ConfigTab::Cheats:
+        return 10;
     default:
         assert(false && "Unknown config tab.");
         return 0;
@@ -424,10 +429,17 @@ struct SoundOptionsContext {
 
 SoundOptionsContext sound_options_context;
 
+// The Sound tab's page is audio.rml on audio_model, which carries the volumes
+// too (make_audio_bindings); a volume changed from code refreshes it as well.
+void dirty_audio_model_variable(const char* name);
+
 void zelda64::reset_sound_settings() {
     sound_options_context.reset();
     if (sound_options_model_handle) {
         sound_options_model_handle.DirtyAllVariables();
+    }
+    for (const char* name : { "main_volume", "bgm_volume", "sfx_volume", "voice_volume" }) {
+        dirty_audio_model_variable(name);
     }
 }
 
@@ -436,6 +448,7 @@ void zelda64::set_main_volume(int volume) {
     if (sound_options_model_handle) {
         sound_options_model_handle.DirtyVariable("main_volume");
     }
+    dirty_audio_model_variable("main_volume");
 }
 
 int zelda64::get_main_volume() {
@@ -447,6 +460,7 @@ void zelda64::set_bgm_volume(int volume) {
     if (sound_options_model_handle) {
         sound_options_model_handle.DirtyVariable("bgm_volume");
     }
+    dirty_audio_model_variable("bgm_volume");
 }
 
 int zelda64::get_bgm_volume() {
@@ -458,6 +472,7 @@ void zelda64::set_sfx_volume(int volume) {
 	if (sound_options_model_handle) {
 		sound_options_model_handle.DirtyVariable("sfx_volume");
 	}
+    dirty_audio_model_variable("sfx_volume");
 }
 
 int zelda64::get_sfx_volume() {
@@ -469,6 +484,7 @@ void zelda64::set_voice_volume(int volume) {
 	if (sound_options_model_handle) {
 		sound_options_model_handle.DirtyVariable("voice_volume");
 	}
+    dirty_audio_model_variable("voice_volume");
 }
 
 int zelda64::get_voice_volume() {
@@ -800,6 +816,10 @@ void enhancements_option_changed(bool needs_relaunch = true) {
     }
     if (enhancements_context.model_handle) {
         enhancements_context.model_handle.DirtyVariable("enh_changed");
+    }
+    if (controls_model_handle) {
+        controls_model_handle.DirtyVariable("extra_exit");
+        controls_model_handle.DirtyVariable("extra_minimap");
     }
 }
 
@@ -1275,6 +1295,7 @@ void make_tracker_bindings(Rml::Context* context) {
                 zelda64::tracker::set_options(o);
             });
     };
+    bind_flag("trk_enabled", &zelda64::tracker::Options::enabled);
     bind_flag("trk_items", &zelda64::tracker::Options::item_tracker);
     bind_flag("trk_checks", &zelda64::tracker::Options::check_tracker);
     bind_flag("trk_locked", &zelda64::tracker::Options::locked);
@@ -1282,6 +1303,7 @@ void make_tracker_bindings(Rml::Context* context) {
     bind_flag("trk_hide_borders", &zelda64::tracker::Options::hide_borders);
     bind_flag("trk_hide_titles", &zelda64::tracker::Options::hide_titles);
     bind_flag("trk_show_wings", &zelda64::tracker::Options::show_wings);
+    bind_flag("trk_show_souls", &zelda64::tracker::Options::show_souls);
     bind_flag("trk_notes", &zelda64::tracker::Options::notes);
     // Each window's background: 0 solid, 1 translucent, 2 clear.
     auto bind_background = [&](const char* name, int zelda64::tracker::Options::* field) {
@@ -1297,6 +1319,12 @@ void make_tracker_bindings(Rml::Context* context) {
     bind_background("trk_check_background", &zelda64::tracker::Options::check_background);
     bind_background("trk_notes_background", &zelda64::tracker::Options::notes_background);
     tracker_model_handle = constructor.GetModelHandle();
+}
+
+void dirty_audio_model_variable(const char* name) {
+    if (audio_context.model_handle) {
+        audio_context.model_handle.DirtyVariable(name);
+    }
 }
 
 void make_audio_bindings(Rml::Context* context) {
@@ -1345,14 +1373,17 @@ void make_audio_bindings(Rml::Context* context) {
                 return;
             }
             audio_context.edited.battle_music = value;
-            // Live: the hook reads active_options() every request.
+            // Live: the hooks read it every request (audio::set_live_options).
             audio_option_changed(false);
+            zelda64::audio::set_live_options(audio_context.edited);
         });
     constructor.BindFunc("aud_sfx_shuffle",
         [](Rml::Variant& out) { out = audio_context.edited.sfx_shuffle ? 1 : 0; },
         [](const Rml::Variant& in) {
             audio_context.edited.sfx_shuffle = in.Get<int>() != 0;
-            audio_option_changed();
+            // Live: the order is drawn at every boot, the switch read per effect.
+            audio_option_changed(false);
+            zelda64::audio::set_live_options(audio_context.edited);
         }
     );
     // Custom mode's tracks: each row shows its choice by name and opens the
@@ -1445,6 +1476,12 @@ void make_audio_bindings(Rml::Context* context) {
             model_handle.DirtyVariable("aud_picker_track");
         });
     audio_context.model_handle = constructor.GetModelHandle();
+    // The volumes, the same values the sound options model binds: the Sound
+    // tab shows them at the top of this page.
+    bind_atomic(constructor, audio_context.model_handle, "main_volume", &sound_options_context.main_volume);
+    bind_atomic(constructor, audio_context.model_handle, "bgm_volume", &sound_options_context.bgm_volume);
+    bind_atomic(constructor, audio_context.model_handle, "sfx_volume", &sound_options_context.sfx_volume);
+    bind_atomic(constructor, audio_context.model_handle, "voice_volume", &sound_options_context.voice_volume);
 }
 
 // The connector's settings as the menu has them. Loaded once, then kept in
@@ -1576,6 +1613,20 @@ void make_randomizer_bindings(Rml::Context* context) {
     bind_randomizer_field(constructor, "rnd_start_mp", &Options::start_mp);
     bind_randomizer_field(constructor, "rnd_start_agility", &Options::start_agility);
     bind_randomizer_field(constructor, "rnd_start_defense", &Options::start_defense);
+    // Stats tab: the Default button puts the four back to Brian's own.
+    constructor.BindEventCallback("rnd_stats_default",
+        [](Rml::DataModelHandle model_handle, Rml::Event&, const Rml::VariantList&) {
+            const Options vanilla{};
+            Options& o = randomizer_context.edited;
+            o.start_hp = vanilla.start_hp;
+            o.start_mp = vanilla.start_mp;
+            o.start_agility = vanilla.start_agility;
+            o.start_defense = vanilla.start_defense;
+            randomizer_option_changed();
+            for (const char* name : { "rnd_start_hp", "rnd_start_mp", "rnd_start_agility", "rnd_start_defense" }) {
+                model_handle.DirtyVariable(name);
+            }
+        });
     bind_randomizer_field(constructor, "rnd_fast_monastery", &Options::fast_monastery);
     bind_randomizer_field(constructor, "rnd_fast_blue_cave", &Options::fast_blue_cave);
     bind_randomizer_field(constructor, "rnd_fast_shamwood", &Options::fast_shamwood);
@@ -2810,7 +2861,9 @@ Rml::Element* recompui::get_child_by_tag(Rml::Element* parent, const std::string
 
 class ConfigTabsetListener : public Rml::EventListener {
     void ProcessEvent(Rml::Event& event) override {
-        if (event.GetId() == Rml::EventId::Tabchange) {
+        // The sub-tabsets inside Randomizer and Layout raise their own
+        // tabchange, which bubbles up here: only the menu's own tabset counts.
+        if (event.GetId() == Rml::EventId::Tabchange && event.GetTargetElement() == recompui::get_config_tabset()) {
             int tab_index = event.GetParameter<int>("tab_index", 0);
             bool in_mod_tab = (tab_index == recompui::config_tab_to_index(recompui::ConfigTab::Mods));
             if (in_mod_tab) {
@@ -2893,6 +2946,50 @@ public:
                         audio_context.edited.custom_tracks[track] = draw(files);
                     }
                 }
+                audio_option_changed(false);
+                push_tracks_live();
+                dirty_track_names();
+            });
+        // "Randomise current map": a new song for the area Brian is in (its
+        // own music, not a battle's), from the folder (:custom), the game's
+        // own music (:own) or either (:mix). That track is the one playing,
+        // so audio::on_frame restarts it with the new song at once.
+        recompui::register_event(listener, "aud_music_random_current",
+            [](const std::string& param, Rml::Event& event) {
+                int track = zelda64::audio::current_map_track();
+                if (track < 0 || track >= zelda64::audio::game_track_count) {
+                    return;
+                }
+                refresh_music_library();
+                std::string mode = param;
+                if (!mode.empty() && mode[0] == ':') {
+                    mode.erase(0, 1);
+                }
+                std::vector<std::string> own;
+                for (int other = 0; other < zelda64::audio::game_track_count; other++) {
+                    if (!zelda64::audio::track_is_jingle(other)) {
+                        own.push_back(zelda64::audio::game_prefix + std::to_string(other));
+                    }
+                }
+                std::vector<std::string> pool;
+                if (mode == "custom" || mode == "mix") {
+                    pool.insert(pool.end(), audio_context.library.begin(), audio_context.library.end());
+                }
+                if (mode == "own" || mode == "mix" || pool.empty()) {
+                    pool.insert(pool.end(), own.begin(), own.end());
+                }
+                auto it = audio_context.edited.custom_tracks.find(track);
+                std::string current = it != audio_context.edited.custom_tracks.end() ? it->second : std::string();
+                std::string own_name = zelda64::audio::game_prefix + std::to_string(track);
+                // Never what is playing now (the game's own track counts as itself).
+                std::erase_if(pool, [&](const std::string& n) {
+                    return n == current || (current.empty() && n == own_name);
+                });
+                if (pool.empty()) {
+                    return;
+                }
+                std::mt19937 rng{ std::random_device{}() };
+                audio_context.edited.custom_tracks[track] = pool[std::uniform_int_distribution<size_t>(0, pool.size() - 1)(rng)];
                 audio_option_changed(false);
                 push_tracks_live();
                 dirty_track_names();
@@ -3326,7 +3423,27 @@ public:
 
         constructor.BindFunc("input_count", [](Rml::Variant& out) { out = static_cast<uint64_t>(recomp::get_num_inputs()); } );
         constructor.BindFunc("input_device_is_keyboard", [](Rml::Variant& out) { out = cur_device == recomp::InputDevice::Keyboard; } );
+        // The Enhancements section at the top of the list (controls.rml):
+        // Exit Spell while Exit from anywhere is on, the minimap zooms while
+        // the minimap is. On in the menu or in the running game (a seed can
+        // switch them on); enhancements_option_changed refreshes them.
+        constructor.BindFunc("extra_exit", [](Rml::Variant& out) {
+            out = enhancements_context.edited.exit_from_anywhere || zelda64::enhancements::active_options().exit_from_anywhere;
+        });
+        constructor.BindFunc("extra_minimap", [](Rml::Variant& out) {
+            out = enhancements_context.edited.minimap || zelda64::enhancements::active_options().minimap;
+        });
 
+        // The label's style: smaller type for the longer names, which do not
+        // wrap and would otherwise run into the bindings (controls.rml).
+        constructor.RegisterTransformFunc("get_input_label_style", [](const Rml::VariantList& inputs) {
+            size_t n = recomp::get_input_name(static_cast<recomp::GameInput>(inputs.at(0).Get<size_t>())).size();
+            const char* style = n <= 13 ? "font-size: 22dp; letter-spacing: 1.6dp; line-height: 24dp;"
+                              : n <= 16 ? "font-size: 18dp; letter-spacing: 1.2dp; line-height: 24dp;"
+                              : n <= 19 ? "font-size: 16dp; letter-spacing: 1.0dp; line-height: 24dp;"
+                              :           "font-size: 14dp; letter-spacing: 0.8dp; line-height: 24dp;";
+            return Rml::Variant{ std::string(style) };
+        });
         constructor.RegisterTransformFunc("get_input_name", [](const Rml::VariantList& inputs) {
             return Rml::Variant{recomp::get_input_name(static_cast<recomp::GameInput>(inputs.at(0).Get<size_t>()))};
         });
@@ -3689,7 +3806,25 @@ void recompui::toggle_fullscreen() {
 }
 
 void recompui::set_config_tab(ConfigTab tab) {
-    get_config_tabset()->SetActiveTab(config_tab_to_index(tab));
+    Rml::ElementTabSet* tabset = get_config_tabset();
+    tabset->SetActiveTab(config_tab_to_index(tab));
+    // Randomizer and Layout have sub-tabs (config_menu.rml): pick the
+    // one asked for, or the first.
+    const char* inner = nullptr;
+    int index = 0;
+    switch (tab) {
+        case ConfigTab::Randomizer:   inner = "randomizer_tabset"; break;
+        case ConfigTab::Layout:       inner = "layout_tabset"; break;
+        // HUD, Minimap, Notifications, Tracker.
+        case ConfigTab::Tracker:      inner = "layout_tabset"; index = 3; break;
+        default: break;
+    }
+    Rml::ElementDocument* document = tabset->GetOwnerDocument();
+    if (inner != nullptr && document != nullptr) {
+        if (auto* sub = rmlui_dynamic_cast<Rml::ElementTabSet*>(document->GetElementById(inner))) {
+            sub->SetActiveTab(index);
+        }
+    }
 }
 
 Rml::ElementTabSet* recompui::get_config_tabset() {

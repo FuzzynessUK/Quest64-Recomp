@@ -7,7 +7,8 @@
 
 // The tracker (Tracker tab, assets/tracker.rml): two overlay windows in the
 // style of Ship of Harkinian's. The item tracker shows the six boss items,
-// the six wings and how many kinds of monster have been beaten; the check
+// the Boss Souls that have arrived (only in a seed with Boss Souls) and the
+// six wings; the check
 // tracker lists every check by area, found ones lit and the rest greyed out,
 // with the area Brian is in opened. Either window can be unlocked and
 // dragged with the mouse, then locked in place.
@@ -31,9 +32,14 @@ namespace zelda64::tracker {
     extern const std::vector<const char*> area_names;
     extern const int monsters_area;
     extern const std::vector<CheckInfo> checks;
-    extern const std::vector<int> map_area;   // per game map, into area_names
+    // Per room, [map][submap], into area_names: where an interior is filed
+    // is decided by the door that leads into it, not by its building set.
+    extern const std::vector<std::vector<int>> room_area;
 
     struct Options {
+        // The whole tracker: off, no window shows and the Tracker tab hides
+        // every other setting.
+        bool enabled = true;
         bool item_tracker = false;
         bool check_tracker = false;
         // Locked: the windows stay put. Unlocked: drag a window by its
@@ -48,6 +54,9 @@ namespace zelda64::tracker {
         bool hide_titles = false;
         // The item tracker's Wings section.
         bool show_wings = true;
+        // The item tracker's Boss Souls section (only ever shown in a seed
+        // with Boss Souls).
+        bool show_souls = true;
         // Each window's background: 0 solid, 1 translucent, 2 clear. (One
         // "background" setting once covered all three; it is read as the
         // starting value for any of these a settings file does not have.)
@@ -94,6 +103,8 @@ namespace zelda64::tracker {
         std::vector<uint8_t> found;     // per check
         std::vector<uint8_t> present;   // per check: part of this game
         int item_counts[32] = {};       // bag counts for item ids 0-31
+        int souls_mode = 0;             // archipelago::tracker_souls: 0 none, 1 seven, 2 eight
+        uint32_t souls = 0;             // bit n (1-8): that boss's Soul has arrived
         int area = -1;                  // where Brian is, or -1
     };
     // Copies the latest snapshot if it is newer than `have`. UI thread.

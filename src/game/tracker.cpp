@@ -45,6 +45,7 @@ namespace {
                 catch (const json::exception&) {}
             }
         };
+        get("enabled", current.enabled);
         get("item_tracker", current.item_tracker);
         get("check_tracker", current.check_tracker);
         get("locked", current.locked);
@@ -52,6 +53,7 @@ namespace {
         get("hide_borders", current.hide_borders);
         get("hide_titles", current.hide_titles);
         get("show_wings", current.show_wings);
+        get("show_souls", current.show_souls);
         get("notes", current.notes);
         get("notes_x", current.notes_x);
         get("notes_y", current.notes_y);
@@ -153,8 +155,9 @@ namespace {
     constexpr int32_t chest_flags = 0x800869D8;
     constexpr int32_t spirit_flags = 0x80086AE8;
     constexpr int32_t bosses_beaten = 0x8007D19C;
-    constexpr int32_t gCurrentMap = 0x80084EEC;
     constexpr int32_t gNextMap = 0x80084EE4;
+    constexpr int32_t room_map = 0x80084EE4;
+    constexpr int32_t room_submap = 0x80084EE8;
 
     bool flag_set(uint8_t* rdram, int32_t base, int id) {
         return (MEM_BU(0, base + (id >> 3)) & (1u << (id & 7))) != 0;
@@ -183,6 +186,7 @@ void zelda64::tracker::set_options(const Options& options) {
     options_loaded = true;
     current = options;
     json j;
+    j["enabled"] = current.enabled;
     j["item_tracker"] = current.item_tracker;
     j["check_tracker"] = current.check_tracker;
     j["locked"] = current.locked;
@@ -190,6 +194,7 @@ void zelda64::tracker::set_options(const Options& options) {
     j["hide_borders"] = current.hide_borders;
     j["hide_titles"] = current.hide_titles;
     j["show_wings"] = current.show_wings;
+    j["show_souls"] = current.show_souls;
     j["notes"] = current.notes;
     j["notes_x"] = current.notes_x;
     j["notes_y"] = current.notes_y;
@@ -286,6 +291,7 @@ void zelda64::tracker::on_frame(uint8_t* rdram) {
     static const std::vector<int64_t> locations = all_locations();
     std::vector<uint8_t> in_seed, checked;
     s.archipelago = zelda64::archipelago::tracker_view(locations, in_seed, checked);
+    s.souls_mode = zelda64::archipelago::tracker_souls(s.souls);
 
     uint8_t beaten = s.in_game ? MEM_BU(0, bosses_beaten) : 0;
     for (size_t i = 0; i < count; i++) {
@@ -318,15 +324,21 @@ void zelda64::tracker::on_frame(uint8_t* rdram) {
         for (int id = 0; id < 32; id++) {
             s.item_counts[id] = counts[id];
         }
-        int map = static_cast<int>(MEM_W(0, gCurrentMap));
-        if (map >= 0 && map < static_cast<int>(map_area.size())) {
-            s.area = map_area[static_cast<size_t>(map)];
+        // The room Brian is in, from the pair the minimap reads (minimap.h:
+        // the exit record changes before the new map has loaded). A room,
+        // not a map: one building set serves several areas.
+        int map = static_cast<int>(MEM_W(0, room_map));
+        int submap = static_cast<int>(MEM_W(0, room_submap));
+        if (map >= 0 && map < static_cast<int>(room_area.size()) && submap >= 0 &&
+            submap < static_cast<int>(room_area[static_cast<size_t>(map)].size())) {
+            s.area = room_area[static_cast<size_t>(map)][static_cast<size_t>(submap)];
         }
     }
 
     std::lock_guard lock{ snapshot_mutex };
     bool changed = latest.in_game != s.in_game || latest.archipelago != s.archipelago ||
         latest.found != s.found || latest.present != s.present || latest.area != s.area ||
+        latest.souls_mode != s.souls_mode || latest.souls != s.souls ||
         !std::equal(std::begin(s.item_counts), std::end(s.item_counts), std::begin(latest.item_counts));
     if (!changed) {
         return;

@@ -1,0 +1,86 @@
+<template name="config-menu__rnd_stats">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Randomizer (config_menu.rml), on randomizer_model; its tab only shows while the randomizer is on and no seed is connected. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div data-if="rnd_mode == 1 && ap_locked == 0">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Brian's starting stats</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>HP: {{rnd_start_hp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_hp_input"
+                                            type="range"
+                                            data-value="rnd_start_hp"
+                                            min="1"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>MP: {{rnd_start_mp}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_mp_input"
+                                            type="range"
+                                            data-value="rnd_start_mp"
+                                            min="0"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Agility: {{rnd_start_agility}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_agility_input"
+                                            type="range"
+                                            data-value="rnd_start_agility"
+                                            min="0"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label"><div>Defense: {{rnd_start_defense}}</div></div>
+                                        <input
+                                            data-event-blur="set_cur_config_index(-1)"
+                                            data-event-focus="set_cur_config_index(1)"
+                                            class="nav-vert"
+                                            id="rnd_start_defense_input"
+                                            type="range"
+                                            data-value="rnd_start_defense"
+                                            min="0"
+                                            max="999"
+                                            step="1"
+                                        />
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" data-event-click="rnd_stats_default()">Default</button>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

@@ -2566,6 +2566,28 @@ button {
   padding: 14dp 16dp;
 }
 
+/* Sub-tabs inside a config tab (Sound: Sound | Audio, Layout: Layout |
+   Tracker), like a Windows property sheet. The inner tabset sizes itself the
+   way the menu's own tabset does, so the panels below fill and scroll. */
+.subtabs {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.subtabs > tabs {
+  flex-wrap: wrap;
+  padding: 0dp 16dp;
+}
+
+.subtab {
+  font-size: 20dp;
+  letter-spacing: 1.4dp;
+  line-height: 20dp;
+  padding: 10dp 14dp;
+}
+
 .hud-preview {
   position: relative;
   display: block;

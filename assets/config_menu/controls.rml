@@ -35,28 +35,34 @@
                     <div class="input-config__mappings" data-event-mouseout="set_input_row_focus(-1)">
                         <div class="input-config__mappings-scroll">
                             <div class="input-config__mappings-wrapper">
+                                <!-- The N64 D-pad has no rows: Quest 64 does nothing with it. The
+                                     physical D-pad can still be bound to the enhancement controls.
+                                -->
+                                <!-- Enhancement controls first, each only while its feature is on (Exit
+                                     from anywhere, the minimap): extra_exit and extra_minimap. -->
+                                <div class="control-section" data-if="extra_exit || extra_minimap" style="display: block; font-family: Jost; font-size: 18dp; letter-spacing: 2dp; color: #c8d0e0; padding: 10dp 0dp 4dp 4dp;">ENHANCEMENTS</div>
                                 <div
                                     class="control-option"
-                                    data-attr-id="'input_row_' + i"
+                                    data-attr-id="'input_row_extra_' + i"
                                     data-for="input_bindings, i : inputs.array"
                                     data-event-mouseover="set_input_row_focus(i)"
                                     data-class-control-option--active="get_input_enum_name(i)==cur_input_row"
-                                    data-if="!input_device_is_keyboard || (get_input_enum_name(i) != 'TOGGLE_MENU' && get_input_enum_name(i) != 'ACCEPT_MENU' && get_input_enum_name(i) != 'APPLY_MENU')"
+                                    data-if="(get_input_enum_name(i) == 'EXIT_SPELL' && extra_exit) || ((get_input_enum_name(i) == 'MINIMAP_ZOOM_IN' || get_input_enum_name(i) == 'MINIMAP_ZOOM_OUT') && extra_minimap)"
                                 >
                                     <label
                                         class="control-option__label"
-                                        style="font-size: 22dp; letter-spacing: 1.6dp; line-height: 24dp;"
+                                        data-attr-style="get_input_label_style(i)"
                                     >{{get_input_name(i)}}</label>
                                     <div class="control-option__bindings">
                                         <button
-                                            data-attr-id="'input_row_button_' + i + '_' + j"
+                                            data-attr-id="'input_row_extra_button_' + i + '_' + j"
                                             data-event-blur="set_input_row_focus(-1)"
                                             data-event-focus="set_input_row_focus(i)"
                                             data-for="cur_binding, j : input_bindings"
                                             data-event-click="set_input_binding(i,j)"
                                             class="prompt-font control-option__binding"
                                             data-attr-bind-slot="j"
-                                            data-attr-style="i == 0 ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
+                                            data-attr-style="(get_input_enum_name(i) == 'EXIT_SPELL' || (!extra_exit && get_input_enum_name(i) == 'MINIMAP_ZOOM_IN')) ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
                                         >
                                             <div class="control-option__binding-recording">
                                                 <div class="control-option__binding-circle" />
@@ -73,7 +79,7 @@
                                         data-event-focus="set_input_row_focus(i)"
                                         data-event-click="clear_input_bindings(i)"
                                         class="icon-button icon-button--error"
-                                        data-attr-style="i == 0 ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
+                                        data-attr-style="(get_input_enum_name(i) == 'EXIT_SPELL' || (!extra_exit && get_input_enum_name(i) == 'MINIMAP_ZOOM_IN')) ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
                                     >
                                         <svg src="icons/Trash.svg" />
                                     </button>
@@ -83,7 +89,61 @@
                                         data-event-focus="set_input_row_focus(i)"
                                         data-event-click="reset_single_input_binding_to_default(i)"
                                         class="icon-button icon-button--error"
-                                        data-attr-style="i == 0 ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
+                                        data-attr-style="(get_input_enum_name(i) == 'EXIT_SPELL' || (!extra_exit && get_input_enum_name(i) == 'MINIMAP_ZOOM_IN')) ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
+                                    >
+                                        <svg src="icons/Reset.svg" />
+                                    </button>
+                                </div>
+                                <div class="control-section" data-if="extra_exit || extra_minimap" style="display: block; font-family: Jost; font-size: 18dp; letter-spacing: 2dp; color: #c8d0e0; padding: 10dp 0dp 4dp 4dp;">GAME</div>
+                                <div
+                                    class="control-option"
+                                    data-attr-id="'input_row_' + i"
+                                    data-for="input_bindings, i : inputs.array"
+                                    data-event-mouseover="set_input_row_focus(i)"
+                                    data-class-control-option--active="get_input_enum_name(i)==cur_input_row"
+                                    data-if="(get_input_enum_name(i) != 'EXIT_SPELL' && get_input_enum_name(i) != 'MINIMAP_ZOOM_IN' && get_input_enum_name(i) != 'MINIMAP_ZOOM_OUT' && get_input_enum_name(i) != 'DPAD_UP' && get_input_enum_name(i) != 'DPAD_DOWN' && get_input_enum_name(i) != 'DPAD_LEFT' && get_input_enum_name(i) != 'DPAD_RIGHT') && (!input_device_is_keyboard || (get_input_enum_name(i) != 'TOGGLE_MENU' && get_input_enum_name(i) != 'ACCEPT_MENU' && get_input_enum_name(i) != 'APPLY_MENU'))"
+                                >
+                                    <label
+                                        class="control-option__label"
+                                        data-attr-style="get_input_label_style(i)"
+                                    >{{get_input_name(i)}}</label>
+                                    <div class="control-option__bindings">
+                                        <button
+                                            data-attr-id="'input_row_button_' + i + '_' + j"
+                                            data-event-blur="set_input_row_focus(-1)"
+                                            data-event-focus="set_input_row_focus(i)"
+                                            data-for="cur_binding, j : input_bindings"
+                                            data-event-click="set_input_binding(i,j)"
+                                            class="prompt-font control-option__binding"
+                                            data-attr-bind-slot="j"
+                                            data-attr-style="i == 0 && !(extra_exit || extra_minimap) ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
+                                        >
+                                            <div class="control-option__binding-recording">
+                                                <div class="control-option__binding-circle" />
+                                                <div class="control-option__binding-edge">
+                                                    <svg class="control-option__binding-edge-svg" src="icons/RecordBorder.svg" />
+                                                </div>
+                                            </div>
+                                            <div class="control-option__binding-icon">{{cur_binding}}</div>
+                                        </button>
+                                    </div>
+                                    <button
+                                        data-if="get_input_enum_name(i) != 'TOGGLE_MENU' && get_input_enum_name(i) != 'ACCEPT_MENU'"
+                                        data-event-blur="set_input_row_focus(-1)"
+                                        data-event-focus="set_input_row_focus(i)"
+                                        data-event-click="clear_input_bindings(i)"
+                                        class="icon-button icon-button--error"
+                                        data-attr-style="i == 0 && !(extra_exit || extra_minimap) ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
+                                    >
+                                        <svg src="icons/Trash.svg" />
+                                    </button>
+                                    <button
+                                        data-if="get_input_enum_name(i) == 'TOGGLE_MENU' || get_input_enum_name(i) == 'ACCEPT_MENU'"
+                                        data-event-blur="set_input_row_focus(-1)"
+                                        data-event-focus="set_input_row_focus(i)"
+                                        data-event-click="reset_single_input_binding_to_default(i)"
+                                        class="icon-button icon-button--error"
+                                        data-attr-style="i == 0 && !(extra_exit || extra_minimap) ? 'nav-up:#cont_kb_toggle' : 'nav-up:auto'"
                                     >
                                         <svg src="icons/Reset.svg" />
                                     </button>

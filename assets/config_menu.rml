@@ -27,7 +27,6 @@
 	<link type="text/template" href="config_menu/general.rml" />
 	<link type="text/template" href="config_menu/controls.rml" />
 	<link type="text/template" href="config_menu/graphics.rml" />
-	<link type="text/template" href="config_menu/sound.rml" />
 	<link type="text/template" href="config_menu/mods.rml" />
 	<link type="text/template" href="config_menu/debug.rml" />
 	<link type="text/template" href="config_menu/cheats.rml" />
@@ -36,6 +35,16 @@
 	<link type="text/template" href="config_menu/layout.rml" />
 	<link type="text/template" href="config_menu/audio.rml" />
 	<link type="text/template" href="config_menu/tracker.rml" />
+	<link type="text/template" href="config_menu/archipelago.rml" />
+	<link type="text/template" href="config_menu/layout_minimap.rml" />
+	<link type="text/template" href="config_menu/layout_notifications.rml" />
+	<link type="text/template" href="config_menu/rnd_spells.rml" />
+	<link type="text/template" href="config_menu/rnd_items.rml" />
+	<link type="text/template" href="config_menu/rnd_monsters.rml" />
+	<link type="text/template" href="config_menu/rnd_stats.rml" />
+	<link type="text/template" href="config_menu/rnd_world.rml" />
+	<link type="text/template" href="config_menu/rnd_lost_keys.rml" />
+	<link type="text/template" href="config_menu/rnd_cosmetics.rml" />
 </head>
 <body class="window">
 	<!-- <handle move_target="#document"> -->
@@ -68,8 +77,137 @@
 							<div>Sound</div>
 							<div class="tab__indicator"></div>
 						</tab>
-						<panel class="config" data-model="sound_options_model">
-							<template src="config-menu__sound" />
+						<panel class="config" data-model="audio_model">
+							<!-- Volume and the custom music options on one page (audio.rml). -->
+							<template src="config-menu__audio" />
+						</panel>
+						<tab class="tab" id="tab_archipelago">
+							<div>Archipelago</div>
+							<div class="tab__indicator"></div>
+						</tab>
+						<panel class="config" data-model="randomizer_model">
+							<!-- The connection's bindings are randomizer_model's (ui_config.cpp). -->
+							<template src="config-menu__archipelago" />
+						</panel>
+						<tab class="tab" id="tab_randomizer">
+							<div>Randomizer</div>
+							<div class="tab__indicator"></div>
+						</tab>
+						<panel class="config">
+							<!-- Sub-tabs, like a Windows property sheet. The whole tabset is on
+							     randomizer_model, so the
+							     section tabs show only while the randomizer is on and no seed is
+							     connected. -->
+							<tabset class="tabs subtabs" id="randomizer_tabset" data-model="randomizer_model">
+								<tab class="tab subtab" id="subtab_randomizer" style="nav-up: #tab_randomizer;">
+									<div>Randomizer</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__randomizer" />
+								</panel>
+								<tab class="tab subtab" id="subtab_rnd_spells" data-if="rnd_mode == 1 && ap_locked == 0" style="nav-up: #tab_randomizer;">
+									<div>Spells</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__rnd_spells" />
+								</panel>
+								<tab class="tab subtab" id="subtab_rnd_items" data-if="rnd_mode == 1 && ap_locked == 0" style="nav-up: #tab_randomizer;">
+									<div>Items</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__rnd_items" />
+								</panel>
+								<tab class="tab subtab" id="subtab_rnd_monsters" data-if="rnd_mode == 1 && ap_locked == 0" style="nav-up: #tab_randomizer;">
+									<div>Monsters</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__rnd_monsters" />
+								</panel>
+								<tab class="tab subtab" id="subtab_rnd_stats" data-if="rnd_mode == 1 && ap_locked == 0" style="nav-up: #tab_randomizer;">
+									<div>Stats</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__rnd_stats" />
+								</panel>
+								<tab class="tab subtab" id="subtab_rnd_world" data-if="rnd_mode == 1 && ap_locked == 0" style="nav-up: #tab_randomizer;">
+									<div>World</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__rnd_world" />
+								</panel>
+								<tab class="tab subtab" id="subtab_rnd_lost_keys" data-if="rnd_mode == 1 && ap_locked == 0" style="nav-up: #tab_randomizer;">
+									<div>Lost Keys</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__rnd_lost_keys" />
+								</panel>
+								<tab class="tab subtab" id="subtab_rnd_cosmetics" data-if="rnd_mode == 1 && ap_locked == 0" style="nav-up: #tab_randomizer;">
+									<div>Cosmetics</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config">
+									<template src="config-menu__rnd_cosmetics" />
+								</panel>
+							</tabset>
+						</panel>
+						<tab class="tab" id="tab_enhancements">
+							<div>Enhancements</div>
+							<div class="tab__indicator"></div>
+						</tab>
+						<panel class="config" data-model="enhancements_model">
+							<template src="config-menu__enhancements" />
+						</panel>
+						<tab class="tab" id="tab_layout">
+							<div>Layout</div>
+							<div class="tab__indicator"></div>
+						</tab>
+						<panel class="config">
+							<!-- Sub-tabs, like a Windows property sheet. Each panel has its own
+							     data model, which RmlUi will not nest, so the outer panel has none. -->
+							<tabset class="tabs subtabs" id="layout_tabset">
+								<tab class="tab subtab" id="subtab_layout" style="nav-up: #tab_layout;">
+									<div>HUD</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config" data-model="enhancements_model">
+									<template src="config-menu__layout" />
+								</panel>
+								<tab class="tab subtab" id="subtab_minimap" style="nav-up: #tab_layout;">
+									<div>Minimap</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config" data-model="enhancements_model">
+									<template src="config-menu__layout_minimap" />
+								</panel>
+								<tab class="tab subtab" id="subtab_notifications" style="nav-up: #tab_layout;">
+									<div>Notifications</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config" data-model="enhancements_model">
+									<template src="config-menu__layout_notifications" />
+								</panel>
+								<tab class="tab subtab" id="subtab_tracker" style="nav-up: #tab_layout;">
+									<div>Tracker</div>
+									<div class="tab__indicator"></div>
+								</tab>
+								<panel class="config" data-model="tracker_model">
+									<template src="config-menu__tracker" />
+								</panel>
+							</tabset>
+						</panel>
+						<tab class="tab" data-model="debug_model" data-if="debug_enabled" id="tab_debug">
+							<div>Debug</div>
+							<div class="tab__indicator"></div>
+						</tab>
+						<panel class="config" data-model="debug_model">
+							<template src="config-menu__debug" />
 						</panel>
 						<tab class="tab" id="tab_mods">
 							<div>Mods</div>
@@ -84,48 +222,6 @@
 						</tab>
 						<panel class="config" data-model="cheats_model">
 							<template src="config-menu__cheats" />
-						</panel>
-						<tab class="tab" id="tab_randomizer">
-							<div>Randomizer</div>
-							<div class="tab__indicator"></div>
-						</tab>
-						<panel class="config" data-model="randomizer_model">
-							<template src="config-menu__randomizer" />
-						</panel>
-						<tab class="tab" id="tab_enhancements">
-							<div>Enhancements</div>
-							<div class="tab__indicator"></div>
-						</tab>
-						<panel class="config" data-model="enhancements_model">
-							<template src="config-menu__enhancements" />
-						</panel>
-						<tab class="tab" id="tab_layout">
-							<div>Layout</div>
-							<div class="tab__indicator"></div>
-						</tab>
-						<panel class="config" data-model="enhancements_model">
-							<template src="config-menu__layout" />
-						</panel>
-						<tab class="tab" id="tab_audio">
-							<div>Audio</div>
-							<div class="tab__indicator"></div>
-						</tab>
-						<panel class="config" data-model="audio_model">
-							<template src="config-menu__audio" />
-						</panel>
-						<tab class="tab" id="tab_tracker">
-							<div>Tracker</div>
-							<div class="tab__indicator"></div>
-						</tab>
-						<panel class="config" data-model="tracker_model">
-							<template src="config-menu__tracker" />
-						</panel>
-						<tab class="tab" data-model="debug_model" data-if="debug_enabled" id="tab_debug">
-							<div>Debug</div>
-							<div class="tab__indicator"></div>
-						</tab>
-						<panel class="config" data-model="debug_model">
-							<template src="config-menu__debug" />
 						</panel>
 					</tabset>
 					<div class="config__icon-buttons">

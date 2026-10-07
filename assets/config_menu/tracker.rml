@@ -13,62 +13,76 @@
                             <div class="config-debug__option-split">
                                 <div class="config-debug__option-controls">
                                     <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Item Tracker</div><div class="config-tip-text">A window with the six boss items and the six wings (with how many of each you hold). Monsters are in the check tracker. Items you hold are lit; the rest are greyed out. Shown while a game is being played.</div></div>
-                                        <select data-value="trk_items" id="trk_items_select" style="nav-up: #tab_tracker">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Tracker</div><div class="config-tip-text">The whole tracker. Off, none of its windows show and the rest of this tab is hidden; your settings are kept for when it is switched back on.</div></div>
+                                        <select data-value="trk_enabled" id="trk_enabled_select" style="nav-up: #subtab_tracker">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Check Tracker</div><div class="config-tip-text">A window listing every check by area: chests, spirits, bosses, and a Monsters section for each kind of monster. Found checks are lit and the rest greyed out; each area shows found / total, and the area you are in opens by itself. Gift NPCs are listed while connected to Archipelago, which is the only thing that remembers them; connected, only the checks in your seed are listed.</div></div>
-                                        <select data-value="trk_checks" id="trk_checks_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notes</div><div class="config-tip-text">A window to write notes in, like Ship of Harkinian's. Click into it to type, locked or not; while you are typing the game does not get the keyboard, so click outside the note when you are done. Unlock the windows to move it by its title or resize it from its bottom-right corner. What you write is kept in tracker_notes.txt.</div></div>
-                                        <select data-value="trk_notes" id="trk_notes_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
-                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show Wings</div><div class="config-tip-text">Whether the item tracker has its Wings section.</div></div>
-                                        <select data-value="trk_show_wings" id="trk_show_wings_select">
-                                            <option value="0">Off</option>
-                                            <option value="1">On</option>
-                                        </select>
-                                    </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Windows</div><div class="config-tip-text">Unlocked, the windows are outlined in gold: drag one by its title to move it, or by its corner to resize it. Lock them again to leave them in place. Either way, the check list scrolls with the wheel or by pressing and dragging it, and a click on an area opens or closes it, and the note takes a click to type in.</div></div>
                                         <select data-value="trk_locked" id="trk_locked_select">
                                             <option value="1">Locked</option>
                                             <option value="0">Unlocked</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Item Tracker</div><div class="config-tip-text">A window with the six boss items and the six wings (with how many of each you hold). Monsters are in the check tracker. Items you hold are lit; the rest are greyed out. Shown while a game is being played.</div></div>
+                                        <select data-value="trk_items" id="trk_items_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Check Tracker</div><div class="config-tip-text">A window listing every check by area: chests, spirits, bosses, and a Monsters section for each kind of monster. Found checks are lit and the rest greyed out; each area shows found / total, and the area you are in opens by itself. Gift NPCs are listed while connected to Archipelago, which is the only thing that remembers them; connected, only the checks in your seed are listed.</div></div>
+                                        <select data-value="trk_checks" id="trk_checks_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notes</div><div class="config-tip-text">A window to write notes in, like Ship of Harkinian's. Click into it to type, locked or not; while you are typing the game does not get the keyboard, so click outside the note when you are done. Unlock the windows to move it by its title or resize it from its bottom-right corner. What you write is kept in tracker_notes.txt.</div></div>
+                                        <select data-value="trk_notes" id="trk_notes_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div style="font-size: 16dp;">Show Boss Souls</div><div class="config-tip-text">Whether the item tracker has its Boss Souls section, which lights up each boss's Soul as it arrives. It only ever shows in an Archipelago seed with Boss Souls on.</div></div>
+                                        <select data-value="trk_show_souls" id="trk_show_souls_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show Wings</div><div class="config-tip-text">Whether the item tracker has its Wings section.</div></div>
+                                        <select data-value="trk_show_wings" id="trk_show_wings_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div style="font-size: 16dp;">Hide Completed Areas</div><div class="config-tip-text">Areas with every check found drop out of the check tracker, apart from the one you are in.</div></div>
                                         <select data-value="trk_hide_done" id="trk_hide_done_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide Borders</div><div class="config-tip-text">The windows have no outline, locked or unlocked.</div></div>
                                         <select data-value="trk_hide_borders" id="trk_hide_borders_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide Titles</div><div class="config-tip-text">The windows' titles ("Tracker", "Checks", "Notes") are left out, locked or not. Unlocked, drag a window by its edge instead.</div></div>
                                         <select data-value="trk_hide_titles" id="trk_hide_titles_select">
                                             <option value="0">Off</option>
                                             <option value="1">On</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div style="font-size: 16dp;">Tracker Background</div><div class="config-tip-text">How the item tracker window's background is drawn over the game.</div></div>
                                         <select data-value="trk_item_background" id="trk_item_background_select">
                                             <option value="0">Solid</option>
@@ -76,7 +90,7 @@
                                             <option value="2">Clear</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div style="font-size: 16dp;">Checks Background</div><div class="config-tip-text">How the check tracker window's background is drawn over the game.</div></div>
                                         <select data-value="trk_check_background" id="trk_check_background_select">
                                             <option value="0">Solid</option>
@@ -84,7 +98,7 @@
                                             <option value="2">Clear</option>
                                         </select>
                                     </div>
-                                    <div class="config-debug__select-wrapper">
+                                    <div class="config-debug__select-wrapper" data-if="trk_enabled == 1">
                                         <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div style="font-size: 16dp;">Notes Background</div><div class="config-tip-text">How the notes window's background is drawn over the game.</div></div>
                                         <select data-value="trk_notes_background" id="trk_notes_background_select">
                                             <option value="0">Solid</option>
@@ -93,12 +107,12 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="config-debug__option-trigger">
+                                <div class="config-debug__option-trigger" data-if="trk_enabled == 1">
                                     <button class="button" onclick="trk_reset_positions">Reset window positions</button>
                                 </div>
                             </div>
                         </div>
-                        <div class="config-debug-option">
+                        <div class="config-debug-option" data-if="trk_enabled == 1">
                             <label class="config-debug-option__label">
                                 <div>Checks</div>
                             </label>

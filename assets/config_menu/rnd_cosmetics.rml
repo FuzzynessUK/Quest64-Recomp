@@ -1,0 +1,70 @@
+<template name="config-menu__rnd_cosmetics">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Randomizer (config_menu.rml), on randomizer_model; its tab only shows while the randomizer is on and no seed is connected. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div data-if="rnd_mode == 1 && ap_locked == 0">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Cosmetics</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Text palette</div></div>
+                                        <select data-value="rnd_text_palette" id="rnd_text_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                            <option value="2">Red</option>
+                                            <option value="3">Blue</option>
+                                            <option value="4">White</option>
+                                            <option value="5">Black</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Staff palette</div></div>
+                                        <select data-value="rnd_staff_palette" id="rnd_staff_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Cloak colour</div></div>
+                                        <select data-value="rnd_cloak_palette" id="rnd_cloak_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Brian's clothes</div></div>
+                                        <select data-value="rnd_brian_palette" id="rnd_brian_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label"><div>Spell palettes</div></div>
+                                        <select data-value="rnd_spell_palette" id="rnd_spell_palette_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Random</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="rnd_cosmetics_default">All default</button>
+                                    <button class="button" onclick="rnd_cosmetics_random">All random</button>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

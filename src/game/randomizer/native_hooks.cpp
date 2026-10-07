@@ -54,11 +54,14 @@ namespace {
     int32_t spirit_records = 0;
     // The Chest Randomizer's tables, likewise.
     int32_t chest_records = 0;
+    // The Archipelago opening speech (quest64_archipelago_intro_text).
+    int32_t intro_message = 0;
 }
 
 void zelda64::randomizer::reset_native_scratch() {
     spirit_records = 0;
     chest_records = 0;
+    intro_message = 0;
 }
 
 namespace {
@@ -526,4 +529,35 @@ extern "C" void quest64_randomizer_abbott_text(uint8_t* rdram, recomp_context* c
     for (size_t i = 0; i < text.size(); i++) {
         MEM_B(static_cast<int32_t>(i), message_buffer) = static_cast<int8_t>(text[i]);
     }
+}
+
+// --- Archipelago: the Grand Abbott's opening speech -------------------------
+// func_80007A50 shows the new game's opening text with func_80008AD8(0,
+// gMsg_Grand_Abbott_intro = 0x80054828): `lui $a1, 0x8005` at 0x80007B18 and
+// `addiu $a1, $a1, 0x4828` in the delay slot of the jal at 0x80007B1C, so a1
+// is set here to the message less 0x4828, as Hard Mode's hook (which runs
+// first, and is left alone) does. While a seed is being played the speech is
+// a welcome and then what he says in the monastery: what opens Mammon's
+// World, and who is where. The message goes in a block of librecomp's heap,
+// written afresh each time, since the portal's condition is the server's.
+extern "C" void quest64_archipelago_intro_text(uint8_t* rdram, recomp_context* ctx) {
+    constexpr size_t room = 0x400;
+    if (zelda64::hardmode::active()) {
+        return;
+    }
+    std::vector<uint8_t> text = zelda64::randomizer::archipelago_intro_message();
+    if (text.empty() || text.size() > room) {
+        return;
+    }
+    if (intro_message == 0) {
+        void* mem = recomp::alloc(rdram, room);
+        if (mem == nullptr) {
+            return;
+        }
+        intro_message = static_cast<int32_t>(static_cast<uint32_t>(reinterpret_cast<uint8_t*>(mem) - rdram) + 0x80000000u);
+    }
+    for (size_t i = 0; i < text.size(); i++) {
+        MEM_B(static_cast<int32_t>(i), intro_message) = static_cast<int8_t>(text[i]);
+    }
+    ctx->r5 = static_cast<gpr>(static_cast<int32_t>(intro_message - 0x4828));
 }

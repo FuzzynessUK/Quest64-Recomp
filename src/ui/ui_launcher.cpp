@@ -116,6 +116,13 @@ public:
                 recompui::show_context(recompui::get_config_context_id(), "");
             }
         );
+        recompui::register_event(listener, "open_archipelago",
+            [](const std::string &param, Rml::Event &event) {
+                recompui::set_config_tab(recompui::ConfigTab::Archipelago);
+                recompui::hide_all_contexts();
+                recompui::show_context(recompui::get_config_context_id(), "");
+            }
+        );
         recompui::register_event(listener, "exit_game",
             [](const std::string& param, Rml::Event& event) {
                 ultramodern::quit();

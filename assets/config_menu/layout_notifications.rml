@@ -1,0 +1,104 @@
+<template name="config-menu__layout_notifications">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Layout (config_menu.rml), on enhancements_model. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Notifications</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Notifications</div><div class="config-tip-text">The on-screen messages. Off hides the options below and shows nothing; On fades each message after three seconds; On (Never Expire) keeps them until the maximum pushes the oldest out. Applies straight away.</div></div>
+                                        <select data-value="enh_notifications" id="enh_notifications_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                            <option value="2">On (Never Expire)</option>
+                                        </select>
+                                    </div>
+                                    <div data-if="enh_notifications != 0">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Position</div><div class="config-tip-text">Where the messages sit on screen. Top left shares its column with the Speedrun Timer when that is top left too. Applies straight away.</div></div>
+                                        <select data-value="enh_notify_position" id="enh_notify_position_select">
+                                            <option value="0">Top left</option>
+                                            <option value="1">Top middle</option>
+                                            <option value="2">Top right</option>
+                                            <option value="3">Left</option>
+                                            <option value="4">Right</option>
+                                            <option value="5">Middle</option>
+                                            <option value="6">Bottom left</option>
+                                            <option value="7">Bottom middle</option>
+                                            <option value="8">Bottom right</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-option__range-wrapper config-debug__select-wrapper config-option__list">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Max messages: {{enh_notify_max}}</div><div class="config-tip-text">How many messages can be on screen at once; beyond that the oldest is pushed out. Applies straight away.</div></div>
+                                        <input
+                                            class="nav-vert"
+                                            id="enh_notify_max_input"
+                                            type="range"
+                                            data-value="enh_notify_max"
+                                            min="1"
+                                            max="10"
+                                            step="1"
+                                        />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show spell learnt</div><div class="config-tip-text">The game says nothing when a spirit takes an element to a spell's unlock level. With this on, "You have learnt ..." appears top-left for three seconds for each spell as it unlocks, using the unlock levels in play (the randomizer's level options included).</div></div>
+                                        <select data-value="enh_spell_notice" id="enh_spell_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show item received</div><div class="config-tip-text">"Received ..." appears top-left for three seconds whenever an item is added to your bag - chests, gifts, drops and shops alike.</div></div>
+                                        <select data-value="enh_item_notice" id="enh_item_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" style="font-size: 16dp; letter-spacing: 1.6dp;" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show Archipelago items</div><div class="config-tip-text">What the Archipelago connector announces while it is connected. Show only your items announces what arrives for you, wherever it was found: "Received Fire Ruby from Bob". Show all players adds the other direction - a check found here holding something that belongs to someone else: "You have sent "Progressive Sword" to "Bob"". Show all items in the room adds every item sent between anyone else as well, the way the room's log shows it: "Bob sent "Hookshot" to "Alice"". Applies straight away; it shows nothing at all unless the connector is on.</div></div>
+                                        <select data-value="enh_ap_notice" id="enh_ap_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Show only your items</option>
+                                            <option value="2">Show all players</option>
+                                            <option value="3">Show all items in the room</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Show song name</div><div class="config-tip-text">"Now playing: ..." appears whenever the music changes: the area or event the game's own track belongs to, or the file name of a custom song from the Audio tab. One at a time keeps a single song name on screen: the track starting takes the place of the one showing instead of stacking under it, so walking through several areas - or leaving messages on Never Expire - does not fill the corner with them.</div></div>
+                                        <select data-value="enh_song_notice" id="enh_song_notice_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                            <option value="2">On (one at a time)</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Speedrun Timer</div><div class="config-tip-text">Shows a run timer on screen. It starts when you leave the title screen and stops on the message that Mammon has been destroyed. Pick where on the screen it sits; messages that share the spot line up under it. Applies straight away.</div></div>
+                                        <select data-value="enh_speedrun_timer" id="enh_speedrun_timer_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">Top left</option>
+                                            <option value="5">Top middle</option>
+                                            <option value="2">Top right</option>
+                                            <option value="3">Bottom left</option>
+                                            <option value="6">Bottom middle</option>
+                                            <option value="4">Bottom right</option>
+                                        </select>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

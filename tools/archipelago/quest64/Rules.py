@@ -21,7 +21,7 @@ ELETALE_BOOK: Rule = Has("Eletale's Book") | Has("Progressive Boss Item", 5)
 DARK_GAOL_KEY: Rule = Has("Dark Gaol Key") | (OptionFilter(MammonPortal, 0) & Has("Progressive Boss Item", 6)) | (OptionFilter(MammonPortal, 0, operator="ne") & Has("Progressive Boss Item", 5))
 ALL_BOSSES_BEATEN: Rule = CanReachLocation("Boss - Solvaring") & CanReachLocation("Boss - Zelse") & CanReachLocation("Boss - Nepty") & CanReachLocation("Boss - Shilf") & CanReachLocation("Boss - Fargo") & CanReachLocation("Boss - Guilty") & CanReachLocation("Boss - Beigis")
 ALL_MONSTER_AREAS: Rule = CanReachRegion("Overworld") & CanReachRegion("Early") & CanReachRegion("Mid") & CanReachRegion("Late")
-ENDGAME_DOOR: Rule = (OptionFilter(MammonPortal, 0) & ELETALE_BOOK) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS)
+ENDGAME_DOOR: Rule = (OptionFilter(MammonPortal, 0) & ELETALE_BOOK) | (OptionFilter(MammonPortal, 1) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 2) & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 3) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 4) & True_()) | (OptionFilter(MammonPortal, 5) & ALL_BOSSES_BEATEN) | (OptionFilter(MammonPortal, 7) & ALL_BOSSES_BEATEN & ALL_MONSTER_AREAS) | (OptionFilter(MammonPortal, 8) & True_()) | (OptionFilter(MammonPortal, 24) & True_())
 
 # The Entrances sheet. An entrance with no rule is always open.
 entrance_rules: Dict[str, Rule] = {

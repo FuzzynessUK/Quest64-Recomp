@@ -20,6 +20,7 @@
 #include "notify.h"
 #include "randomizer/merrow_data.h"
 #include "zelda_config.h"
+#include "zelda_sound.h"
 #include "zelda_support.h"
 #include "json/json.hpp"
 #include "librecomp/addresses.hpp"
@@ -80,7 +81,20 @@ namespace {
     // loads and starts the sequence, so a change is a start.
     constexpr int32_t bgm_current_track = 0x8008FCC0;
     int last_seen_track = -2;
-    std::array<int8_t, sfx_count> sfx_remap{};
+    // A shuffled order of the effects, drawn at every boot whether the
+    // shuffle is on or not, so it can be switched on while the game runs.
+    std::array<int8_t, sfx_count> sfx_shuffled{};
+    // The Sound tab's live values (set_live_options), -1 until it sets them.
+    std::atomic<int> live_battle_music{ -1 };
+    std::atomic<int> live_sfx_shuffle{ -1 };
+    int battle_music_now() {
+        int v = live_battle_music.load();
+        return v >= 0 ? v : zelda64::audio::active_options().battle_music;
+    }
+    bool sfx_shuffle_now() {
+        int v = live_sfx_shuffle.load();
+        return v >= 0 ? v != 0 : zelda64::audio::active_options().sfx_shuffle;
+    }
 
     // With the shuffle on, a looping ambience (a waterfall, say) can land on
     // any effect and then never stop, so every effect is cut three seconds
@@ -223,6 +237,8 @@ namespace {
     int preview_last_request = -2;
     bool preview_in_battle = false;
     constexpr int32_t gBattleState = 0x8008C592;
+    // current_map_track(): set by on_frame, read by the menu.
+    std::atomic<int> map_track{ -1 };
     // A preview's request is watched: if the player is still stopped with
     // nothing pending a while after it, the request is made again (rapid
     // previews can hit a window in the game's own start-up sequence -
@@ -644,6 +660,10 @@ const char* zelda64::audio::track_label(int track) {
     return track >= 0 && track < game_track_count ? track_labels[track] : "";
 }
 
+int zelda64::audio::current_map_track() {
+    return map_track.load();
+}
+
 bool zelda64::audio::track_is_jingle(int track) {
     return track == 28 || track == 29 || track == 30 || track == 43;
 }
@@ -813,11 +833,15 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
     seq_buffers[1] = 0;
     reset_resume_state();
     std::iota(bgm_remap.begin(), bgm_remap.end(), 0);
-    std::iota(sfx_remap.begin(), sfx_remap.end(), 0);
+    std::iota(sfx_shuffled.begin(), sfx_shuffled.end(), 0);
+    {
+        std::mt19937 sfx_rng{ std::random_device{}() };
+        std::shuffle(sfx_shuffled.begin(), sfx_shuffled.end(), sfx_rng);
+    }
     // The library is placed whenever the folder has files, so the menu can
     // switch tracks to it live in any mode.
     bool custom_music = !library_files().empty() || !fanfare_files().empty();
-    if (options.music_shuffle == MusicShuffle::Off && !options.sfx_shuffle && !custom_music) {
+    if (options.music_shuffle == MusicShuffle::Off && !custom_music) {
         return;
     }
 
@@ -856,9 +880,6 @@ void zelda64::audio::apply_at_boot(uint8_t* rdram) {
         }
     }
 
-    if (options.sfx_shuffle) {
-        std::shuffle(sfx_remap.begin(), sfx_remap.end(), rng);
-    }
 }
 
 // UpdateBGM (0x800267B8) and func_800267F8: a0 is the track to start, or
@@ -1013,7 +1034,7 @@ void seek_call(uint8_t* rdram, void (*fn)(uint8_t*, recomp_context*), int32_t ma
 // would restart it from the beginning - which is the very jolt the option
 // exists to avoid.
 extern "C" int quest64_audio_skip_bgm(uint8_t* rdram, recomp_context* ctx) {
-    int mode = zelda64::audio::active_options().battle_music;
+    int mode = battle_music_now();
     int wanted = static_cast<int8_t>(ctx->r4 & 0xFF);
 
     if (mode == 1 && wanted == battle_track) {
@@ -1041,7 +1062,7 @@ extern "C" int quest64_audio_skip_bgm(uint8_t* rdram, recomp_context* ctx) {
 // the battle track the field sequence is still loaded and playing, so its
 // position can still be read.
 void tick_resume(uint8_t* rdram) {
-    if (zelda64::audio::active_options().battle_music != 2) {
+    if (battle_music_now() != 2) {
         return;
     }
 
@@ -1163,21 +1184,38 @@ extern "C" void quest64_audio_victory(uint8_t*, recomp_context* ctx) {
 // func_80025B8C: the routine every sound effect ends in, queued or not,
 // with the effect id in a0 (volume in a1, 0x40 in a2). A volume of zero is
 // a stop request (func_80025B3C), left alone.
-extern "C" void quest64_audio_sfx(uint8_t*, recomp_context* ctx) {
-    if (!zelda64::audio::active_options().sfx_shuffle) {
-        return;
+//
+// The Effects volume (Sound tab) is applied here too, to the volume of each
+// effect as it is queued, so a change takes effect with the next sound. At
+// 0% the request is not queued at all (returns 1: the hook skips the
+// routine, a leaf that only fills the queue); any other level keeps at least
+// 1, since 0 would turn it into a stop.
+extern "C" int quest64_audio_sfx(uint8_t*, recomp_context* ctx) {
+    if (static_cast<int32_t>(ctx->r5) != 0) {
+        int percent = std::clamp(zelda64::get_sfx_volume(), 0, 100);
+        if (percent == 0) {
+            return 1;
+        }
+        if (percent < 100) {
+            int32_t volume = static_cast<int32_t>(ctx->r5);
+            ctx->r5 = S32(std::max(1, (volume * percent + 50) / 100));
+        }
+    }
+    if (!sfx_shuffle_now()) {
+        return 0;
     }
     int32_t id = static_cast<int32_t>(ctx->r4);
     if (id < 0 || id >= sfx_count) {
-        return;
+        return 0;
     }
     if (static_cast<int32_t>(ctx->r5) == 0) {
-        return;
+        return 0;
     }
-    int played = sfx_remap[id];
+    int played = sfx_shuffled[id];
     ctx->r4 = S32(played);
     sfx_started[played] = sfx_clock::now();
     sfx_live[played] = true;
+    return 0;
 }
 
 // Once per frame from the cheats frame hook: cut whatever has been going
@@ -1218,6 +1256,11 @@ bool zelda64::audio::library_loaded() {
     return library_in_rom;
 }
 
+void zelda64::audio::set_live_options(const Options& options) {
+    live_battle_music.store(options.battle_music);
+    live_sfx_shuffle.store(options.sfx_shuffle ? 1 : 0);
+}
+
 void zelda64::audio::set_custom_volume_live(int percent) {
     custom_volume_live = std::clamp(percent, 10, 100);
     custom_volume_dirty = true;
@@ -1231,14 +1274,18 @@ void zelda64::audio::set_custom_volume_live(int percent) {
 // music, which is per file and automatic; the slider then sets how loud
 // custom music sits against the game's as a whole, which is a taste and is
 // the same for every file.
+//
+// The Music volume (Sound tab) scales every track, the game's own included;
+// on_frame calls the routine again when it changes, so it is live.
 extern "C" void quest64_audio_music_volume(uint8_t* rdram, recomp_context* ctx) {
+    float level = static_cast<float>(static_cast<int32_t>(ctx->r4 & 0xFF));
     int track = static_cast<int8_t>(MEM_B(0, bgm_current_track));
     auto it = session_songs.find(track);
-    if (it == session_songs.end() || zelda64::audio::game_track_of(it->second) >= 0) {
-        return;
+    if (it != session_songs.end() && zelda64::audio::game_track_of(it->second) < 0) {
+        int percent = custom_volume_live >= 0 ? custom_volume_live.load() : zelda64::audio::active_options().custom_volume;
+        level *= (percent / 100.0f) * custom_gain(it->second);
     }
-    int percent = custom_volume_live >= 0 ? custom_volume_live.load() : zelda64::audio::active_options().custom_volume;
-    float level = static_cast<int32_t>(ctx->r4 & 0xFF) * (percent / 100.0f) * custom_gain(it->second);
+    level *= std::clamp(zelda64::get_bgm_volume(), 0, 100) / 100.0f;
     ctx->r4 = S32(std::clamp(static_cast<int32_t>(level + 0.5f), 0, 255));
 }
 
@@ -1257,8 +1304,30 @@ void zelda64::audio::on_frame(uint8_t* rdram, recomp_context* ctx) {
             preview = pending_preview;
             pending_preview = -2;
         }
+        // A change to the track playing right now is heard at once: like a
+        // row's Play, the track is stopped this frame and asked for again
+        // the next, so the game loads the new entry. The menu sends all 44
+        // entries on any change, so only a real change to this one counts,
+        // and none while a preview owns the music (Play / Stop).
+        static int restart_next = -1;
+        if (restart_next >= 0) {
+            request_track(rdram, restart_next);
+            restart_next = -1;
+        }
+        const int playing = static_cast<int8_t>(MEM_B(0, bgm_current_track));
         for (const auto& [track, name] : entries) {
+            auto before = session_songs.find(track);
+            const std::string was = before != session_songs.end() ? before->second : std::string();
             write_live_entry(rdram, track, name);
+            auto after = session_songs.find(track);
+            const std::string now = after != session_songs.end() ? after->second : std::string();
+            if (track == playing && now != was && preview_return == -2) {
+                live_log << "  track " << track << " is playing and changed (" << (was.empty() ? "game's own" : was)
+                         << " -> " << (now.empty() ? "game's own" : now) << "): restarting it\n";
+                live_log.flush();
+                request_track(rdram, -1);
+                restart_next = track;
+            }
         }
         int requested = static_cast<int8_t>(MEM_B(0, bgm_request_track));
         bool in_battle = (MEM_HU(0, gBattleState) & 1) != 0;
@@ -1338,7 +1407,12 @@ void zelda64::audio::on_frame(uint8_t* rdram, recomp_context* ctx) {
 
     // The custom music volume changed in the menu: have the game set the
     // players' volume again, through the hooked routine.
-    if (custom_volume_dirty.exchange(false) && ctx != nullptr) {
+    // The Music slider likewise.
+    static int applied_bgm_volume = -1;
+    const int bgm_volume = zelda64::get_bgm_volume();
+    const bool bgm_changed = applied_bgm_volume >= 0 && bgm_volume != applied_bgm_volume;
+    applied_bgm_volume = bgm_volume;
+    if ((custom_volume_dirty.exchange(false) || bgm_changed) && ctx != nullptr) {
         recomp_context copy = *ctx;
         func_80026A04(rdram, &copy);
     }
@@ -1346,6 +1420,10 @@ void zelda64::audio::on_frame(uint8_t* rdram, recomp_context* ctx) {
     // "Show song name" (Layout tab): a line whenever the main player
     // starts a track.
     int track = static_cast<int8_t>(MEM_B(0, bgm_current_track));
+    if (track >= 0 && track < game_track_count && (MEM_HU(0, gBattleState) & 1) == 0 &&
+        !zelda64::audio::track_is_jingle(track)) {
+        map_track.store(track);
+    }
     if (track != last_seen_track) {
         bool announce = last_seen_track != -2 && track >= 0 && track < game_track_count
             && zelda64::enhancements::active_options().song_notice;
@@ -1370,7 +1448,7 @@ void zelda64::audio::on_frame(uint8_t* rdram, recomp_context* ctx) {
         }
     }
 
-    if (!active_options().sfx_shuffle) {
+    if (!sfx_shuffle_now()) {
         return;
     }
     sfx_clock::time_point now = sfx_clock::now();

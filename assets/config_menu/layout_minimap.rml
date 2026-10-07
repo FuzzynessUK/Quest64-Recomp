@@ -1,0 +1,73 @@
+<template name="config-menu__layout_minimap">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Layout (config_menu.rml), on enhancements_model. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Minimap</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Minimap</div><div class="config-tip-text">A map of the area you are in: its walls, you as an arrow pointing the way you are going, chests (gold, grey once opened), spirits (cyan) and people who give items (green); doors are shown only as a white question mark when Checks Guide or a gift NPC marks them. North is up. It hides while a text box would cover it. "On (no background)" leaves out the dark box behind it. Bind Minimap Zoom In and Minimap Zoom Out under Controls to zoom in on where you are; zoomed in, the map follows you. Drag the Map box in the HUD layout preview above to move it, and set its size below. Applies straight away.</div></div>
+                                        <select data-value="enh_minimap" id="enh_minimap_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                            <option value="2">On (no background)</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Minimap size</div><div class="config-tip-text">How big the minimap is (Enhancements, Quality of Life). Drag the Map box above to move it; Minimap default puts it back at the top right of the picture.</div></div>
+                                        <select data-value="enh_minimap_size" id="enh_minimap_size_select">
+                                            <option value="48">Small</option>
+                                            <option value="72">Medium</option>
+                                            <option value="96">Large</option>
+                                            <option value="128">Extra large</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Checks Guide</div><div class="config-tip-text">A door that leads to a chest not yet opened, a spirit not yet taken, or (while playing an Archipelago seed with giftsanity) a gift NPC not yet checked - in the room behind it or anywhere further into that building or area - is marked with an white question mark, and if the door is in a building's wall, the building's outline is drawn in heavier white. A gift NPC still to check gets a white ring. Follows the randomizer when it has moved chests or spirits. Applies straight away.</div></div>
+                                        <select data-value="enh_minimap_checks_guide" id="enh_minimap_checks_guide_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide spirits</div><div class="config-tip-text">Leaves the spirits (cyan) off the minimap. Applies straight away.</div></div>
+                                        <select data-value="enh_minimap_hide_spirits" id="enh_minimap_hide_spirits_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide chests</div><div class="config-tip-text">Leaves the chests (gold, grey once opened) off the minimap. Applies straight away.</div></div>
+                                        <select data-value="enh_minimap_hide_chests" id="enh_minimap_hide_chests_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper" data-if="enh_minimap != 0">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hide gift NPCs</div><div class="config-tip-text">Shows the people who hand over items in green (grey once checked in an Archipelago seed), and the doors that lead to them - such as the taverns - with a white question mark, with the building's outline in heavier white when the door is in its wall. On leaves all of that off the minimap. Applies straight away.</div></div>
+                                        <select data-value="enh_minimap_hide_givers" id="enh_minimap_hide_givers_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" onclick="hud_reset_mm" data-if="enh_minimap != 0">Minimap default</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

@@ -98,13 +98,18 @@ namespace zelda64::archipelago {
     // monsters, 4 pages), or -1 when no seed is being played; `monsters` is
     // how many kinds the monster condition counts, `pages` how many Torn
     // Pages the page condition wants.
-    int portal_requirement(int& monsters, int& pages);
+    // With `orbs`, also how many of the four orbs (bit 8).
+    int portal_requirement(int& monsters, int& pages, int* orbs = nullptr);
     // Page Hunt: the pages the seed wants, 0 when the goal is not a Page Hunt
     // (or no seed is being played).
     int page_hunt_pages();
 
     bool tracker_view(const std::vector<int64_t>& locations, std::vector<uint8_t>& in_seed,
                       std::vector<uint8_t>& checked);
+    // Boss Souls for the tracker: 0 when the seed has none (or no seed is
+    // being played), 1 the seven before Mammon, 2 Mammon's as well. `held`
+    // gets bit n (1-8, Solvaring first) for each Soul that has arrived.
+    int tracker_souls(uint32_t& held);
 
     // Phase 3 calls these; they are no-ops until the connector is on.
 

@@ -1,0 +1,80 @@
+<template name="config-menu__rnd_items">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Randomizer (config_menu.rml), on randomizer_model; its tab only shows while the randomizer is on and no seed is connected. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div data-if="rnd_mode == 1 && ap_locked == 0">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Items</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Chests</div><div class="config-tip-text">Vanilla leaves the chests alone. Shuffle moves the vanilla chest contents among the chests. Random rolls every chest from the whole item pool; whether gems and wings are in that pool is set by the two options below. Under Lost Keys this only fills the chests the key items and wings do not take.</div></div>
+                                        <select data-value="rnd_chests" id="rnd_chests_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Monster drops</div><div class="config-tip-text">What non-boss monsters drop. Shuffle moves the vanilla drops among the monsters, blanks included. Random rolls every monster from the item pool, with no blanks.</div></div>
+                                        <select data-value="rnd_drops" id="rnd_drops_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Gifts</div><div class="config-tip-text">Items handed over by the gift-giving NPCs, the Shannons included. Shuffle moves the vanilla gifts among them; Random rolls each from the item pool. Softlock protection keeps the Eletale Book and Dark Gaol Key off the final two Shannons.</div></div>
+                                        <select data-value="rnd_gifts" id="rnd_gifts_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wingsmiths</div><div class="config-tip-text">Items handed over by the wingsmiths. Shuffle moves the wings among them; Random rolls each from the item pool, which can leave wings out of the game entirely.</div></div>
+                                        <select data-value="rnd_wingsmiths" id="rnd_wingsmiths_select">
+                                            <option value="0">Vanilla</option>
+                                            <option value="1">Shuffle</option>
+                                            <option value="2">Random</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle final Shannons</div><div class="config-tip-text">On: the final two Shannons keep the Eletale Book and Dark Gaol Key and sit out the gift shuffle. Off: they take part, with softlock protection making sure neither of those two items ends up on them. Lost Keys always includes them.</div></div>
+                                        <select data-value="rnd_shuffle_shannon" id="rnd_shuffle_shannon_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Wings from wingsmiths only</div><div class="config-tip-text">Keeps wings out of the Random item pool, so the only place a wing turns up is a wingsmith. Shuffle only moves items already in a list, and Lost Keys places wings itself.</div></div>
+                                        <select data-value="rnd_wingsmith_wings_only" id="rnd_wingsmith_wings_only_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Boss Rewards Shuffler</div><div class="config-tip-text">Lets the four Elemental Gems, the Eletale Book and the Dark Gaol Key move with everything else. Off keeps them out of the pool and in their vanilla places, so only ordinary items move. Lost Keys places them itself.</div></div>
+                                        <select data-value="rnd_boss_rewards_shuffler" id="rnd_boss_rewards_shuffler_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

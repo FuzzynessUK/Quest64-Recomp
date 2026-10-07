@@ -1,0 +1,128 @@
+<template name="config-menu__rnd_spells">
+    <head>
+    </head>
+    <body>
+        <!-- A sub-tab of Randomizer (config_menu.rml), on randomizer_model; its tab only shows while the randomizer is on and no seed is connected. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div data-if="rnd_mode == 1 && ap_locked == 0">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Spells</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Shuffle spells</div><div class="config-tip-text">Shuffles the properties of all 60 spells among their slots: element, unlock level and menu position stay put, everything else moves. Combinations known to crash are avoided. The "with boss spells" settings also put nine of the bosses' own spells into the pool, as Bubble does with Nepty's: each takes over a player spell's slot, so that spell is gone from the run. Recommended is the mix Merrow suggests, Similar swaps each boss spell for the one it most resembles, Any picks at random. Exit, Escape and Return are never taken.</div></div>
+                                        <select data-value="rnd_spell_shuffle" id="rnd_spell_shuffle_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                            <option value="2">With boss spells</option>
+                                            <option value="3">Boss spells, similar</option>
+                                            <option value="4">Boss spells, any</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Hinted spell names</div><div class="config-tip-text">Shuffled spells are renamed from a prefix and suffix taken from the original spell and the one whose properties it now has, so the name hints at what it does.</div></div>
+                                        <select data-value="rnd_hinted_spell_names" id="rnd_hinted_spell_names_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Linear hint names</div><div class="config-tip-text">Hinted names always put the original spell first and the new one second, instead of choosing the order at random.</div></div>
+                                        <select data-value="rnd_linear_spell_names" id="rnd_linear_spell_names_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Early healing</div><div class="config-tip-text">Guarantees Healing Lv1 is among the first three spells of one of the four elements, so it is found by element level 10 and always costs 2 MP.</div></div>
+                                        <select data-value="rnd_early_healing" id="rnd_early_healing_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Extra healing</div><div class="config-tip-text">Weakness Lv1 becomes Mending Lv1, a second copy of Healing Lv1 (with the spell shuffle on it lands in a different element from Healing; with Early healing on, Vampire's Touch becomes a third source too).</div></div>
+                                        <select data-value="rnd_extra_healing" id="rnd_extra_healing_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Distribute powerful spells</div><div class="config-tip-text">The four strongest combat spells (Avalanche, Magic Barrier, Water Pillar Lv3, Large Cutter) are dealt one to each element when shuffled, and tend towards the top of their element. Better for races.</div></div>
+                                        <select data-value="rnd_distribute_spells" id="rnd_distribute_spells_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Spell combination fixes</div><div class="config-tip-text">Applies Merrow's fix-up data to shuffled spell combinations, so volatile combinations work and ones with effect or scaling problems look right.</div></div>
+                                        <select data-value="rnd_spell_overrides" id="rnd_spell_overrides_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Spell damage rebalance</div><div class="config-tip-text">Adjusts the damage of most spells: assorted weak spells become useful, the strongest are nerfed a little, and multi-level spells scale inversely so the precise low-level versions do slightly more per hit than the big ones.</div></div>
+                                        <select data-value="rnd_spell_rebalance" id="rnd_spell_rebalance_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Bubble</div><div class="config-tip-text">Replaces Soul Search Lv1 with Nepty's bubble spell, giving Water an early ranged spell.</div></div>
+                                        <select data-value="rnd_bubble" id="rnd_bubble_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>All spells at level 1</div><div class="config-tip-text">Every spell unlocks at element level 1.</div></div>
+                                        <select data-value="rnd_level_1_spells" id="rnd_level_1_spells_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Status spells always hit</div><div class="config-tip-text">Positive and negative status spells always pass their accuracy check.</div></div>
+                                        <select data-value="rnd_max_accuracy" id="rnd_max_accuracy_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>All spells always hit</div><div class="config-tip-text">Every spell has 100 accuracy, Escape and Extinction included. Offensive spells can still miss on the agility roll that follows the accuracy check.</div></div>
+                                        <select data-value="rnd_max_accuracy_all" id="rnd_max_accuracy_all_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Soul Search</div><div class="config-tip-text">Every spell has a chance to trigger the Soul Search effect on hit, revealing the enemy's details, and the magnifying-glass icon is made more compact. Each trigger also gives Brian a little MP experience, so MP grows quicker.</div></div>
+                                        <select data-value="rnd_soul_search" id="rnd_soul_search_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Invalidity</div><div class="config-tip-text">Boss spells lose their passive Invalidity effect, which strips buffs and debuffs and otherwise makes those spells mostly useless when they are shuffled to Brian.</div></div>
+                                        <select data-value="rnd_invalidity" id="rnd_invalidity_select">
+                                            <option value="0">Off</option>
+                                            <option value="1">On</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

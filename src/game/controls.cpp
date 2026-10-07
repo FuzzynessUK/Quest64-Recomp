@@ -1,5 +1,7 @@
 #include <array>
 
+#include "SDL.h"
+
 #include "librecomp/helpers.hpp"
 #include "recomp_input.h"
 #include "ultramodern/ultramodern.hpp"
@@ -34,6 +36,31 @@ static const std::vector<std::string> input_enum_names = {
     DEFINE_ALL_INPUTS()
 };
 #undef DEFINE_INPUT
+
+// The hotkeys below (Reset Game, Exit Spell, the minimap zooms) are read even
+// with the config menu open, which a controller moves around with the D-pad;
+// a hotkey bound to the D-pad would fire while navigating it (Reset Game
+// would restart the game). So while game input is off, a hotkey's controller
+// D-pad bindings do not count. In play they work like any other button,
+// which is what the D-pad is for now that Quest 64's own D-pad rows are gone.
+static bool hotkey_held(recomp::GameInput input) {
+    const size_t index = static_cast<size_t>(input);
+    if (recomp::get_input_digital(keyboard_input_mappings[index])) {
+        return true;
+    }
+    for (const recomp::InputField& field : controller_input_mappings[index]) {
+        // InputType::ControllerDigital is 3 (input.cpp keeps that enum private).
+        const bool dpad = field.input_type == 3 &&
+            field.input_id >= SDL_CONTROLLER_BUTTON_DPAD_UP && field.input_id <= SDL_CONTROLLER_BUTTON_DPAD_RIGHT;
+        if (dpad && recomp::game_input_disabled()) {
+            continue;
+        }
+        if (recomp::get_input_digital(field)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 size_t recomp::get_num_inputs() {
     return (size_t)GameInput::COUNT;
@@ -91,10 +118,8 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
     // Reset is checked outside the game-input guard so the hotkey still works
     // with the menu open, and on the press edge so holding it only fires once.
     {
-        constexpr size_t reset_index = static_cast<size_t>(GameInput::RESET_GAME);
         static bool reset_was_held = false;
-        bool reset_held = recomp::get_input_digital(keyboard_input_mappings[reset_index])
-                       || recomp::get_input_digital(controller_input_mappings[reset_index]);
+        bool reset_held = hotkey_held(GameInput::RESET_GAME);
         if (reset_held && !reset_was_held) {
             zelda64::restart_application();
         }
@@ -104,10 +129,8 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
     // Exit works from anywhere, with or without the spell, so it is checked
     // here rather than gated on the menu being open.
     {
-        constexpr size_t exit_index = static_cast<size_t>(GameInput::EXIT_SPELL);
         static bool exit_was_held = false;
-        bool exit_held = recomp::get_input_digital(keyboard_input_mappings[exit_index])
-                      || recomp::get_input_digital(controller_input_mappings[exit_index]);
+        bool exit_held = hotkey_held(GameInput::EXIT_SPELL);
         if (exit_held && !exit_was_held) {
             zelda64::enhancements::cast_exit();
         }
@@ -120,9 +143,7 @@ bool recomp::get_n64_input(int controller_num, uint16_t* buttons_out, float* x_o
         static bool zoom_was_held[2] = { false, false };
         const GameInput zoom_inputs[2] = { GameInput::MINIMAP_ZOOM_IN, GameInput::MINIMAP_ZOOM_OUT };
         for (int k = 0; k < 2; k++) {
-            size_t index = static_cast<size_t>(zoom_inputs[k]);
-            bool held = recomp::get_input_digital(keyboard_input_mappings[index])
-                     || recomp::get_input_digital(controller_input_mappings[index]);
+            bool held = hotkey_held(zoom_inputs[k]);
             if (held && !zoom_was_held[k]) {
                 zelda64::minimap::zoom(k == 0 ? 1 : -1);
             }

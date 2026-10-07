@@ -136,6 +136,8 @@
 			<div id="trk_item_title" class="trk-title">Tracker</div>
 			<div class="trk-section">Boss Items</div>
 			<div id="trk_boss_items" class="trk-grid"></div>
+			<div id="trk_souls_heading" class="trk-section">Boss Souls</div>
+			<div id="trk_souls" class="trk-grid"></div>
 			<div id="trk_wings_heading" class="trk-section">Wings</div>
 			<div id="trk_wings" class="trk-grid"></div>
 		</div>

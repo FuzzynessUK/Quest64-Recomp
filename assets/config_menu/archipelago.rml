@@ -1,0 +1,50 @@
+<template name="config-menu__archipelago">
+    <head>
+    </head>
+    <body>
+        <!-- The Archipelago connection, its own tab (config_menu.rml). Its
+             bindings are randomizer_model's. -->
+        <form class="config__form">
+            <div class="config__wrapper">
+                <div class="config-debug">
+                    <div class="config-debug__scroll">
+                        <div class="config-debug-option">
+                            <label class="config-debug-option__label">
+                                <div>Archipelago</div>
+                            </label>
+                            <div class="config-debug__option-split">
+                                <div class="config-debug__option-controls">
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Server</div><div class="config-tip-text">Where the room is, as host:port - a room on archipelago.gg is the address and port the room page shows, and a room you host yourself is usually localhost:38281. Port 38281 is assumed if you leave it off. Whether the room wants a secure connection is worked out for you; put ws:// or wss:// in front to insist on one.</div></div>
+                                        <input type="text" id="ap_server_input" style="nav-up: #tab_archipelago;" data-value="ap_server" maxlength="64" />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Slot name</div><div class="config-tip-text">The name from your yaml - the one the room lists as your player. It has to match exactly.</div></div>
+                                        <input type="text" id="ap_slot_input" data-value="ap_slot" maxlength="32" />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" data-event-mouseover="show_tip" data-event-mouseout="hide_tip"><div>Password</div><div class="config-tip-text">Only if the room has one. Leave it empty otherwise.</div></div>
+                                        <input type="text" id="ap_password_input" data-value="ap_password" maxlength="64" />
+                                    </div>
+                                    <div class="config-debug__select-wrapper">
+                                        <div class="config-debug__select-label" style="font-size: 14dp; width: 100%;"><div>{{ap_status}}</div></div>
+                                    </div>
+                                </div>
+                                <div class="config-debug__option-trigger">
+                                    <button class="button" data-event-click="ap_connect()" data-if="ap_connected == 0">Connect</button>
+                                    <button class="button" data-event-click="ap_disconnect()" data-if="ap_connected == 1">Disconnect</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="config-debug-option" data-if="ap_locked == 1">
+                            <label class="config-debug-option__label">
+                                <div style="flex: 1 1 0dp; width: 100%; white-space: normal;">Connected: the randomizer, enhancements and cosmetics settings come from your YAML. Connect before starting the game so it boots with them.</div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="config-tip"></div>
+                </div>
+            </div>
+        </form>
+    </body>
+</template>

@@ -283,6 +283,10 @@ namespace zelda64::randomizer {
     // boss list where bosses count; otherwise the boss list when boss order
     // is shuffled.
     std::vector<uint8_t> abbott_message();
+    // The Grand Abbott's opening speech while an Archipelago seed is being
+    // played: "Welcome to Quest 64 Archipelago" on its own page, then what
+    // abbott_message says. Empty when no seed is being played.
+    std::vector<uint8_t> archipelago_intro_message();
 
     // Drops the memory the native hooks took out of librecomp's heap last
     // launch, which a relaunch re-initialises. Called from apply_at_boot.

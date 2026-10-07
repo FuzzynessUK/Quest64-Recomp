@@ -65,7 +65,7 @@ text = "quest64_audio_victory(rdram, ctx); if (quest64_audio_skip_bgm(rdram, ctx
 before_vram = 0x800267F8
 [[patches.hook]]
 func = "func_80025B8C"
-text = "quest64_audio_sfx(rdram, ctx);"
+text = "if (quest64_audio_sfx(rdram, ctx)) return;"
 before_vram = 0x80025B8C
 # The second sequence player's jingles, started by track number.
 [[patches.hook]]
@@ -471,7 +471,7 @@ text = "quest64_hardmode_agi_exp_t9(rdram, ctx);"
 before_vram = 0x80007474
 [[patches.hook]]
 func = "func_80007A50"
-text = "quest64_hardmode_scripted_message_1(rdram, ctx);"
+text = "quest64_hardmode_scripted_message_1(rdram, ctx); quest64_archipelago_intro_text(rdram, ctx);"
 before_vram = 0x80007B1C
 [[patches.hook]]
 func = "UpdateBGM"
@@ -501,6 +501,12 @@ before_vram = 0x800098D8
 func = "func_80009818"
 text = "quest64_hardmode_battle_stones(rdram, ctx);"
 before_vram = 0x800098F8
+# Archipelago: in a seed a boss's own drop (his gem) is held back; his check
+# hands over the seed's item instead (src/game/archipelago.cpp).
+[[patches.hook]]
+func = "func_8001D828"
+text = "quest64_archipelago_boss_drop(rdram, ctx);"
+before_vram = 0x8001D88C
 [[patches.hook]]
 func = "func_8000ACC0"
 text = "quest64_hardmode_damage_double(rdram, ctx);"

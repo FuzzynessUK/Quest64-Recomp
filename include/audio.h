@@ -85,6 +85,10 @@ namespace zelda64::audio {
     // leaves them alone, since a looping song on the jingle player would
     // never end.
     bool track_is_jingle(int track);
+    // The music of the area Brian is in: the last track the main player
+    // started outside a battle that is not a jingle, or -1 before any.
+    // What "Randomise current map" (Sound tab) changes.
+    int current_map_track();
     // The order the menu lists the tracks in: events first, then areas in
     // story order, then the rest.
     const int* track_menu_order();
@@ -129,6 +133,10 @@ namespace zelda64::audio {
     // The options the running game booted with. Changes made in the menu
     // are saved straight away but only take effect on the next launch.
     const Options& active_options();
+    // The settings that take effect while the game runs - battle music and
+    // the sound effect shuffle - handed over by the Sound tab as they change.
+    // Until the first call the boot copy (active_options) is what counts.
+    void set_live_options(const Options& options);
 
     void apply_at_boot(uint8_t* rdram);
 

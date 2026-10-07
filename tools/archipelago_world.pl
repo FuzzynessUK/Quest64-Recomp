@@ -562,8 +562,10 @@ class Chestsanity(DefaultOnToggle):
 
 class Giftsanity(DefaultOnToggle):
     """NPCs who hand over an item are Archipelago checks: the gift NPCs, the
-    two endgame Shannons and the wingsmiths. Each gives its check once, the
-    first time you talk to them, whatever is in your bag - and no item."""
+    two endgame Shannons and the six wingsmiths (Melrode to Brannoch). Each
+    gives its check once, the first time you talk to them, whatever is in
+    your bag - and no item, except that with Wings normal a wingsmith also
+    hands over his own town's wings."""
     display_name = "Giftsanity"
 
 
@@ -571,16 +573,16 @@ class Wings(Choice):
     """Where the six pairs of wings come from. No rule needs wings: they are
     for getting about.
 
-    normal        the wingsmiths hand over their wings, as in the game (with
-                  giftsanity on, on top of their check)
-    shuffled      one of each pair is in the item pool; the wingsmiths give
-                  only their check
+    normal        each wingsmith hands over his own town's wings, as in the
+                  game, once per save. With giftsanity on he also sends a
+                  check; with it off he gives only the wings
+    shuffled      one of each pair is in the item pool. The wingsmiths give
+                  no wings: with giftsanity on they send a check, with it
+                  off they give nothing
     progressive   six "Progressive Wings" are in the pool instead, each the
                   next pair in town order: White, Yellow, Blue, Green, Red,
-                  Black; the wingsmiths give only their check
-
-    With giftsanity off the wingsmiths are not checks and hand over their
-    wings whatever this says."""
+                  Black. The wingsmiths give no wings: with giftsanity on
+                  they send a check, with it off they give nothing"""
     display_name = "Wings"
     option_normal = 0
     option_shuffled = 1
@@ -697,9 +699,18 @@ class MammonPortal(Choice):
                             the run still ends with Mammon. Needs goal
                             mammon.
     bosses_and_pages        all_bosses and all_pages.
-    bosses_monsters_pages   all_bosses, all_monsters and all_pages."""
+    bosses_monsters_pages   all_bosses, all_monsters and all_pages.
+
+    all_orbs                the four orbs - Earth Orb, Wind Jade, Water Jewel
+                            and Fire Ruby - have to be in your bag.
+    some_orbs               orbs_required of the four orbs, any of them.
+                            With boss_items progressive the orbs are the
+                            first four Progressive Boss Items, so it is that
+                            many of those."""
     display_name = "Mammon's World Portal"
-    # A bitmask: 1 bosses, 2 monsters, 4 pages. The game reads it that way.
+    # A bitmask: 1 bosses, 2 monsters, 4 pages, 8 orbs. The game reads it that
+    # way. 16 only says "orbs_required of them" rather than all four; the
+    # apworld settles the number and sends it as slot_data orbs_required.
     option_vanilla = 0
     option_all_bosses = 1
     option_all_monsters = 2
@@ -707,6 +718,8 @@ class MammonPortal(Choice):
     option_all_pages = 4
     option_bosses_and_pages = 5
     option_bosses_monsters_pages = 7
+    option_all_orbs = 8
+    option_some_orbs = 24
     default = 0
 
 
@@ -838,6 +851,15 @@ class Goal(Choice):
     default = 0
 
 
+class OrbsRequired(Range):
+    """How many of the four orbs (Earth Orb, Wind Jade, Water Jewel, Fire
+    Ruby) open Mammon's World when Mammon's World Portal is some_orbs."""
+    display_name = "Orbs Required"
+    range_start = 1
+    range_end = 4
+    default = 2
+
+
 class PagesRequired(Range):
     """How many Torn Pages finish a Page Hunt, or open Mammon's World when
     Mammon's World Portal asks for pages."""
@@ -867,6 +889,7 @@ class Q64Options(PerGameCommonOptions):
     pages_required: PagesRequired
     page_placement: PagePlacement
     mammon_portal: MammonPortal
+    orbs_required: OrbsRequired
     boss_souls: BossSouls
     open_world: OpenWorld
     boss_items: BossItems
@@ -964,7 +987,7 @@ import logging
 from typing import Dict, List
 
 from BaseClasses import ItemClassification, LocationProgressType, Region, Tutorial
-from rule_builder.rules import Has
+from rule_builder.rules import Has, HasFromList
 from Options import OptionError
 from worlds.AutoWorld import WebWorld, World
 
@@ -1306,12 +1329,29 @@ class Q64World(World):
         set_all_rules(self)
         if self.options.goal.value == Goal.option_page_hunt:
             self.set_completion_rule(Has("Torn Page", self.options.pages_required.value))
-        # The pages portal: the workbook's ENDGAME_DOOR has the bosses and
-        # monsters halves; the page count is an option, so it is added here.
-        if self.options.mammon_portal.value & 4:
+        # The pages and orbs portals: the workbook's ENDGAME_DOOR has the
+        # bosses and monsters halves; the page and orb counts are options,
+        # so they are added here.
+        portal = self.options.mammon_portal.value
+        if portal & (4 | 8):
             door = self.multiworld.get_entrance("Boss 7 to Endgame", self.player)
-            self.set_rule(door, entrance_rules["Boss 7 to Endgame"]
-                          & Has("Torn Page", self.options.pages_required.value))
+            rule = entrance_rules["Boss 7 to Endgame"]
+            if portal & 4:
+                rule = rule & Has("Torn Page", self.options.pages_required.value)
+            if portal & 8:
+                orbs = self.orbs_required()
+                if self.options.boss_items.value == BossItems.option_progressive:
+                    # The first four Progressive Boss Items are the orbs.
+                    rule = rule & Has("Progressive Boss Item", orbs)
+                else:
+                    rule = rule & HasFromList("Earth Orb", "Wind Jade", "Water Jewel", "Fire Ruby", count=orbs)
+            self.set_rule(door, rule)
+
+    def orbs_required(self) -> int:
+        """The orbs the portal wants: all four, or orbs_required of them."""
+        if self.options.mammon_portal.value & 16:
+            return self.options.orbs_required.value
+        return 4
 
     def fill_slot_data(self) -> Dict[str, object]:
         # What the game needs once it connects: which groups are checks, and
@@ -1320,6 +1360,7 @@ class Q64World(World):
             "goal": self.options.goal.value,
             "pages_required": self.options.pages_required.value,
             "mammon_portal": self.options.mammon_portal.value,
+            "orbs_required": self.orbs_required() if self.options.mammon_portal.value & 8 else 0,
             "boss_souls": self.options.boss_souls.value,
             "chestsanity": bool(self.options.chestsanity),
             "giftsanity": bool(self.options.giftsanity),
@@ -1381,7 +1422,10 @@ $game:
   # Which groups of locations are Archipelago checks.
   #
   # chestsanity   the @{[ $by_group{chest} // 0 ]} treasure chests
-  # giftsanity    the @{[ $by_group{giver} // 0 ]} NPCs who hand something over
+  # giftsanity    the @{[ $by_group{giver} // 0 ]} NPCs who hand something over, the six wingsmiths
+  #               (Melrode to Brannoch) and the two endgame Shannons among
+  #               them. Each sends its check the first time you talk to it.
+  #               What a wingsmith hands over as well is up to wings, below
   # enemysanity   defeating each of the @{[ $by_group{enemy} // 0 ]} kinds of regular monster. One
   #               check a kind, sent the first time you beat one of them
   # spiritsanity  the @{[ $by_group{spirit} // 0 ]} spirits. With this on a spirit sends a check
@@ -1397,14 +1441,16 @@ $game:
     'false': 0
 
   # Where the six pairs of wings come from. No rule needs wings.
-  # normal        the wingsmiths hand over their wings, as in the game
-  # shuffled      one of each pair in the item pool; the wingsmiths give
-  #               only their check
+  # normal        each wingsmith hands over his own town's wings, as in the
+  #               game, once per save. With giftsanity on he also sends a
+  #               check; with it off he gives only the wings
+  # shuffled      one of each pair in the item pool. The wingsmiths give no
+  #               wings: with giftsanity on they send a check, with it off
+  #               they give nothing
   # progressive   six "Progressive Wings" in the pool, each the next pair in
-  #               town order (White, Yellow, Blue, Green, Red, Black); the
-  #               wingsmiths give only their check
-  # With giftsanity off the wingsmiths are not checks and give their wings
-  # whatever this says.
+  #               town order (White, Yellow, Blue, Green, Red, Black). The
+  #               wingsmiths give no wings: with giftsanity on they send a
+  #               check, with it off they give nothing
   wings:
     normal: 1
     shuffled: 0
@@ -1482,6 +1528,9 @@ $game:
   #               goal mammon: the run still ends with him
   # bosses_and_pages        all_bosses and all_pages
   # bosses_monsters_pages   all_bosses, all_monsters and all_pages
+  # all_orbs      the four orbs in your bag: Earth Orb, Wind Jade, Water Jewel
+  #               and Fire Ruby
+  # some_orbs     orbs_required of the four orbs (set below), any of them
   mammon_portal:
     vanilla: 1
     all_bosses: 0
@@ -1490,6 +1539,13 @@ $game:
     all_pages: 0
     bosses_and_pages: 0
     bosses_monsters_pages: 0
+    all_orbs: 0
+    some_orbs: 0
+
+  # With mammon_portal some_orbs: how many of the four orbs open Mammon's
+  # World, 1 to 4. With boss_items progressive it is that many Progressive
+  # Boss Items, which arrive as the orbs in story order.
+  orbs_required: 2
 
   # Bosses are not in the game until their Soul turns up: an empty arena you
   # walk straight through, the same state the game uses for a boss already
@@ -1613,7 +1669,7 @@ my %files = (
     "$out/quest64/__init__.py"  => $init_py,
     # The apworld manifest. Rule Builder (rule_builder) is what sets the
     # floor at 0.6.7.
-    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.9.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
+    "$out/quest64/archipelago.json" => qq({"game": "$game", "minimum_ap_version": "0.6.7", "world_version": "1.10.0", "authors": ["Fuzzyness"], "version": 7, "compatible_version": 7}\n),
     "$out/quest64/docs/en_quest64.md" => "# Quest 64 Recompiled\n\nEvery chest, gift, boss and spirit can hold an item from any world in the\nmultiworld. Turn the Archipelago Connector on in the port's menu and give it\nthe server address and your slot name.\n",
     "$out/quest64/docs/guide_en.md"   => "# Quest 64 Recompiled Setup Guide\n\n1. Put `quest64.apworld` in `Archipelago/custom_worlds`.\n2. Put your filled-in `Quest64Recompiled.yaml` in `Archipelago/Players`.\n3. Generate and host as usual.\n4. In Quest 64 Recompiled, open the config menu, turn on the Archipelago\n   Connector and enter the server address, your slot name and the password\n   if the room has one.\n",
     "$out/Quest64Recompiled.yaml" => $yaml,
@@ -1658,3 +1714,8 @@ printf "  %d item kinds, %d items in the pool\n",
     scalar(grep { $_->{count} > 0 } @item_rows),
     eval { my $t = 0; $t += $_->{count} for @item_rows; $t };
 printf "wrote %s/Quest64Recompiled.yaml\n", $out;
+
+# The YAML builder page offers exactly these options: it is made from the
+# template and Options.py just written. Publish it with
+# tools/publish_yaml_builder.pl.
+system($^X, dirname(__FILE__) . '/yaml_builder.pl') == 0 or die "tools/yaml_builder.pl failed\n";
