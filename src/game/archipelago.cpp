@@ -1890,7 +1890,11 @@ int zelda64::archipelago::tracker_souls(uint32_t& held) {
 // is what func_8000B530 leaves at 0x8007D1A0 as the map loads: his index in
 // gBossData plus one, 0 when there is none. gBossData is in story order and
 // the boss-order shuffle only moves where each entry stands, so that number
-// is the boss himself (Solvaring 1 ... Mammon 8).
+// is the boss himself (Solvaring 1 ... Mammon 8). But the boss battle's
+// start, func_8001C8C4, copies it to 0x8008C570 and zeroes 0x8007D1A0
+// (0x8001C9B4), so in the fight itself only the copy holds it - the one the
+// victory hands to func_8000BB68. It is never cleared, so it means something
+// only while gBattleState has 0x100 (boss battle) set.
 //
 // A repeat is harmless - the server ignores a location it already has - but
 // the sent list keeps the traffic down, since an enemy type is checked once
@@ -1900,7 +1904,15 @@ namespace {
     constexpr int32_t monster_file_row = 0x8007D0BC;
     constexpr int32_t monster_file_row_size = 20;
     constexpr int32_t monster_entry_size = 0x38;
-    constexpr int32_t boss_here = 0x8007D1A0;
+    constexpr int32_t boss_in_battle = 0x8008C570;
+
+    // The boss being fought (1-8), or 0 outside a boss battle.
+    int boss_fought(uint8_t* rdram) {
+        if (!(MEM_HU(0, gBattleState) & 0x100)) {
+            return 0;
+        }
+        return MEM_W(0, boss_in_battle);
+    }
     // Merrow's id of each file's first entry; the files hold 12, 15, 11,
     // 13, 12 and 4 entries, 67 in all.
     constexpr std::array<int, 6> file_first_id = { 0, 12, 27, 38, 51, 63 };
@@ -1950,7 +1962,7 @@ extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
         log_line("defeated monster " + std::to_string(index) + ", checked");
         return;
     }
-    int order = MEM_W(0, boss_here);
+    int order = boss_fought(rdram);
     if (order < 1 || order > boss_count) {
         char note[128];
         std::snprintf(note, sizeof note,
@@ -1973,11 +1985,15 @@ extern "C" void quest64_archipelago_kill(uint8_t* rdram, recomp_context* ctx) {
 // progressive boss items the Earth Orb arrived from another game and then
 // Solvaring handed over another. The hook sits at 0x8001D88C, after both
 // paths have left the answer in v0; 0xFF is "no drop".
+//
+// So: boss_items normal, the boss's own item is locked on his check and comes
+// back from the server the moment he falls; shuffled or progressive, he gives
+// whatever the seed put on his check and the gate items are only in the pool.
 extern "C" void quest64_archipelago_boss_drop(uint8_t* rdram, recomp_context* ctx) {
-    if (!playing_seed() || !(MEM_HU(0, gBattleState) & 0x100)) {
+    if (!playing_seed()) {
         return;
     }
-    int order = MEM_W(0, boss_here);
+    int order = boss_fought(rdram);
     if (order < 1 || order > boss_count ||
         !seed_has(zelda64::archipelago::group_boss, order)) {
         return;
