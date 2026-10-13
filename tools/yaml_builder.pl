@@ -478,7 +478,9 @@ function build() {
       addTip(input, text);
       row.append(label, control);
       (m < perColumn ? left : right).appendChild(row);
-      controls[k] = { input, number };
+      controls[k] = { input, number, row };
+      input.addEventListener("input", relate);
+      input.addEventListener("change", relate);
     });
     section.appendChild(cols);
     page.appendChild(section);
@@ -491,6 +493,48 @@ function show() {
     const c = controls[k];
     c.input.value = String(values.value[k]);
     if (c.number) c.number.textContent = String(values.value[k]);
+  });
+  relate();
+}
+
+// Options that only mean something with others set a certain way. Pages are
+// off unless the goal is a Page Hunt or the portal asks for them, so Pages
+// Required and Page Placement are only shown then (there is no "0 pages":
+// with neither, no pages go into the pool and the two are ignored). Orbs
+// Required only matters with some_orbs. The portal's page choices need goal
+// mammon (the apworld refuses page_hunt with them), so they are greyed out
+// under a Page Hunt, and one already chosen becomes the same choice without
+// pages.
+const PAGE_PORTALS = { all_pages: "vanilla", bosses_and_pages: "all_bosses", bosses_monsters_pages: "both" };
+function optionIndex(key) { return options.findIndex(o => o.key === key); }
+function chosen(key) {
+  const k = optionIndex(key);
+  return k < 0 ? null : options[k].choices[values.value[k]].name;
+}
+const RELEVANT = {
+  pages_required: () => chosen("goal") === "page_hunt" || chosen("mammon_portal") in PAGE_PORTALS,
+  page_placement: () => chosen("goal") === "page_hunt" || chosen("mammon_portal") in PAGE_PORTALS,
+  orbs_required: () => chosen("mammon_portal") === "some_orbs",
+};
+function relate() {
+  const p = optionIndex("mammon_portal");
+  if (p >= 0) {
+    const hunt = chosen("goal") === "page_hunt";
+    const portal = options[p];
+    if (hunt && chosen("mammon_portal") in PAGE_PORTALS) {
+      const instead = portal.choices.findIndex(c => c.name === PAGE_PORTALS[chosen("mammon_portal")]);
+      if (instead >= 0) {
+        values.value[p] = instead;
+        controls[p].input.value = String(instead);
+      }
+    }
+    Array.from(controls[p].input.options).forEach((opt, i) => {
+      opt.disabled = hunt && portal.choices[i].name in PAGE_PORTALS;
+    });
+  }
+  options.forEach((o, k) => {
+    const relevant = RELEVANT[o.key];
+    if (relevant && controls[k]) controls[k].row.style.display = relevant() ? "" : "none";
   });
 }
 
