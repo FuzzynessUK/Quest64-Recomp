@@ -1552,6 +1552,11 @@ namespace {
         return true;
     }
 
+    // How long Brian has to have been somewhere a death can land, unbroken,
+    // before one does.
+    constexpr auto death_settle = std::chrono::seconds(1);
+    std::chrono::steady_clock::time_point death_ready_since{};
+
     void apply_link_death(uint8_t* rdram) {
         if (link_death_running.load() && MEM_HU(0, player_state) != state_hit && MEM_HU(0, player_hp) != 0) {
             // Whatever we started did not end in the death branch (it would
@@ -1565,10 +1570,28 @@ namespace {
         if (victory_hold(rdram)) {
             return;
         }
+        // No text box either, and all of it for a full second. A new game
+        // opens with the Grand Abbott's speech (func_80007A50, D_8007B2E8 =
+        // 1) the moment the monastery has loaded, with Brian standing - a
+        // Death Trap received before the game started fell into it and left
+        // Brian unable to move or act once the scripted opening was cut off.
+        // The second covers the frames between a map load and the text box
+        // a script opens on it.
         bool ready = MEM_W(0, gNextMap) != -1 && MEM_HU(0, game_mode_addr) == 1 &&
                      (static_cast<uint32_t>(MEM_W(0, menu_mask)) & moving_or_menu) == 0 &&
                      MEM_HU(0, player_state) <= 2 && MEM_HU(0, player_hp) != 0 &&
-                     !zelda64::enhancements::item_menu_open(rdram);
+                     !zelda64::enhancements::item_menu_open(rdram) && !text_box_open(rdram);
+        auto now = std::chrono::steady_clock::now();
+        if (!ready) {
+            death_ready_since = {};
+        }
+        else if (death_ready_since == std::chrono::steady_clock::time_point{}) {
+            death_ready_since = now;
+            return;
+        }
+        else if (now - death_ready_since < death_settle) {
+            return;
+        }
         if (!ready) {
             // Why it is waiting, about once a second, so a wait that never
             // ends can be read off the log.
@@ -1585,6 +1608,7 @@ namespace {
             }
             return;
         }
+        death_ready_since = {};
         if (from_trap) {
             trap_death_waiting.store(false);
         }
