@@ -1,4 +1,5 @@
 #include <cstring>
+#include <fstream>
 #include <span>
 #include <vector>
 
@@ -7,6 +8,7 @@
 #include "hardmode.h"
 #include "librecomp/game.hpp"
 #include "recomp.h"
+#include "zelda_config.h"
 
 using zelda64::randomizer::ListMode;
 using zelda64::randomizer::Mode;
@@ -17,17 +19,23 @@ namespace {
     // amounts the game hands out (monster EXP, the per-hit stat gains) and
     // the percentages the status screen shows stay the game's own:
     //
-    // - 0x80053ECC: 54 u16 entries, the experience each HP/MP/AGI/DEF level
-    //   needs (10, 11, 11, 11, 12, ...). func_800074A0 subtracts an entry
-    //   and raises the stat when its counter passes it; every stat reads
-    //   the same table with its own multiple. Levels cap at 0x36.
+    // - 0x80053ECC: the experience each HP/MP/AGI/DEF level needs (10, 11,
+    //   11, 11, 12, ...). func_800074A0 subtracts entry [level] and raises
+    //   the stat when its counter passes it; every stat reads the same
+    //   table with its own multiple (HP x1, MP x4, AGI x1, DEF x2) and its
+    //   own level byte (+0x30..+0x33). A level stops rising at 0x36 (54)
+    //   but entry 54 is still read for every rise after that - most of HP's
+    //   500 points - so 55 entries are in use, not 54. Halving only 54 left
+    //   the late game at the vanilla rate (39 a point).
     // - 0x80053D3C: 98 u32 entries, the combat experience each level needs
-    //   (8, 10, 13, 17, 22, ...), read at 0x80007920; the level caps at 98.
+    //   (8, 10, 13, 17, 22, ...), read at 0x80007920 only while the level
+    //   is under 98, so entries 0-97. The table has 100 entries in the ROM
+    //   (the stat table follows it); the last two are never read.
     //
     // Each entry becomes the nearest whole number to half of itself, never
     // below one.
     constexpr int32_t stat_exp_table = 0x80053ECC;
-    constexpr int stat_exp_levels = 54;
+    constexpr int stat_exp_levels = 55;
     constexpr int32_t combat_exp_table = 0x80053D3C;
     constexpr int combat_exp_levels = 98;
     constexpr int exp_multiplier = 2;
@@ -112,13 +120,22 @@ void zelda64::easierquest::apply_at_boot(uint8_t* rdram) {
         MEM_W(0, vram) = static_cast<int32_t>(value);
     };
 
+    // double_exp.txt: what was halved, entry by entry, for checking it took.
+    std::ofstream log(zelda64::get_app_folder_path() / "double_exp.txt");
+    log << "Double Experience: stat " << (stat ? "on" : "off") << ", level " << (combat ? "on" : "off")
+        << (active() ? " (Easy Mode)" : "") << "\n";
     for (int level = 0; stat && level < stat_exp_levels; level++) {
         int32_t entry = stat_exp_table + level * 2;
-        write_u16(entry, static_cast<uint16_t>(divided(MEM_HU(0, entry))));
+        uint16_t before = MEM_HU(0, entry);
+        write_u16(entry, static_cast<uint16_t>(divided(before)));
+        log << "stat level " << level << ": " << before << " -> " << MEM_HU(0, entry)
+            << " (HP/AGI x1, DEF x2, MP x4)\n";
     }
     for (int level = 0; combat && level < combat_exp_levels; level++) {
         int32_t entry = combat_exp_table + level * 4;
-        write_u32(entry, divided(static_cast<uint32_t>(MEM_W(0, entry))));
+        uint32_t before = static_cast<uint32_t>(MEM_W(0, entry));
+        write_u32(entry, divided(before));
+        log << "level " << (level + 1) << ": " << before << " -> " << static_cast<uint32_t>(MEM_W(0, entry)) << "\n";
     }
 
     recomp::set_rom_contents(std::move(patched));
