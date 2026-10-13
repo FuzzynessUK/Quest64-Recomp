@@ -91,6 +91,9 @@ namespace {
     int note_frames = 0;
     bool was_in_battle = false;
     bool ring_gone = false;
+    // Frames since every enemy reached 0 HP, waiting for the deaths to play out.
+    int death_wait = 0;
+    constexpr int death_wait_max = 150;
     std::mt19937 rng{ std::random_device{}() };
 
     int roll(int lo, int hi) {
@@ -145,6 +148,7 @@ void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
     if (!was_in_battle) {
         was_in_battle = true;
         ring_gone = false;
+        death_wait = 0;
         int present = MEM_W(0, enemy_count);
         present = present < 1 ? 1 : (present > max_enemies ? max_enemies : present);
         for (int slot = 0; slot < max_enemies; slot++) {
@@ -178,18 +182,31 @@ void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
         func_80019CA4(rdram, &c);
     }
 
-    // The end of the battle, as a turn change would have found it.
+    // The end of the battle, as a turn change would have found it. Not the
+    // moment the last HP reaches 0: a monster's EXP and stones are added to
+    // the battle's totals (0x8007BA68 / 0x8007BA6C) only when its knock-back
+    // ends and it dies (func_80009818, which also takes it off enemy_count).
+    // Ending on HP alone lost the last monster's EXP, and all of it when one
+    // spell finished everybody. So wait for the game's own count to reach 0;
+    // should it never (a death that does not count down), end after
+    // death_wait_max frames anyway.
     const int count = max_enemies;
     int alive = 0;
     for (int slot = 0; slot < count; slot++) {
         alive += enemy_alive(rdram, slot) ? 1 : 0;
     }
     if (alive == 0) {
+        const bool deaths_done = MEM_W(0, enemy_count) <= 0;
+        if (!deaths_done && ++death_wait < death_wait_max) {
+            return;
+        }
         MEM_H(0, gBattleState) = static_cast<int16_t>(state | 0x400 | 0x4);
         MEM_H(0, turn_pause) = 0x14;
-        log_line("every enemy down: the battle ends");
+        log_line(deaths_done ? "every enemy down: the battle ends"
+                             : "every enemy at 0 HP but the count never reached 0: the battle ends anyway");
         return;
     }
+    death_wait = 0;
     if ((state & 0x10) != 0 || ((state & 0x100) == 0 && (MEM_HU(0, brian_flags) & 0x20) != 0)) {
         MEM_H(0, gBattleState) = static_cast<int16_t>(state | 0x4);
         log_line("off the edge: escaping");
