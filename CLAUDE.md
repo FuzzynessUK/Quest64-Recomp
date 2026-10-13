@@ -594,7 +594,19 @@ Nothing is currently half-done. Open items are in `DOCS/HANDOFF.md`
   in the app folder.
 - `src/game/map_table.cpp` — map/submap/entrance tables extracted from the ROM.
 - `src/game/widescreen.cpp` — display-list post-processor hooked in
-  `nnScExecuteGraphics` before `osSpTaskLoad`; F3DEX 1.23 opcodes.
+  `nnScExecuteGraphics` before `osSpTaskLoad`; F3DEX 1.23 opcodes. Runs every
+  frame (widescreen edits only with the option on). **Frame interpolation**
+  (1.9.2): every untagged "G_MTX modelview load + G_DL call" pair in the
+  frame list (0x80500000-0x80600000) is wrapped in an RT64 matrix group whose
+  id follows the object frame to frame (same DL, nearest position within 64,
+  scale within 1.3x; else a new id, drawn without interpolation) -
+  `match_and_tag_objects`. Fixed water-ripple sprites smeared across the
+  screen. Limbs are tagged by the `func_8001DC78` patch in `patches/main.c`
+  with **simple** (linear) groups: decomposed ones opened gaps at the stitched
+  seams (hair, cape). Diagnostics: with `frame_capture.txt` in the app folder
+  the last 60 frames' lists (decoded matrices, vertices) are kept and F9
+  writes them to `frame_capture/`. The camera is folded into the projection
+  matrix; the game runs at 30 fps.
 - `src/ui/ui_config.cpp` + `assets/config_menu/*.rml` — config tabs. Cheats,
   Randomizer and Enhancements use the debug-tab styling (`config-debug*`).
   `assets/recomp.rcss` is compiled from `assets/scss/`; edit both.

@@ -1,10 +1,14 @@
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <mutex>
 #include <set>
+#include <string>
 #include <tuple>
+#include <vector>
 
 #include "zelda_config.h"
 #include "zelda_render.h"
@@ -34,6 +38,7 @@ namespace {
     constexpr uint8_t op_fillrect = 0xF6;
     constexpr uint8_t op_settilesize = 0xF2;
     constexpr uint8_t op_settile = 0xF5;
+    constexpr uint8_t op_mtx = 0x01;
     constexpr uint8_t op_vtx = 0x04;
     constexpr uint8_t op_moveword = 0xBC;
     constexpr uint8_t mw_segment = 0x06;
@@ -138,14 +143,47 @@ namespace {
     constexpr int max_commands = 1 << 16;
 
     std::atomic<bool> enabled = true;
-    // Set by the F8 key; the next frame's whole command stream is written
-    // out with rect/vertex details.
-    std::atomic<bool> dump_next_frame = false;
-    FILE* dump_file = nullptr;
+    // Frame capture, for chasing frame interpolation glitches (a draw whose
+    // matrix or vertex count changes between two frames is what RT64
+    // mismatches). Only when frame_capture.txt is in the app folder: every
+    // frame's whole command stream, with vertices and decoded matrices, is
+    // kept as text in a ring of the last capture_frames frames, and the F9
+    // key writes the ring out, oldest first, to frame_capture/. A glitch
+    // lasts a few frames and is over before a key can be pressed, so the
+    // record has to be of what already happened.
+    constexpr int capture_frames = 60;
+    std::vector<std::string> capture_ring(capture_frames);
+    int capture_next = 0;
+    int capture_count = 0;
+    int capture_enabled = -1; // -1 = not checked yet
+    std::atomic<bool> capture_save_requested = false;
+    std::string* dump_buf = nullptr;
 
     void dump(const char* fmt, auto... args) {
-        if (dump_file) {
-            fprintf(dump_file, fmt, args...);
+        if (dump_buf) {
+            char line[256];
+            int n = snprintf(line, sizeof(line), fmt, args...);
+            if (n > 0) {
+                dump_buf->append(line, std::min(n, static_cast<int>(sizeof(line)) - 1));
+            }
+        }
+    }
+
+    void save_capture() {
+        std::filesystem::path dir = zelda64::get_app_folder_path() / "frame_capture";
+        std::error_code ec;
+        std::filesystem::remove_all(dir, ec);
+        std::filesystem::create_directories(dir, ec);
+        int first = (capture_next - capture_count + capture_frames) % capture_frames;
+        for (int i = 0; i < capture_count; i++) {
+            char name[32];
+            snprintf(name, sizeof(name), "frame_%02d.txt", i);
+            FILE* f = fopen((dir / name).string().c_str(), "wb");
+            if (f) {
+                const std::string& text = capture_ring[(first + i) % capture_frames];
+                fwrite(text.data(), 1, text.size(), f);
+                fclose(f);
+            }
         }
     }
 
@@ -456,6 +494,109 @@ namespace {
         write_w(rdram, addr + 20, 0);
     }
 
+    // Whether this frame's widescreen 2D edits apply. The walk itself runs
+    // regardless, for the object tagging below.
+    bool ws_active = true;
+
+    // Interpolation ids for objects the game draws as a plain "load modelview
+    // matrix, call display list" pair in the frame's own list (map pieces,
+    // trees, footprints, the water's ripple sprites...). Untagged, RT64 pairs
+    // each one with a draw from the previous frame by guesswork, and when
+    // effects spawn, die and reorder - the ripples do all three every few
+    // frames - it pairs a dead ripple with a new one elsewhere and the
+    // in-between frame draws one stretched across the water. Here each object
+    // is matched to the previous frame's by display list and nearest position
+    // (and similar scale), keeps that object's id, and anything new gets a new
+    // id, which RT64 draws where it is without interpolating it. Characters
+    // are tagged by the limb patch (func_8001DC78) and sit inside its groups,
+    // so anything inside a group is left alone.
+    struct TaggedObject {
+        int32_t mtx_cmd;  // address of the G_MTX command (the DL call follows it)
+        uint32_t dl;      // display list called
+        float x, y, z;    // translation row
+        float scale;      // length of the first row
+        uint32_t id;
+    };
+    std::vector<TaggedObject> tag_current;
+    std::vector<TaggedObject> tag_previous;
+    uint32_t tag_next_id = 1;
+    int ex_group_depth = 0;
+    constexpr int32_t frame_lists_start = 0x80500000;
+    constexpr int32_t frame_lists_end = 0x80600000;
+    constexpr float tag_max_distance = 64.0f;
+    constexpr float tag_max_scale_ratio = 1.3f;
+    constexpr uint32_t tag_id_base = 0x7E000000u;
+
+    float mtx_element(uint8_t* rdram, int32_t m, int i) {
+        int32_t fixed = (static_cast<int32_t>(MEM_H(0, m + i * 2)) << 16)
+            | static_cast<uint16_t>(MEM_HU(0, m + 32 + i * 2));
+        return fixed / 65536.0f;
+    }
+
+    void match_and_tag_objects(uint8_t* rdram) {
+        struct Pair { float cost; int cur; int prev; };
+        std::vector<Pair> pairs;
+        for (int c = 0; c < static_cast<int>(tag_current.size()); c++) {
+            const TaggedObject& cur = tag_current[c];
+            for (int p = 0; p < static_cast<int>(tag_previous.size()); p++) {
+                const TaggedObject& prev = tag_previous[p];
+                if (prev.dl != cur.dl) {
+                    continue;
+                }
+                float dx = cur.x - prev.x, dy = cur.y - prev.y, dz = cur.z - prev.z;
+                float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+                if (dist > tag_max_distance) {
+                    continue;
+                }
+                float lo = std::min(cur.scale, prev.scale), hi = std::max(cur.scale, prev.scale);
+                if (lo <= 0.0f ? hi > 0.0f : hi / lo > tag_max_scale_ratio) {
+                    continue;
+                }
+                pairs.push_back({ dist, c, p });
+            }
+        }
+        std::stable_sort(pairs.begin(), pairs.end(), [](const Pair& a, const Pair& b) { return a.cost < b.cost; });
+        std::vector<bool> cur_done(tag_current.size()), prev_done(tag_previous.size());
+        for (const Pair& pair : pairs) {
+            if (cur_done[pair.cur] || prev_done[pair.prev]) {
+                continue;
+            }
+            tag_current[pair.cur].id = tag_previous[pair.prev].id;
+            cur_done[pair.cur] = prev_done[pair.prev] = true;
+        }
+        for (size_t c = 0; c < tag_current.size(); c++) {
+            if (!cur_done[c]) {
+                tag_current[c].id = tag_id_base | (tag_next_id++ & 0xFFFFFF);
+            }
+        }
+
+        // gEXMatrixGroupSimple(id, G_EX_PUSH, G_MTX_MODELVIEW, pos, rot, persp,
+        // tile interpolated, vertices/texcoords/lookat skipped, linear order,
+        // editable) - the same as the limb patch uses.
+        constexpr uint32_t group_flags = 1u /* push */ | (1u << 3) /* pos */ | (1u << 5) /* rot */
+            | (1u << 11) /* persp */ | (1u << 15) /* tile */ | (1u << 19) /* edit allow */;
+        for (const TaggedObject& obj : tag_current) {
+            uint32_t mtx_w0 = read_w(rdram, obj.mtx_cmd);
+            uint32_t mtx_w1 = read_w(rdram, obj.mtx_cmd + 4);
+            uint32_t dl_w0 = read_w(rdram, obj.mtx_cmd + 8);
+            uint32_t dl_w1 = read_w(rdram, obj.mtx_cmd + 12);
+            SubList sub(rdram, 14);
+            sub.enable_ex();
+            sub.cmd((ex_opcode << 24) | 0x00000C, obj.id);
+            sub.cmd(group_flags, 0);
+            sub.cmd(mtx_w0, mtx_w1);
+            sub.cmd(dl_w0, dl_w1);
+            sub.cmd((ex_opcode << 24) | 0x00000D, 1); // pop one modelview group
+            sub.cmd(static_cast<uint32_t>(op_enddl) << 24, 0);
+            write_w(rdram, obj.mtx_cmd, static_cast<uint32_t>(op_dl) << 24);
+            write_w(rdram, obj.mtx_cmd + 4, static_cast<uint32_t>(sub.start));
+            write_w(rdram, obj.mtx_cmd + 8, static_cast<uint32_t>(op_spnoop) << 24);
+            write_w(rdram, obj.mtx_cmd + 12, 0);
+        }
+        tag_previous.swap(tag_current);
+        tag_current.clear();
+    }
+
     void walk(uint8_t* rdram, int32_t addr, int depth, int& budget, int32_t branch_addr = 0) {
         if (depth > max_depth) {
             return;
@@ -475,7 +616,7 @@ namespace {
                     return;
 
                 case op_setscissor:
-                    if (remove_borders.load() && w0 == inset_scissor_w0 && w1 == inset_scissor_w1) {
+                    if (ws_active && remove_borders.load() && w0 == inset_scissor_w0 && w1 == inset_scissor_w1) {
                         w0 = full_scissor_w0;
                         w1 = full_scissor_w1;
                         write_w(rdram, addr, w0);
@@ -510,13 +651,67 @@ namespace {
                     break;
                 }
 
+                case op_mtx: {
+                    // F3DEX 1.x gSPMatrix: params in bits 16-23 (1 projection,
+                    // 2 load, 4 push). Mtx = 16 s16 integer halves then 16 u16
+                    // fractions, row-major.
+                    int32_t m = static_cast<int32_t>(resolve(w1) | 0x80000000u);
+                    if (dump_buf && in_rdram(m, 64)) {
+                        int params = (w0 >> 16) & 0xFF;
+                        dump("    mtx %s%s%s\n", (params & 1) ? "proj" : "modelview",
+                            (params & 2) ? " load" : " mul", (params & 4) ? " push" : "");
+                        for (int row = 0; row < 4; row++) {
+                            dump("     ");
+                            for (int col = 0; col < 4; col++) {
+                                int i = row * 4 + col;
+                                int32_t fixed = (static_cast<int32_t>(MEM_H(0, m + i * 2)) << 16)
+                                    | static_cast<uint16_t>(MEM_HU(0, m + 32 + i * 2));
+                                dump(" %12.5f", fixed / 65536.0);
+                            }
+                            dump("\n");
+                        }
+                    }
+                    // A modelview load in the frame's own list, outside any
+                    // id group, followed directly by a display list call (not
+                    // a branch): an object to tag after the walk.
+                    uint32_t next_w0 = read_w(rdram, addr + 8);
+                    int params = (w0 >> 16) & 0xFF;
+                    if ((params & 1) == 0 && (params & 2) != 0 && ex_group_depth == 0
+                        && addr >= frame_lists_start && addr + 16 <= frame_lists_end
+                        && (next_w0 >> 24) == op_dl && ((next_w0 >> 16) & 0xFF) == 0x00
+                        && in_rdram(m, 64)) {
+                        float r0x = mtx_element(rdram, m, 0), r0y = mtx_element(rdram, m, 1), r0z = mtx_element(rdram, m, 2);
+                        tag_current.push_back({ addr, resolve(read_w(rdram, addr + 12)),
+                            mtx_element(rdram, m, 12), mtx_element(rdram, m, 13), mtx_element(rdram, m, 14),
+                            std::sqrt(r0x * r0x + r0y * r0y + r0z * r0z), 0 });
+                    }
+                    break;
+                }
+
+                case ex_opcode: {
+                    // RT64 extended commands are two words long when they are
+                    // a matrix group; track the group depth so objects already
+                    // tagged (the limb patch) are not tagged again.
+                    uint32_t sub_op = w0 & 0xFFFFFF;
+                    if (sub_op == 0x00000C) {
+                        if (read_w(rdram, addr + 8) & 1) {
+                            ex_group_depth++;
+                        }
+                        addr += 8;
+                    }
+                    else if (sub_op == 0x00000D) {
+                        ex_group_depth = std::max(0, ex_group_depth - static_cast<int>(w1 & 0xFF));
+                    }
+                    break;
+                }
+
                 case op_vtx: {
                     // F3DEX 1.x gSPVertex: w0 = 04 | v0*2 << 16 | n << 10 | (16n-1).
                     int n = (w0 >> 10) & 0x3F;
                     if (!in_rdram(static_cast<int32_t>(resolve(w1) | 0x80000000u), n * 16)) {
                         break;
                     }
-                    if (dump_file) {
+                    if (dump_buf) {
                         int32_t v = static_cast<int32_t>(resolve(w1) | 0x80000000u);
                         for (int i = 0; i < n; i++) {
                             dump("    v%d: x=%d y=%d z=%d rgba=%02X%02X%02X%02X\n", i,
@@ -530,7 +725,7 @@ namespace {
                         if (log_rects) {
                             log_quad(rdram, v);
                         }
-                        if (enabled.load() && branch_addr != 0 && is_overlay_quad(rdram, v)) {
+                        if (ws_active && branch_addr != 0 && is_overlay_quad(rdram, v)) {
                             redirect_overlay_branch(rdram, branch_addr, v);
                             // The rest of the quad's list is no longer drawn.
                             return;
@@ -554,7 +749,7 @@ namespace {
                 }
 
                 case op_fillrect: {
-                    if (remove_borders.load() && w0 == inset_clear_w0 && w1 == inset_clear_w1) {
+                    if (ws_active && remove_borders.load() && w0 == inset_clear_w0 && w1 == inset_clear_w1) {
                         w0 = full_clear_w0;
                         w1 = full_clear_w1;
                         write_w(rdram, addr, w0);
@@ -563,7 +758,7 @@ namespace {
                     int lrx = (w0 >> 12) & 0xFFF;
                     int ulx = (w1 >> 12) & 0xFFF;
                     log_rect(op, ulx >> 2, (w1 & 0xFFF) >> 2, lrx >> 2, (w0 & 0xFFF) >> 2);
-                    if (is_full_screen_fill(ulx >> 2, lrx >> 2)) {
+                    if (ws_active && is_full_screen_fill(ulx >> 2, lrx >> 2)) {
                         extend_fillrect(rdram, addr, w0, w1);
                     }
                     break;
@@ -578,11 +773,11 @@ namespace {
                     int tile = (w1 >> 24) & 0x7;
                     log_rect(op, ulx >> 2, (w1 & 0xFFF) >> 2, lrx >> 2, (w0 & 0xFFF) >> 2, tile);
                     bool backdrop = tiles[tile].width > 0 && tiles[tile].width <= backdrop_max_texture_width;
-                    if (op == op_texrect && (h1_w0 >> 24) == op_rdphalf_1 && (h2_w0 >> 24) == op_rdphalf_2
+                    if (ws_active && op == op_texrect && (h1_w0 >> 24) == op_rdphalf_1 && (h2_w0 >> 24) == op_rdphalf_2
                         && backdrop && is_backdrop_span(ulx >> 2, lrx >> 2)) {
                         extend_texrect(rdram, addr, w0, w1, read_w(rdram, addr + 12), read_w(rdram, addr + 20));
                     }
-                    else if (op == op_texrect && (h1_w0 >> 24) == op_rdphalf_1 && (h2_w0 >> 24) == op_rdphalf_2) {
+                    else if (ws_active && op == op_texrect && (h1_w0 >> 24) == op_rdphalf_1 && (h2_w0 >> 24) == op_rdphalf_2) {
                         HudBlock* block = hud_block_of(ulx >> 2, (w1 & 0xFFF) >> 2, tiles[tile]);
                         if (block != nullptr && block->custom.load() && hud_on_screen(rdram)) {
                             move_hud_texrect(rdram, addr, w0, w1, read_w(rdram, addr + 12), read_w(rdram, addr + 20), *block,
@@ -620,15 +815,13 @@ void zelda64::renderer::set_hud_layout(bool hp_custom, float hp_x, float hp_y, b
 }
 
 void zelda64::renderer::request_widescreen_frame_dump() {
-    dump_next_frame.store(true);
+    capture_save_requested.store(true);
 }
 
 // Hooked in nnScExecuteGraphics just before osSpTaskLoad, with the NUScTask
 // in a0; the OSTask follows at +0x10 and its display list pointer at +0x30.
 extern "C" void quest64_widescreen_task(uint8_t* rdram, recomp_context* ctx) {
-    if (!enabled.load()) {
-        return;
-    }
+    ws_active = enabled.load();
     int32_t task = static_cast<int32_t>(ctx->r4) + 0x10;
     if (!in_rdram(task + 0x30, 4)) {
         return;
@@ -637,9 +830,15 @@ extern "C" void quest64_widescreen_task(uint8_t* rdram, recomp_context* ctx) {
     if (data_ptr == 0) {
         return;
     }
-    if (dump_next_frame.exchange(false)) {
-        std::filesystem::path path = zelda64::get_app_folder_path() / "widescreen_frame.txt";
-        dump_file = fopen(path.string().c_str(), "w");
+    if (capture_enabled < 0) {
+        capture_enabled = std::filesystem::exists(zelda64::get_app_folder_path() / "frame_capture.txt") ? 1 : 0;
+    }
+    if (capture_enabled) {
+        dump_buf = &capture_ring[capture_next];
+        dump_buf->clear();
+        dump("frame at %llu ms\n", static_cast<unsigned long long>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count()));
     }
     for (uint32_t& segment : segments) {
         segment = 0;
@@ -647,9 +846,16 @@ extern "C" void quest64_widescreen_task(uint8_t* rdram, recomp_context* ctx) {
     game_scissor_w0 = 0xED020020;
     game_scissor_w1 = 0x004E03A0;
     int budget = max_commands;
+    ex_group_depth = 0;
+    tag_current.clear();
     walk(rdram, static_cast<int32_t>(data_ptr | 0x80000000u), 0, budget);
-    if (dump_file) {
-        fclose(dump_file);
-        dump_file = nullptr;
+    match_and_tag_objects(rdram);
+    if (dump_buf) {
+        dump_buf = nullptr;
+        capture_next = (capture_next + 1) % capture_frames;
+        capture_count = std::min(capture_count + 1, capture_frames);
+        if (capture_save_requested.exchange(false)) {
+            save_capture();
+        }
     }
 }

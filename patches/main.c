@@ -300,7 +300,16 @@ RECOMP_PATCH void func_8001DC78(MtxF* arg0, Vec3f arg1, s32 arg4, s32 arg5, s32 
     // ordinal separates actors that share it. The first instance XORs with zero,
     // so a lone actor keeps the plain limb address as its id.
     mtx_id = ((u32)temp_s2) ^ (gMtxTagInstance * 0x9E3779B9u);
-    gEXMatrixGroupDecomposedNormal(gMasterGfxPos++, mtx_id, G_EX_PUSH, G_MTX_MODELVIEW, G_EX_EDIT_ALLOW);
+    // Simple (linear) interpolation, not decomposed. The models are stitched: a
+    // seam vertex of one limb sits where the neighbouring limb's vertex does
+    // because M_a * p_a == M_b * p_b in every real frame. A linear blend of the
+    // matrices keeps that equality in the in-between frame; decomposing each
+    // limb and slerping its rotation does not, which opened gaps in Brian's
+    // hair and cape at high frame rates.
+    gEXMatrixGroupSimple(gMasterGfxPos++, mtx_id, G_EX_PUSH, G_MTX_MODELVIEW,
+                         G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE, G_EX_COMPONENT_INTERPOLATE,
+                         G_EX_COMPONENT_SKIP, G_EX_COMPONENT_INTERPOLATE, G_EX_ORDER_LINEAR, G_EX_EDIT_ALLOW,
+                         G_EX_COMPONENT_SKIP, G_EX_COMPONENT_SKIP);
     gSPMatrix(gMasterGfxPos++, D_2000000 + 3 + D_8007B2F8, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
     D_8007B2F8++;
     var_s0 = arg9;
