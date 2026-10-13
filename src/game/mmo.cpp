@@ -149,6 +149,7 @@ void zelda64::mmo::on_frame(uint8_t* rdram, recomp_context* ctx) {
         was_in_battle = true;
         ring_gone = false;
         death_wait = 0;
+        zelda64::mmo::reset_agi_origin(rdram);
         int present = MEM_W(0, enemy_count);
         present = present < 1 ? 1 : (present > max_enemies ? max_enemies : present);
         for (int slot = 0; slot < max_enemies; slot++) {
@@ -295,6 +296,35 @@ namespace {
         set_f(rdram, ring_centre_x, mem_f(rdram, actor + 0x0));
         set_f(rdram, ring_centre_z, mem_f(rdram, actor + 0x8));
     }
+}
+
+// Battle Agility experience. func_800073CC, called as each of Brian's actions
+// ends (the attack button func_80002F60, the end of a cast func_800045F0 or an
+// item func_80004AB8), adds his distance from the turn ring's centre to a
+// running total (0x8007BCA0) and gives +1 AGI experience for every 50. Turn
+// based, the ring is re-centred on him at every turn change, so each action
+// counts the ground covered that turn once. In Real Time Combat there are no
+// turns: the same gap was counted again on every press, and standing still
+// mashing A raised Agility. Here the distance is measured from where the last
+// action was counted instead (a0 = 0x8007BAB8, Brian at +0x14 / +0x1C), so
+// every step counts once and standing still counts nothing.
+namespace {
+    float agi_from_x = 0.0f;
+    float agi_from_z = 0.0f;
+}
+
+void zelda64::mmo::reset_agi_origin(uint8_t* rdram) {
+    agi_from_x = mem_f(rdram, brian + 0x0);
+    agi_from_z = mem_f(rdram, brian + 0x8);
+}
+
+extern "C" void quest64_mmo_agi_distance(uint8_t* rdram, recomp_context* ctx) {
+    if (!on() || (MEM_HU(0, gBattleState) & 0x1) == 0) {
+        return;
+    }
+    set_f(rdram, ring_centre_x, agi_from_x);
+    set_f(rdram, ring_centre_z, agi_from_z);
+    zelda64::mmo::reset_agi_origin(rdram);
 }
 
 // func_80005748 at its entry, a1 = Brian.

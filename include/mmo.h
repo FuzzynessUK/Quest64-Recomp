@@ -12,6 +12,9 @@ namespace zelda64::mmo {
     bool active();
     // Game thread, every frame.
     void on_frame(uint8_t* rdram, recomp_context* ctx);
+    // Battle Agility is counted from where Brian stood at the last action
+    // counted; this puts that point where he stands now (battle start).
+    void reset_agi_origin(uint8_t* rdram);
 }
 
 #endif

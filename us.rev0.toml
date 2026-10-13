@@ -469,6 +469,12 @@ before_vram = 0x80007310
 func = "func_800073CC"
 text = "quest64_hardmode_agi_exp_t9(rdram, ctx);"
 before_vram = 0x80007474
+# Real Time Combat: battle Agility experience, at its entry - the distance is
+# measured from where the last action was counted, not from the turn ring.
+[[patches.hook]]
+func = "func_800073CC"
+text = "quest64_mmo_agi_distance(rdram, ctx);"
+before_vram = 0x800073CC
 [[patches.hook]]
 func = "func_80007A50"
 text = "quest64_hardmode_scripted_message_1(rdram, ctx); quest64_archipelago_intro_text(rdram, ctx);"
