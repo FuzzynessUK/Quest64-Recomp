@@ -3331,6 +3331,14 @@ public:
             }
         );
         bind_option(constructor, "wm_option", &new_options.wm_option);
+        // Lock Window Size: live, not part of the graphics config Apply
+        // sends to the renderer (main.cpp keeps it in window.json).
+        constructor.BindFunc("window_locked",
+            [](Rml::Variant& out) { out = zelda64::is_window_size_locked() ? 1 : 0; },
+            [](const Rml::Variant& in) {
+                zelda64::set_window_size_locked(in.Get<int>() != 0);
+                graphics_model_handle.DirtyVariable("window_locked");
+            });
         bind_option(constructor, "ar_option", &new_options.ar_option);
         bind_option(constructor, "hr_option", &new_options.hr_option);
         bind_option(constructor, "msaa_option", &new_options.msaa_option);

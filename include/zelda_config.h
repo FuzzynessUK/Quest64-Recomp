@@ -20,6 +20,15 @@ namespace zelda64 {
     void reset_single_input_binding(recomp::InputDevice device, recomp::GameInput input);
 
     std::filesystem::path get_app_folder_path();
+
+    // The window's size and place, kept in window.json (main.cpp): noted on
+    // every window event, restored at launch.
+    void note_window_geometry();
+    // Graphics > Lock Window Size: the window cannot be resized or maximized
+    // by hand. Saved in window.json with the size; applied on the window's
+    // own thread at the next frame.
+    bool is_window_size_locked();
+    void set_window_size_locked(bool locked);
     
     bool get_debug_mode_enabled();
     void set_debug_mode_enabled(bool enabled);

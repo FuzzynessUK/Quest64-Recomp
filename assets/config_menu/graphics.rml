@@ -138,6 +138,32 @@
                         </div>
                     </div>
 
+                    <div class="config-option" data-event-mouseover="set_cur_config_index(7)">
+                        <label class="config-option__title">Lock Window Size</label>
+                        <div class="config-option__list">
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(7)"
+                                name="windowlock"
+                                data-checked="window_locked"
+                                value="0"
+                                id="wl_off"
+                                style="nav-up: #wm_windowed; nav-down: #rr_original"
+                            />
+                            <label class="config-option__tab-label" for="wl_off">Off</label>
+                            <input type="radio"
+                                data-event-blur="set_cur_config_index(-1)"
+                                data-event-focus="set_cur_config_index(7)"
+                                name="windowlock"
+                                data-checked="window_locked"
+                                value="1"
+                                id="wl_on"
+                                style="nav-up: #wm_fullscreen; nav-down: #rr_display"
+                            />
+                            <label class="config-option__tab-label" for="wl_on">On</label>
+                        </div>
+                    </div>
+
                     <div class="config-option" data-event-mouseover="set_cur_config_index(4)">
                         <label class="config-option__title">Framerate</label>
                         <div class="config-option__list">
@@ -298,6 +324,9 @@
                         <br />
                         <br />
                         <b>Note: This option won't be available if your GPU does not support programmable MSAA sample positions, as it is currently required to avoid rendering glitches.</b>
+                    </p>
+                    <p data-if="cur_config_index == 7">
+                        Stops the window being resized by dragging its edges or maximized, so it keeps the size you have set. The window's size and position are remembered either way and restored the next time the game opens or resets. Takes effect straight away; no need to Apply.
                     </p>
                     <p data-if="cur_config_index == 6">
                         Adjusts the placement of HUD elements to fit the selected aspect ratio. <b>Expand</b> will use the aspect ratio of the game's output window.

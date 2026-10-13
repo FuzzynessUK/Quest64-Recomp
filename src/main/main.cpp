@@ -7,6 +7,9 @@
 #include <numeric>
 #include <stdexcept>
 #include <cinttypes>
+#include <atomic>
+#include <chrono>
+#include <fstream>
 
 #include "nfd.h"
 
@@ -49,6 +52,7 @@
 #include "librecomp/game.hpp"
 #include "librecomp/mods.hpp"
 #include "librecomp/helpers.hpp"
+#include "json/json.hpp"
 
 #include "../../patches/graphics.h"
 #include "../../patches/input.h"
@@ -145,8 +149,120 @@ bool SetImageAsIcon(const char* filename, SDL_Window* window)
 
 SDL_Window* window;
 
+// The window's size and place, kept in window.json so a relaunch (a reset,
+// a Layout change, or quitting and starting again) opens it where it was.
+// Only the windowed geometry is kept: while maximized the size before
+// maximizing is remembered along with the flag, and nothing is recorded in
+// fullscreen. Written half a second after the last change, so dragging the
+// window does not write the file on every step.
+namespace {
+    struct WindowGeometry {
+        int x = SDL_WINDOWPOS_CENTERED;
+        int y = SDL_WINDOWPOS_CENTERED;
+        int w = 1600;
+        int h = 960;
+        bool maximized = false;
+        bool locked = false;
+    };
+    WindowGeometry window_geometry;
+    // Set from the menu (UI thread), applied by update_gfx on the window's own.
+    std::atomic<bool> window_lock_pending{ false };
+    bool window_geometry_dirty = false;
+    std::chrono::steady_clock::time_point window_geometry_changed;
+
+    std::filesystem::path window_geometry_path() {
+        return zelda64::get_app_folder_path() / "window.json";
+    }
+
+    // Whether any part of the rectangle is on a connected display, so a
+    // window saved on a monitor that has since gone does not open off screen.
+    bool on_a_display(int x, int y, int w, int h) {
+        SDL_Rect window_rect{ x, y, w, h };
+        for (int i = 0; i < SDL_GetNumVideoDisplays(); i++) {
+            SDL_Rect display;
+            SDL_Rect overlap;
+            if (SDL_GetDisplayUsableBounds(i, &display) == 0 &&
+                SDL_IntersectRect(&window_rect, &display, &overlap) && overlap.w >= 64 && overlap.h >= 64) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void load_window_geometry() {
+        std::ifstream in(window_geometry_path());
+        if (!in) {
+            return;
+        }
+        nlohmann::json j = nlohmann::json::parse(in, nullptr, false);
+        if (j.is_discarded() || !j.is_object()) {
+            return;
+        }
+        WindowGeometry g;
+        g.w = j.value("width", g.w);
+        g.h = j.value("height", g.h);
+        g.maximized = j.value("maximized", false);
+        g.locked = j.value("locked", false);
+        if (g.w < 320 || g.h < 240) {
+            return;
+        }
+        if (j.contains("x") && j.contains("y")) {
+            int x = j.value("x", 0), y = j.value("y", 0);
+            if (on_a_display(x, y, g.w, g.h)) {
+                g.x = x;
+                g.y = y;
+            }
+        }
+        window_geometry = g;
+    }
+
+    void save_window_geometry() {
+        nlohmann::json j;
+        j["width"] = window_geometry.w;
+        j["height"] = window_geometry.h;
+        j["maximized"] = window_geometry.maximized;
+        j["locked"] = window_geometry.locked;
+        if (window_geometry.x != static_cast<int>(SDL_WINDOWPOS_CENTERED)) {
+            j["x"] = window_geometry.x;
+            j["y"] = window_geometry.y;
+        }
+        std::ofstream out(window_geometry_path());
+        out << j.dump(4);
+    }
+}
+
+// From the SDL event filter on any window event.
+void zelda64::note_window_geometry() {
+    if (window == nullptr ||
+        ultramodern::renderer::get_graphics_config().wm_option == ultramodern::renderer::WindowMode::Fullscreen) {
+        return;
+    }
+    uint32_t flags = SDL_GetWindowFlags(window);
+    if ((flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MINIMIZED)) != 0) {
+        return;
+    }
+    bool maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0;
+    if (!maximized) {
+        SDL_GetWindowPosition(window, &window_geometry.x, &window_geometry.y);
+        SDL_GetWindowSize(window, &window_geometry.w, &window_geometry.h);
+    }
+    window_geometry.maximized = maximized;
+    window_geometry_dirty = true;
+    window_geometry_changed = std::chrono::steady_clock::now();
+}
+
+bool zelda64::is_window_size_locked() {
+    return window_geometry.locked;
+}
+
+void zelda64::set_window_size_locked(bool locked) {
+    window_geometry.locked = locked;
+    window_lock_pending.store(true);
+}
+
 ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::gfx_data_t) {
     uint32_t flags = SDL_WINDOW_RESIZABLE;
+    load_window_geometry();
 
 #if defined(__APPLE__)
     flags |= SDL_WINDOW_METAL;
@@ -154,7 +270,13 @@ ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::
     flags |= SDL_WINDOW_VULKAN;
 #endif
 
-    window = SDL_CreateWindow("Quest 64: Recompiled", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1600, 960,  flags);
+    if (window_geometry.maximized) {
+        flags |= SDL_WINDOW_MAXIMIZED;
+    }
+    if (window_geometry.locked) {
+        flags &= ~SDL_WINDOW_RESIZABLE;
+    }
+    window = SDL_CreateWindow("Quest 64: Recompiled", window_geometry.x, window_geometry.y, window_geometry.w, window_geometry.h, flags);
 #if defined(__linux__)
     SetImageAsIcon("icons/512.png",window);
     if (ultramodern::renderer::get_graphics_config().wm_option == ultramodern::renderer::WindowMode::Fullscreen) { // TODO: Remove once RT64 gets native fullscreen support on Linux
@@ -186,6 +308,16 @@ ultramodern::renderer::WindowHandle create_window(ultramodern::gfx_callbacks_t::
 
 void update_gfx(void*) {
     recomp::handle_events();
+    if (window_lock_pending.exchange(false) && window != nullptr) {
+        SDL_SetWindowResizable(window, window_geometry.locked ? SDL_FALSE : SDL_TRUE);
+        window_geometry_dirty = true;
+        window_geometry_changed = std::chrono::steady_clock::now();
+    }
+    if (window_geometry_dirty &&
+        std::chrono::steady_clock::now() - window_geometry_changed > std::chrono::milliseconds(500)) {
+        window_geometry_dirty = false;
+        save_window_geometry();
+    }
 }
 
 static SDL_AudioCVT audio_convert;

@@ -154,6 +154,18 @@ bool sdl_event_filter(void* userdata, SDL_Event* event) {
             InputState.controller_states.erase(controller_event->which);
         }
         break;
+    case SDL_EventType::SDL_WINDOWEVENT:
+        switch (event->window.event) {
+        case SDL_WINDOWEVENT_MOVED:
+        case SDL_WINDOWEVENT_SIZE_CHANGED:
+        case SDL_WINDOWEVENT_MAXIMIZED:
+        case SDL_WINDOWEVENT_RESTORED:
+            zelda64::note_window_geometry();
+            break;
+        default:
+            break;
+        }
+        break;
     case SDL_EventType::SDL_QUIT: {
         if (!ultramodern::is_game_started()) {
             ultramodern::quit();
