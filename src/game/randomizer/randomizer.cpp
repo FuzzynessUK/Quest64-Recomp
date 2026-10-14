@@ -3052,7 +3052,7 @@ std::string abbott_text() {
     }
     else if (portal == 0) {
         lines.push_back("The Eletale Book");
-        list_bosses = false;
+        list_bosses = native.boss_order_shuffled;
     }
     else if (portal > 0) {
         // The portal is a bitmask (1 bosses, 2 monsters, 4 pages, 8 orbs):
@@ -3074,7 +3074,9 @@ std::string abbott_text() {
         for (size_t i = 0; i < needs.size(); i++) {
             lines.push_back(i == 0 ? needs[i] : "& " + needs[i]);
         }
-        list_bosses = (portal & 1) != 0;
+        // Who is where whenever it is not the game's own order, whatever
+        // opens the portal; with All Bosses it is listed either way.
+        list_bosses = (portal & 1) != 0 || native.boss_order_shuffled;
     }
     // portal -1: not connected, boss order shuffled - just who is where.
     std::string text;
